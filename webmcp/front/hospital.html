@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <!-- ⚠️ viewport meta 태그 (필수): 없으면 모바일이 데스크톱 폭(약 980px) 기준으로
+         렌더링되어 위젯이 작게 보입니다. 위젯이 화면을 꽉 채우도록 합니다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>생생병원 WebMCP 테스트</title>
+    <!-- 💡 widget.css?v=3: 배포 후 브라우저 캐시 문제를 피하려고 버전 쿼리스트링을 붙입니다.
+         CSS를 수정하고 배포했는데 새 스타일이 안 보이면 ?v= 값을 올리세요. -->
+    <link rel="stylesheet" href="widget.css?v=3" />
+    <style>
+      body { margin: 0; padding: 40px; font-family: -apple-system, "Noto Sans KR", sans-serif; background: #f0f2f5; color: #1f2937; }
+      .docs { max-width: 720px; line-height: 1.7; }
+      h1 { color: #0e7490; }
+      code { background: #eef; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+      details { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+      details summary { padding: 12px 16px; font-weight: 600; cursor: pointer; color: #0e7490; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+      details summary::-webkit-details-marker { display: none; }
+      details summary::after { content: "▾"; font-size: 12px; transition: transform 0.2s; }
+      details[open] summary::after { transform: rotate(180deg); }
+      details .body { padding: 0 16px 14px; font-size: 13px; color: #374151; }
+      details .body table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+      details .body th, details .body td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+      details .body th { background: #f9fafb; }
+      details .body ol { padding-left: 20px; margin: 6px 0; }
+      details .body li { margin: 3px 0; }
+      details .body pre { background: #0f172a; color: #7dd3fc; padding: 12px 14px; border-radius: 8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre; margin: 8px 0; }
+      details .body pre .c { color: #94a3b8; }
+      details .body pre .k { color: #c084fc; }
+      details .body pre .s { color: #86efac; }
+    </style>
+  </head>
+  <body>
+    <div class="docs">
+      <h1>🏥 생생병원 WebMCP 테스트</h1>
+
+      <details open>
+        <summary>📋 데모에 설정된 WebMCP 정보</summary>
+        <div class="body">
+          <table>
+            <tr><th>항목</th><th>값</th></tr>
+            <tr><td>siteNs</td><td><code>hospital</code></td></tr>
+            <tr><td>프록시 엔드포인트</td><td><code>/api/chat</code> → 백엔드(8001)</td></tr>
+            <tr><td>Gemini 키</td><td>DB(<code>webmcp.tenants</code>)에서 도메인별 조회</td></tr>
+            <tr><td>모델</td><td><code>gemini-3.5-flash-lite</code></td></tr>
+          </table>
+          <b>등록된 WebMCP 툴</b>
+          <table>
+            <tr><th>툴</th><th>설명</th></tr>
+            <tr><td><code>hospital.get_info</code></td><td>병원 기본정보 조회</td></tr>
+            <tr><td><code>hospital.doctor.get_info</code></td><td>의사 정보 조회</td></tr>
+            <tr><td><code>hospital.special.get_info</code></td><td>특성화 치료센터 조회</td></tr>
+            <tr><td><code>hospital.treatment.get_info</code></td><td>부위별 질환 치료 조회</td></tr>
+            <tr><td><code>hospital.appointment.get_current</code></td><td>현재 예약 정보 조회</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details>
+        <summary>🏥 병원 정보</summary>
+        <div class="body">
+          <b>기본 정보</b>
+          <table>
+            <tr><th>항목</th><th>정보</th></tr>
+            <tr><td>병원명</td><td><code>생생병원</code> (척추·관절 특화)</td></tr>
+            <tr><td>소개</td><td>당신의 생생한 일상을 돕는 척추·관절 병원</td></tr>
+            <tr><td>규모</td><td>64병상, 1300평 / 5개과 13명 전문의 협진</td></tr>
+            <tr><td>주소</td><td>경기도 부천시 소사구 경인옛로 3, 5-8층(소사본동)</td></tr>
+            <tr><td>고객센터</td><td><code>1670-0711</code></td></tr>
+            <tr><td>대표</td><td>오종양, 박범용 (사업자번호 672-17-00332)</td></tr>
+            <tr><td>카카오톡</td><td><code>http://pf.kakao.com/_ZxdBgu/chat</code></td></tr>
+            <tr><td>네이버예약</td><td><code>https://m.booking.naver.com/booking/13/bizes/193210</code></td></tr>
+            <tr><td>온라인예약</td><td><code>https://www.saengsaenghospital.com/04_reservation_consultation/01experience_online_reserve.php</code></td></tr>
+          </table>
+          <b>병원 특징</b>
+          <table>
+            <tr><th>특징</th><th>내용</th></tr>
+            <tr><td>대표원장</td><td>가톨릭대 의학박사 출신, 10년 이상 경력 전문의만 진료</td></tr>
+            <tr><td>무균 수술실</td><td>양압시스템 24시간, 개원 이래 7년 감염률 제로</td></tr>
+            <tr><td>간호간병</td><td>통합서비스 최고 등급 A등급</td></tr>
+            <tr><td>첨단장비</td><td>MRI, CT, 초음파기 ONE-STOP 검사</td></tr>
+            <tr><td>수술</td><td>로봇 인공관절, 최소침습 척추내시경, 고관절 내시경</td></tr>
+          </table>
+          <b>전화 안내</b>
+          <table>
+            <tr><th>부서</th><th>전화</th></tr>
+            <tr><td>검진센터</td><td><code>032-230-0735</code></td></tr>
+            <tr><td>원무과</td><td><code>032-230-0703</code></td></tr>
+            <tr><td>재활치료(도수치료)</td><td><code>032-230-0752</code></td></tr>
+            <tr><td>7병동</td><td><code>032-230-0740</code></td></tr>
+            <tr><td>8병동</td><td><code>032-230-0754</code></td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details>
+        <summary>🖥️ 클라이언트 / 서버 정보</summary>
+        <div class="body">
+          <b>클라이언트 (프론트엔드)</b>
+          <table>
+            <tr><th>항목</th><th>값</th></tr>
+            <tr><td>위젯</td><td><code>widget.js</code> + <code>widget.css</code></td></tr>
+            <tr><td>공용 라이브러리</td><td><code>webmcp.js</code> (프록시 호출)</td></tr>
+            <tr><td>설정</td><td><code>hospital-config.js</code> (WebMCPConfig + 지식)</td></tr>
+            <tr><td>접속 URL</td><td><code>http://192.168.31.136:8081/hospital.html</code> (내부)<br><code>http://114.205.189.190:8081/hospital.html</code> (공인)</td></tr>
+          </table>
+          <b>서버 (백엔드)</b>
+          <table>
+            <tr><th>항목</th><th>값</th></tr>
+            <tr><td>웹서버</td><td>nginx (8081 포트, standalone)</td></tr>
+            <tr><td>백엔드</td><td>FastAPI (uvicorn, 8001 포트, systemd)</td></tr>
+            <tr><td>DB</td><td>MariaDB <code>webmcp</code> (192.168.31.136)</td></tr>
+            <tr><td>테이블</td><td><code>tenants</code>, <code>request_logs</code></td></tr>
+          </table>
+        </div>
+      </details>
+
+      <details>
+        <summary>⚙️ WebMCP.config 설정 정보</summary>
+        <div class="body">
+          <p><code>hospital-config.js</code> 에 정의된 <code>window.WebMCPConfig</code> 실제 전체 코드입니다.</p>
+          <pre id="webmcpConfigCode" class="wmcp-config-code">로딩 중...</pre>
+        </div>
+      </details>
+
+      <details>
+        <summary>🚀 사용 방법</summary>
+        <div class="body">
+          <ol>
+            <li>우측 하단 <b>💬</b> 버튼을 눌러 AI 비서를 엽니다.</li>
+            <li>하단의 <b>퀵 질문</b>(병원 정보 · 의사 · 예약)을 클릭하거나 직접 질문을 입력합니다.</li>
+            <li>AI가 등록된 WebMCP 툴과 DB 키를 통해 Gemini로 답변합니다.</li>
+            <li>✕ 버튼으로 닫고, 💬 버튼으로 다시 열 수 있습니다.</li>
+          </ol>
+        </div>
+      </details>
+    </div>
+
+    <!-- hospital.html 기준 WebMCPConfig + 시스템 프롬프트 (webmcp.js 보다 먼저 로드) -->
+    <script src="hospital-config.js?v=2"></script>
+    <script src="webmcp.js?v=2"></script>
+    <script src="webmcp-tools.js?v=1"></script>
+    <script src="webmcp-widget.js?v=2"></script>
+    <script src="widget.js?v=3"></script>
+
+    <!-- WebMCP.config 실제 전체 코드 표시 -->
+    <script>
+      (function () {
+        function renderConfig() {
+          var el = document.getElementById('webmcpConfigCode');
+          if (!el || typeof window.WebMCPConfig === 'undefined') return;
+          var cfg = JSON.parse(JSON.stringify(window.WebMCPConfig, function (k, v) {
+            if (typeof v === 'function') return '[function ' + v.name + '()]';
+            return v;
+          }));
+          el.textContent = 'window.WebMCPConfig = ' + JSON.stringify(cfg, null, 2);
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', renderConfig);
+        } else {
+          renderConfig();
+        }
+      })();
+    </script>
+  </body>
+</html>

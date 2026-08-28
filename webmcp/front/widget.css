@@ -1,0 +1,304 @@
+/* ============================================================================
+   widget.css — AI 비서 웹 위젯 (공용) 스타일
+   버전: v1.1.0 (2026-08-22)
+     - v1.1.0: 확대(expand) 모드가 전체 화면(100vw × 100dvh)을 채우도록 변경
+     - v1.0.0: 최초 공통 위젯 스타일
+   Chrome 확장 팝업(webmcp-extension/popup.html)과 동일한 UI/UX.
+   모든 선택자는 #webmcp-widget 으로 스코프해 페이지 스타일과 충돌 방지.
+   ⚠️ 리셋(#webmcp-widget *)은 box-sizing만 처리하고, padding/margin은
+      각 컴포넌트 규칙이 #webmcp-widget 스코프로 우선 적용되게 함.
+
+   ────────────────────────────────────────────────────────────────────────────
+   🎨 바탕 색상 및 UI 요소 설정/변경 가이드
+   ────────────────────────────────────────────────────────────────────────────
+   이 파일은 "테마 색상"이 여러 곳에 하드코딩되어 있습니다. 색을 바꾸려면
+   아래 핵심 색상 값만 찾아서 교체하면 됩니다. (Ctrl/Cmd+F 로 검색)
+
+   [핵심 브랜드 색상 — 자주 바꾸는 값]
+   - #85176d  : 메인 브랜드 보라/핑크 (헤더 그라디언트, 사용자 말풍선, 버튼, 링크)
+   - #e91b65  : 보조 핑크 (헤더/런처 그라디언트의 끝 색)
+   - #f7f7fb  : 패널 전체 바탕색 (채팅 영역 배경)
+   - #fff     : 봇 말풍선 / 입력바 / 아코디언 배경
+   - #1f2937  : 기본 텍스트 색 (진한 회색)
+   - #6b7280  : 보조 텍스트 (로더, 아코디언 요약)
+   - #9ca3af  : 약한 텍스트 (시간, 아코디언 본문)
+   - #e5e7eb  : 테두리 색 (border)
+   - #f3f4f6  : 코드 블록/인라인 배경
+
+   ────────────────────────────────────────────────────────────────────────────
+   🎨 고객 사이트별 색상표 적용 (CSS 변수 방식) — 권장
+   ────────────────────────────────────────────────────────────────────────────
+   이 파일의 모든 색상은 아래 CSS 변수(--wmcp-*)로 정의되어 있습니다.
+   고객 사이트마다 다른 색을 적용하려면 widget.js(webmcp-widget.js)가
+   WebMCPConfig.theme 을 읽어 #webmcp-widget 에 CSS 변수를 주입합니다.
+
+   사이트 설정 예 (hospital-config.js 등):
+     window.WebMCPConfig = {
+       siteNs: 'hospital',
+       names: { ... },
+       theme: {                       // ← 이 색상표만 바꾸면 위젯 전체 색이 변경됨
+         primary:   '#85176d',        // 메인 브랜드 색
+         primary2:  '#e91b65',        // 그라디언트 보조 색
+         bg:        '#f7f7fb',        // 패널 바탕색
+         surface:   '#ffffff',        // 봇 말풍선/입력바 배경
+         text:      '#1f2937',        // 기본 텍스트
+         textMuted: '#6b7280',        // 보조 텍스트
+         textFaint: '#9ca3af',        // 약한 텍스트
+         border:    '#e5e7eb',        // 테두리
+         codeBg:    '#f3f4f6',        // 코드 블록 배경
+         pillBg:    '#f3e8ff',        // 픽스 칩 배경
+         errorBg:   '#fef2f2',        // 오류 말풍선 배경
+         errorBorder:'#fca5a5',       // 오류 말풍선 테두리
+         errorText: '#b91c1c',        // 오류 말풍선 텍스트
+       },
+     };
+
+   theme 을 생략하면 아래 기본값(기본 브랜드 색)이 사용됩니다.
+   특정 키만 넣으면 나머지는 기본값으로 자동 보완됩니다.
+   ========================================================================== */
+#webmcp-widget {
+  /* ── 색상표 (기본값) ─────────────────────────────────────── */
+  --wmcp-primary:    #85176d;   /* 메인 브랜드 색 */
+  --wmcp-primary2:   #e91b65;   /* 그라디언트 보조 색 */
+  --wmcp-bg:         #f7f7fb;   /* 패널 바탕색 */
+  --wmcp-surface:    #ffffff;   /* 봇 말풍선/입력바/아코디언 배경 */
+  --wmcp-text:       #1f2937;   /* 기본 텍스트 */
+  --wmcp-text-muted: #6b7280;   /* 보조 텍스트 */
+  --wmcp-text-faint: #9ca3af;   /* 약한 텍스트 */
+  --wmcp-border:     #e5e7eb;   /* 테두리 */
+  --wmcp-code-bg:    #f3f4f6;   /* 코드 블록/인라인 배경 */
+  --wmcp-pill-bg:    #f3e8ff;   /* 픽스 칩 배경 */
+  --wmcp-error-bg:    #fef2f2;  /* 오류 말풍선 배경 */
+  --wmcp-error-border:#fca5a5;  /* 오류 말풍선 테두리 */
+  --wmcp-error-text:  #b91c1c;  /* 오류 말풍선 텍스트 */
+
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  color: var(--wmcp-text);
+}
+#webmcp-widget *,
+#webmcp-widget *::before,
+#webmcp-widget *::after { box-sizing: border-box; }
+
+/* ── 런처(플로팅 버튼) ─────────────────────────────────────── */
+#webmcp-widget .wmcp-launcher {
+  width: 58px; height: 58px; border: none; border-radius: 50%;
+  background: linear-gradient(135deg, var(--wmcp-primary), var(--wmcp-primary2)); color: #fff;
+  font-size: 26px; cursor: pointer; margin: 0; padding: 0;
+  box-shadow: 0 6px 20px rgba(133, 23, 109, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+#webmcp-widget .wmcp-launcher:hover { transform: scale(1.06); box-shadow: 0 8px 24px rgba(133,23,109,0.5); }
+
+/* ── 패널 ───────────────────────────────────────────────────── */
+#webmcp-widget .wmcp-panel {
+  position: fixed; right: 20px; bottom: 20px;
+  width: 380px; max-width: calc(100vw - 24px); height: 600px; max-height: calc(100vh - 24px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--wmcp-bg); color: var(--wmcp-text); border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.28); border: 1px solid var(--wmcp-border);
+}
+/* hidden 속성이 display:flex 보다 우선하도록 (닫기/열기 토글) */
+#webmcp-widget .wmcp-panel[hidden] { display: none; }
+
+/* 헤더 */
+#webmcp-widget .wmcp-header {
+  padding: 12px 16px; background: linear-gradient(135deg, var(--wmcp-primary), var(--wmcp-primary2));
+  color: #fff; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+#webmcp-widget .wmcp-header h1 { font-size: 15px; font-weight: 700; flex: 1; margin: 0; }
+#webmcp-widget .wmcp-status { font-size: 10px; background: rgba(255,255,255,0.2); padding: 3px 7px; border-radius: 12px; white-space: nowrap; }
+#webmcp-widget .wmcp-close,
+#webmcp-widget .wmcp-expand {
+  border: none; background: rgba(255,255,255,0.2); color: #fff; width: 26px; height: 26px;
+  border-radius: 50%; font-size: 15px; line-height: 1; cursor: pointer; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background 0.15s;
+}
+#webmcp-widget .wmcp-close:hover,
+#webmcp-widget .wmcp-expand:hover { background: rgba(255,255,255,0.4); }
+#webmcp-widget .wmcp-expand { font-size: 18px; }
+
+/* 데스크톱 확대 모드 (기본 380×600 → 약 560×85vh) */
+#webmcp-widget .wmcp-panel.wmcp-panel--expanded {
+  width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh;
+}
+#webmcp-widget .wmcp-panel {
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+/* ── 채팅 영역 ─────────────────────────────────────────────── */
+#webmcp-widget .wmcp-chat {
+  flex: 1 1 0%; overflow-y: auto; overflow-x: hidden;
+  padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; min-height: 0;
+}
+#webmcp-widget .wmcp-msg { display: flex; flex-direction: column; flex-shrink: 0; width: fit-content; max-width: 100%; min-width: 0; }
+#webmcp-widget .wmcp-msg .wmcp-bubble {
+  padding: 10px 12px; border-radius: 14px; font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; max-width: 100%; min-width: 0;
+}
+/* 마크다운 렌더링 요소 */
+#webmcp-widget .wmcp-msg .wmcp-bubble p { margin: 0 0 6px; }
+#webmcp-widget .wmcp-msg .wmcp-bubble p:last-child { margin-bottom: 0; }
+#webmcp-widget .wmcp-msg .wmcp-bubble h1, #webmcp-widget .wmcp-msg .wmcp-bubble h2,
+#webmcp-widget .wmcp-msg .wmcp-bubble h3, #webmcp-widget .wmcp-msg .wmcp-bubble h4 {
+  margin: 6px 0 4px; font-weight: 700; line-height: 1.3;
+}
+#webmcp-widget .wmcp-msg .wmcp-bubble h2 { font-size: 14px; }
+#webmcp-widget .wmcp-msg .wmcp-bubble h3 { font-size: 13px; }
+#webmcp-widget .wmcp-msg .wmcp-bubble h4 { font-size: 12.5px; }
+#webmcp-widget .wmcp-msg .wmcp-bubble ul, #webmcp-widget .wmcp-msg .wmcp-bubble ol { margin: 4px 0; padding-left: 18px; }
+#webmcp-widget .wmcp-msg .wmcp-bubble li { margin: 2px 0; }
+#webmcp-widget .wmcp-msg .wmcp-bubble a { color: var(--wmcp-primary); text-decoration: underline; }
+#webmcp-widget .wmcp-msg .wmcp-bubble .md-code {
+  background: var(--wmcp-code-bg); border: 1px solid var(--wmcp-border); border-radius: 6px; padding: 8px 10px; margin: 6px 0;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre; overflow-x: auto;
+}
+#webmcp-widget .wmcp-msg .wmcp-bubble .md-inline {
+  background: var(--wmcp-code-bg); padding: 1px 4px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+}
+#webmcp-widget .wmcp-msg .wmcp-bubble .md-table {
+  border-collapse: collapse; margin: 6px 0; font-size: 14px; width: 100%;
+}
+#webmcp-widget .wmcp-msg .wmcp-bubble .md-table th,
+#webmcp-widget .wmcp-msg .wmcp-bubble .md-table td {
+  border: 1px solid var(--wmcp-border); padding: 5px 8px; text-align: left; vertical-align: top;
+}
+#webmcp-widget .wmcp-msg .wmcp-bubble .md-table th {
+  background: var(--wmcp-code-bg); font-weight: 700;
+}
+#webmcp-widget .wmcp-msg.bot { align-self: flex-start; align-items: flex-start; }
+#webmcp-widget .wmcp-msg.bot .wmcp-bubble { background: var(--wmcp-surface); border: 1px solid var(--wmcp-border); border-top-left-radius: 4px; color: var(--wmcp-text); }
+#webmcp-widget .wmcp-msg.user { align-self: flex-end; align-items: flex-end; }
+#webmcp-widget .wmcp-msg.user .wmcp-bubble { background: var(--wmcp-primary); color: #fff; border-top-right-radius: 4px; }
+#webmcp-widget .wmcp-msg.error .wmcp-bubble { background: var(--wmcp-error-bg); border-color: var(--wmcp-error-border); color: var(--wmcp-error-text); }
+#webmcp-widget .wmcp-msg .wmcp-time { font-size: 10px; color: var(--wmcp-text-faint); margin-top: 4px; white-space: nowrap; }
+
+/* ── 오류 아코디언 (상세 내용 접기) ─────────────────────────── */
+#webmcp-widget .wmcp-msg .wmcp-bubble .wmcp-error-details { margin: 0; }
+#webmcp-widget .wmcp-msg .wmcp-bubble .wmcp-error-details summary {
+  cursor: pointer; font-weight: 600; list-style: none; user-select: none;
+}
+#webmcp-widget .wmcp-msg .wmcp-bubble .wmcp-error-details summary::-webkit-details-marker { display: none; }
+#webmcp-widget .wmcp-msg .wmcp-bubble .wmcp-error-details summary::before { content: '▸ '; }
+#webmcp-widget .wmcp-msg .wmcp-bubble .wmcp-error-details[open] summary::before { content: '▾ '; }
+#webmcp-widget .wmcp-msg .wmcp-bubble .wmcp-error-body {
+  margin-top: 6px; padding: 8px 10px; border-radius: 6px;
+  background: rgba(0,0,0,0.05); font-size: 11px; line-height: 1.5;
+  word-break: break-all; white-space: pre-wrap;
+}
+
+/* ── 입력 영역 ─────────────────────────────────────────────── */
+#webmcp-widget .wmcp-inputbar {
+  flex-shrink: 0; border-top: 1px solid var(--wmcp-border); background: var(--wmcp-surface);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+}
+#webmcp-widget .wmcp-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+#webmcp-widget .wmcp-pill {
+  font-size: 11px; padding: 4px 10px; border-radius: 14px; background: var(--wmcp-pill-bg);
+  color: var(--wmcp-primary); cursor: pointer; border: none; margin: 0; transition: background 0.15s;
+}
+#webmcp-widget .wmcp-pill:hover { background: var(--wmcp-pill-bg); filter: brightness(0.95); }
+#webmcp-widget .wmcp-inputrow { display: flex; gap: 8px; align-items: flex-end; }
+#webmcp-widget .wmcp-inputrow textarea {
+  flex: 1; min-height: 44px; max-height: 120px; border: 1px solid #d1d5db; border-radius: 20px;
+  padding: 12px 16px; font-size: 13px; font-family: inherit; resize: none; outline: none; color: var(--wmcp-text); margin: 0;
+}
+#webmcp-widget .wmcp-inputrow textarea:focus { border-color: var(--wmcp-primary); }
+#webmcp-widget .wmcp-ask {
+  width: 48px; height: 48px; border: none; border-radius: 50%; font-size: 20px; font-weight: 700;
+  cursor: pointer; background: var(--wmcp-primary); color: #fff; flex-shrink: 0; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+#webmcp-widget .wmcp-ask:hover { opacity: 0.85; }
+#webmcp-widget .wmcp-ask:disabled { opacity: 0.5; cursor: not-allowed; }
+#webmcp-widget .wmcp-loader { display: none; text-align: center; color: var(--wmcp-text-muted); font-size: 12px; padding: 4px; }
+#webmcp-widget .wmcp-loader.show { display: block; }
+
+/* ── 아코디언(동작 방식) ────────────────────────────────────── */
+#webmcp-widget .wmcp-accordion { flex-shrink: 0; background: var(--wmcp-surface); border-top: 1px solid var(--wmcp-border); }
+#webmcp-widget .wmcp-accordion summary {
+  padding: 10px 14px; font-size: 12px; font-weight: 600; color: var(--wmcp-text-muted);
+  cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between;
+}
+#webmcp-widget .wmcp-accordion summary::-webkit-details-marker { display: none; }
+#webmcp-widget .wmcp-accordion summary::after { content: "▾"; font-size: 10px; transition: transform 0.2s; }
+#webmcp-widget .wmcp-accordion[open] summary::after { transform: rotate(180deg); }
+#webmcp-widget .wmcp-acc-body { padding: 0 14px 12px; font-size: 11px; color: var(--wmcp-text-faint); line-height: 1.6; }
+#webmcp-widget .wmcp-acc-body code { background: var(--wmcp-code-bg); padding: 1px 4px; border-radius: 4px; }
+
+/* ── 모바일 반응형: 화면을 꽉 차게 ──────────────────────────────
+   📱 모바일(768px 이하)에서 위젯이 화면 전체를 채우도록 합니다.
+   - 100dvh(동적 뷰포트 높이)를 사용해 모바일 브라우저 주소창 높이까지
+     정확히 채웁니다. (100vh는 주소창 높이 때문에 오버플로우 발생 가능)
+   - ⚠️ 이 반응형이 동작하려면 페이지 <head>에 viewport meta 태그가
+     필수입니다. (hospital.html / index.html 참고)
+
+   🛠 설정 방법:
+   - 화면을 더/덜 채우려면 width/height 값을 조정하세요.
+   - 패널이 차지할 최대 폭을 바꾸려면 @media (max-width: 768px)의
+     768을 조정하세요.
+   - 데스크톱 패널 크기는 아래 @media (min-width: 769px) 블록에서
+     width: 380px / height: 600px 을 바꾸면 됩니다. */
+@media (max-width: 768px) {
+  #webmcp-widget .wmcp-panel {
+    right: 0; bottom: 0;
+    width: 100vw; max-width: 100vw;
+    height: 100dvh; max-height: 100dvh;
+    border-radius: 0;
+  }
+  /* 모바일은 이미 전체 화면이므로 확대 버튼 숨김 */
+  #webmcp-widget .wmcp-expand { display: none; }
+  #webmcp-widget .wmcp-panel.wmcp-panel--expanded {
+    width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh;
+  }
+  /* BottomNavigation(76px) 위로 런처를 올려 겹침을 피한다 */
+  #webmcp-widget { right: 12px; bottom: 88px; }
+
+  /* ── 모바일 폰트 확대 (데스크톱의 160%) ──────────────────────
+     데스크톱 기준 각 텍스트 요소의 폰트 크기를 모바일에서 1.6배로
+     키웁니다. (처음 2배로 키웠다가 너무 크다는 피드백으로 1.6배로
+     조정) 값이 커진 만큼 패딩/간격도 함께 늘려 어색하지 않게
+     조정했습니다. */
+  #webmcp-widget .wmcp-header { padding: 14px 16px; }
+  #webmcp-widget .wmcp-header h1 { font-size: 24px; }
+  #webmcp-widget .wmcp-status { font-size: 16px; padding: 5px 10px; }
+  #webmcp-widget .wmcp-close { width: 35px; height: 35px; font-size: 21px; }
+  #webmcp-widget .wmcp-chat { padding: 14px 13px; gap: 13px; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble { padding: 13px 14px; font-size: 21px; line-height: 1.6; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble h2 { font-size: 22px; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble h3 { font-size: 21px; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble h4 { font-size: 20px; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble ul, #webmcp-widget .wmcp-msg .wmcp-bubble ol { padding-left: 22px; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble .md-code { font-size: 19px; padding: 10px 11px; }
+  #webmcp-widget .wmcp-msg .wmcp-bubble .md-inline { font-size: 19px; }
+  #webmcp-widget .wmcp-msg .wmcp-time { font-size: 16px; margin-top: 6px; }
+  #webmcp-widget .wmcp-inputbar { padding: 11px 13px; gap: 10px; }
+  #webmcp-widget .wmcp-pill { font-size: 18px; padding: 6px 13px; border-radius: 16px; }
+  #webmcp-widget .wmcp-inputrow textarea { min-height: 48px; max-height: 112px; padding: 13px 16px; font-size: 21px; border-radius: 19px; }
+  #webmcp-widget .wmcp-ask { width: 51px; height: 51px; font-size: 26px; }
+  #webmcp-widget .wmcp-loader { font-size: 19px; padding: 6px; }
+  #webmcp-widget .wmcp-accordion summary { padding: 11px 14px; font-size: 19px; }
+  #webmcp-widget .wmcp-acc-body { padding: 0 14px 13px; font-size: 18px; }
+}
+/* 데스크톱 (769px 이상): 기존 플로팅 패널 유지 */
+@media (min-width: 769px) {
+  #webmcp-widget .wmcp-panel {
+    right: 20px; bottom: 20px;
+    width: 380px; max-width: calc(100vw - 24px);
+    height: 600px; max-height: calc(100vh - 24px);
+    border-radius: 18px;
+  }
+  #webmcp-widget .wmcp-panel.wmcp-panel--expanded {
+    width: min(560px, calc(100vw - 40px));
+    height: min(85vh, calc(100vh - 40px));
+  }
+}
+/* BottomNavigation는 lg(1024px) 미만에서 표시되므로 런처를 그 위로 올린다 */
+@media (max-width: 1023px) {
+  #webmcp-widget { right: 12px; bottom: 88px; }
+}

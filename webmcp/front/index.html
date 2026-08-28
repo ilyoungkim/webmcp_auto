@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebMCP — Gemini 기반 멀티테넌트 AI 비서 플랫폼</title>
+  <meta name="description" content="WebMCP는 웹사이트에 Gemini AI 비서를 안전하게 통합하는 멀티테넌트 프록시 플랫폼입니다. 도메인별 API 키 관리, 비정상 접속 감지, 원클릭 배포로 운영 부담 없이 AI 경험을 제공합니다." />
+  <meta name="keywords" content="WebMCP, Gemini, AI 비서, 멀티테넌트, 프록시, 웹 위젯, AI 챗봇" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://webmcp.duckdns.org/" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="favicon.png" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="WebMCP" />
+  <meta property="og:title" content="WebMCP — Gemini 기반 멀티테넌트 AI 비서 플랫폼" />
+  <meta property="og:description" content="웹사이트에 Gemini AI 비서를 안전하게 통합하는 멀티테넌트 프록시 플랫폼. 도메인별 키 관리와 원클릭 배포." />
+  <meta property="og:url" content="https://webmcp.duckdns.org/" />
+  <meta property="og:locale" content="ko_KR" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="WebMCP — Gemini 기반 멀티테넌트 AI 비서 플랫폼" />
+  <meta name="twitter:description" content="웹사이트에 Gemini AI 비서를 안전하게 통합하는 멀티테넌트 프록시 플랫폼." />
+
+  <!-- JSON-LD 구조화 데이터 -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "WebMCP",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "웹사이트에 Gemini AI 비서를 안전하게 통합하는 멀티테넌트 프록시 플랫폼",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" },
+    "url": "https://webmcp.duckdns.org/"
+  }
+  </script>
+
+  <style>
+    :root {
+      --ink: #0f172a;
+      --ink-soft: #1e293b;
+      --paper: #ffffff;
+      --paper-warm: #f8fafc;
+      --accent: #2563eb;
+      --accent-soft: #3b82f6;
+      --line: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --faint: #94a3b8;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Pretendard", "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: var(--paper);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── 네비게이션 ── */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: saturate(180%) blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); font-size: 18px; }
+    .brand .mark {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--ink), var(--accent));
+      display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800;
+    }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a { font-size: 14px; font-weight: 500; color: var(--muted); transition: color .15s; }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-cta {
+      background: var(--ink); color: #fff; padding: 9px 18px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; transition: background .15s;
+    }
+    .nav-cta:hover { background: var(--ink-soft); }
+
+    /* ── 헤로 ── */
+    .hero { padding: 96px 0 80px; background: var(--paper-warm); border-bottom: 1px solid var(--line); }
+    .hero .wrap { text-align: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: var(--accent);
+      background: #eff6ff; border: 1px solid #dbeafe; padding: 6px 14px; border-radius: 999px; margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(34px, 6vw, 60px); line-height: 1.12; font-weight: 800;
+      letter-spacing: -0.03em; color: var(--ink); margin: 0 0 20px;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(120deg, var(--accent), #0ea5e9);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero .lead { font-size: 18px; color: var(--muted); max-width: 640px; margin: 0 auto 36px; }
+    .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
+      border-radius: 12px; font-size: 15px; font-weight: 600; transition: transform .12s, box-shadow .12s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--ink); color: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.16); }
+    .btn-primary:hover { box-shadow: 0 12px 32px rgba(15,23,42,.24); }
+    .btn-ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    .btn-ghost:hover { border-color: var(--faint); }
+
+    .hero-meta { margin-top: 48px; display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; }
+    .stat { text-align: center; }
+    .stat .num { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+    .stat .label { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* ── 섹션 공통 ── */
+    section { padding: 88px 0; }
+    .section-head { max-width: 640px; margin-bottom: 52px; }
+    .section-tag { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+    .section-head h2 { font-size: clamp(26px, 4vw, 40px); font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 14px; line-height: 1.2; }
+    .section-head p { font-size: 16px; color: var(--muted); margin: 0; }
+
+    /* ── 기능 카드 ── */
+    .grid { display: grid; gap: 24px; }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card {
+      background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 28px;
+      transition: border-color .15s, box-shadow .15s, transform .15s;
+    }
+    .card:hover { border-color: var(--faint); box-shadow: 0 12px 32px rgba(15,23,42,.08); transform: translateY(-3px); }
+    .card .icon {
+      width: 44px; height: 44px; border-radius: 12px; margin-bottom: 18px;
+      display: grid; place-items: center; font-size: 20px;
+      background: #eff6ff; color: var(--accent);
+    }
+    .card h3 { font-size: 18px; font-weight: 700; color: var(--ink); margin: 0 0 10px; }
+    .card p { font-size: 14.5px; color: var(--muted); margin: 0; }
+
+    /* ── 다크 섹션 ── */
+    .dark { background: var(--ink); color: #fff; }
+    .dark .section-tag { color: #60a5fa; }
+    .dark .section-head h2 { color: #fff; }
+    .dark .section-head p { color: #94a3b8; }
+    .dark .card { background: #1e293b; border-color: #334155; }
+    .dark .card:hover { border-color: #475569; }
+    .dark .card h3 { color: #fff; }
+    .dark .card p { color: #94a3b8; }
+    .dark .card .icon { background: #1e3a5f; color: #93c5fd; }
+
+    /* ── 활용 리스트 ── */
+    .usecase { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .usecase-item {
+      display: flex; gap: 16px; padding: 24px; border: 1px solid var(--line); border-radius: 14px;
+      background: #fff;
+    }
+    .usecase-item .num {
+      font-size: 14px; font-weight: 800; color: var(--accent);
+      width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px;
+      background: #eff6ff; display: grid; place-items: center;
+    }
+    .usecase-item h3 { font-size: 16px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
+    .usecase-item p { font-size: 14px; color: var(--muted); margin: 0; }
+
+    /* ── 샘플 카드 ── */
+    .sample { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+    .sample-card {
+      display: flex; flex-direction: column; overflow: hidden;
+      border: 1px solid var(--line); border-radius: 16px; background: #fff;
+      transition: border-color .15s, box-shadow .15s, transform .15s;
+    }
+    .sample-card:hover { border-color: var(--faint); box-shadow: 0 16px 40px rgba(15,23,42,.12); transform: translateY(-4px); }
+    .sample-cover {
+      height: 140px; display: grid; place-items: center; font-size: 42px;
+    }
+    .sample-cover.yonja { background: linear-gradient(135deg, #fdf2f8, #fce7f3); }
+    .sample-cover.hospital { background: linear-gradient(135deg, #ecfeff, #cffafe); }
+    .sample-cover.genisev { background: linear-gradient(135deg, #fef2f2, #fee2e2); }
+    .sample-body { padding: 24px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .sample-body .tag { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase; }
+    .sample-body h3 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0; }
+    .sample-body p { font-size: 14px; color: var(--muted); margin: 0; flex: 1; }
+    .sample-body .link {
+      font-size: 14px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 4px;
+    }
+
+    /* ── 정의 섹션 ── */
+    .define { background: #fff; }
+    .define-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    .define-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 30px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .define-card .d-icon { font-size: 30px; }
+    .define-card h3 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0; }
+    .define-card .d-term {
+      font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .define-card p { font-size: 14.5px; color: var(--muted); margin: 0; line-height: 1.7; }
+    .define-card ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+    .define-card ul li { margin: 4px 0; }
+
+    /* ── 표준 섹션 ── */
+    .standard { background: #fff; border-top: 1px solid var(--line); }
+    .standard-note {
+      display: flex; gap: 14px; align-items: flex-start;
+      background: #f8fafc; border: 1px solid var(--line); border-radius: 14px;
+      padding: 20px 22px; margin-bottom: 28px;
+    }
+    .standard-note .badge {
+      flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
+      background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 18px;
+    }
+    .standard-note p { margin: 0; font-size: 14.5px; color: var(--muted); }
+    .standard-note strong { color: var(--ink); }
+    .standard-list { display: grid; gap: 16px; }
+    .standard-item {
+      display: flex; gap: 16px; padding: 20px 22px;
+      border: 1px solid var(--line); border-radius: 12px; background: #fff;
+    }
+    .standard-item .dot {
+      flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); margin-top: 7px;
+    }
+    .standard-item h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 4px; }
+    .standard-item p { font-size: 14px; color: var(--muted); margin: 0; }
+    .standard-ref { margin-top: 28px; font-size: 13.5px; color: var(--muted); }
+    .standard-ref a { color: var(--accent); text-decoration: underline; }
+
+    /* ── CTA ── */
+    .cta { padding: 80px 0; background: var(--paper-warm); border-top: 1px solid var(--line); }
+    .cta-inner h2 { font-size: clamp(26px, 4vw, 38px); font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin: 0 0 14px; }
+    .cta-inner p { color: var(--muted); font-size: 16px; margin: 0 0 32px; }
+
+    /* ── 푸터 ── */
+    footer { background: var(--ink); color: #94a3b8; padding: 48px 0; }
+    .foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .foot-brand { font-weight: 800; color: #fff; font-size: 16px; }
+    .foot-links { display: flex; gap: 20px; font-size: 14px; }
+    .foot-links a { color: #94a3b8; transition: color .15s; }
+    .foot-links a:hover { color: #fff; }
+
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .hero { padding: 64px 0 56px; }
+      section { padding: 60px 0; }
+      .hero-meta { gap: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav" aria-label="메인 내비게이션">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top">
+        <span class="mark">M</span>
+        <span>WebMCP</span>
+      </a>
+      <div class="nav-links">
+        <a href="#define">정의</a>
+        <a href="#why">왜 WebMCP인가</a>
+        <a href="#usecase">활용</a>
+        <a href="#value">가치</a>
+        <a href="#standard">표준</a>
+        <a href="#samples">샘플</a>
+      </div>
+      <a class="nav-cta" href="#samples">샘플 보기</a>
+    </div>
+  </nav>
+
+  <main>
+  <header class="hero" id="top">
+    <div class="wrap">
+      <span class="eyebrow">✦ 멀티테넌트 AI 프록시 플랫폼</span>
+      <h1>웹사이트에 <span class="grad">AI 비서</span>를<br />안전하게 통합하다</h1>
+      <p class="lead">
+        WebMCP는 Gemini 기반 AI 비서를 어떤 웹사이트에도 빠르게 붙일 수 있는 프록시 플랫폼입니다.
+        API 키는 서버 DB에서만 관리하고, 도메인별로 안전하게 격리합니다.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#samples">라이브 샘플 보기 →</a>
+        <a class="btn btn-ghost" href="#why">작동 원리 알아보기</a>
+      </div>
+      <div class="hero-meta">
+        <div class="stat"><div class="num">1줄</div><div class="label">DB 등록만으로 연결</div></div>
+        <div class="stat"><div class="num">0</div><div class="label">클라이언트 키 노출</div></div>
+        <div class="stat"><div class="num">3</div><div class="label">라이브 데모 사이트</div></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="define" class="define">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-tag">Introduction</div>
+        <h2>기본 개념 이해하기</h2>
+        <p>WebMCP와 AI 비서가 무엇인지, 어떻게 동작하는지 핵심 개념을 정리했습니다.</p>
+      </div>
+      <div class="define-grid">
+        <div class="define-card">
+          <div class="d-icon">🧩</div>
+          <span class="d-term">WebMCP란?</span>
+          <h3>웹사이트용 AI 도구 연결 플랫폼</h3>
+          <p>
+            WebMCP는 <strong>Gemini 기반 AI 비서를 웹사이트에 안전하게 통합</strong>하기 위한
+            멀티테넌트 프록시 플랫폼입니다. Google이 제안한 웹 표준(MCP, Model Context Protocol)의
+            개념을 실무에 구현하여, 웹 페이지가 AI 에이전트에게 구조화된 도구를 노출하도록 돕습니다.
+          </p>
+          <ul>
+            <li>AI API 키를 클라이언트에 노출하지 않고 서버 DB에서만 관리</li>
+            <li>도메인(고객사) 단위로 키·모델·호출 한도를 독립 운영</li>
+            <li>표준 위젯 스크립트 3줄로 어떤 사이트에도 빠르게 적용</li>
+          </ul>
+        </div>
+        <div class="define-card">
+          <div class="d-icon">💬</div>
+          <span class="d-term">AI 비서란?</span>
+          <h3>사이트 지식을 답변하는 대화형 에이전트</h3>
+          <p>
+            <strong>AI 비서</strong>는 사이트에 주입된 지식(회사 소개, 제품, 서비스, 예약 등)을 바탕으로
+            사용자의 질문에 즉시 답변하는 대화형 챗봇입니다. WebMCP가 제공하는 위젯을 통해
+            우측 하단 버튼으로 열고, 빠른 메뉴(퀵 질문)나 자유 입력으로 이용할 수 있습니다.
+          </p>
+          <ul>
+            <li>사이트별 시스템 프롬프트로 브랜드·도메인 지식을 주입</li>
+            <li>퀵 메뉴로 자주 묻는 질문을 한 번의 클릭으로 제공</li>
+            <li>24시간 무중단으로 고객 문의에 자동 응답</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-tag">Why WebMCP</div>
+        <h2>왜 WebMCP인가?</h2>
+        <p>AI 비서를 도입하려는 기업이 마주치는 보안·운영·비용 문제를 한 번에 해결합니다.</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <div class="icon">🔒</div>
+          <h3>키 노출 제로</h3>
+          <p>Gemini API 키는 클라이언트에 전달되지 않고 서버 DB에서만 보관됩니다. 모든 호출은 프록시를 경유합니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🧩</div>
+          <h3>도메인별 멀티테넌트</h3>
+          <p>고객사마다 별도의 키와 모델, 호출 한도를 독립적으로 관리합니다. 새 고객 추가도 DB 한 줄이면 끝납니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🛡️</div>
+          <h3>비정상 접속 감지</h3>
+          <p>Origin·User-Agent 기반으로 비정상 요청을 차단하고, 모든 접속을 로깅해 이상 징후를 추적합니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">⚡</div>
+          <h3>원클릭 배포</h3>
+          <p>표준 위젯 스크립트 세 줄만 붙이면 AI 비서가 완성됩니다. 코드 수정 없이 재사용 가능한 구조입니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🎨</div>
+          <h3>사이트별 브랜딩</h3>
+          <p>고객사마다 색상·퀵 메뉴·지식 프롬프트를 자유롭게 커스터마이즈해 브랜드 정체성을 유지합니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">📈</div>
+          <h3>운영 부담 최소화</h3>
+          <p>도메인 단위 Rate Limit과 요청 로그로 과금·이상 사용을 한눈에 관리할 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="usecase" class="dark">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-tag">Use Cases</div>
+        <h2>WebMCP의 활용</h2>
+        <p>실제 비즈니스 현장에서 이렇게 쓰입니다.</p>
+      </div>
+      <div class="usecase">
+        <div class="usecase-item">
+          <div class="num">1</div>
+          <div>
+            <h3>병원·의료 사이트</h3>
+            <p>진료과·의사·예약 정보를 AI가 안내하는 고객 상담 비서로 활용합니다.</p>
+          </div>
+        </div>
+        <div class="usecase-item">
+          <div class="num">2</div>
+          <div>
+            <h3>제조·부품 기업</h3>
+            <p>제품 스펙·솔루션·기술 문의를 AI가 답변해 영업·기술 문의를 자동화합니다.</p>
+          </div>
+        </div>
+        <div class="usecase-item">
+          <div class="num">3</div>
+          <div>
+            <h3>서비스 플랫폼</h3>
+            <p>서비스·가격·상담원 안내 등 고객 FAQ를 AI 비서가 24시간 처리합니다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="value">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-tag">Value</div>
+        <h2>WebMCP가 만드는 가치</h2>
+        <p>도입 기업과 고객 모두에게 실질적인 성과를 제공합니다.</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <div class="icon">💰</div>
+          <h3>고객 응대 비용 절감</h3>
+          <p>반복적인 문의를 AI가 대신 처리해 상담 인력의 부담을 줄이고 응답 시간을 단축합니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🌙</div>
+          <h3>24시간 무중단 서비스</h3>
+          <p>시간과 관계없이 항상 답변하는 AI 비서로 고객 만족도와 전환율을 높입니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🚀</div>
+          <h3>빠른 시장 출시</h3>
+          <p>복잡한 AI 인프라 구축 없이 며칠 만에 AI 경험을 서비스에 통합할 수 있습니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🔐</div>
+          <h3>규제·보안 리스크 감소</h3>
+          <p>키 노출을 원천 차단하고 도메인 단위로 격리해 보안 감사에도 안심할 수 있습니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">📊</div>
+          <h3>데이터 기반 인사이트</h3>
+          <p>요청 로그를 통해 고객이 무엇을 궁금해하는지 파악해 제품·콘텐츠 전략에 활용합니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">♾️</div>
+          <h3>확장 가능한 구조</h3>
+          <p>고객사가 늘어나도 서버 한 대로 수십 개 사이트를 안정적으로 서빙할 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="standard" class="standard">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-tag">Web Standard</div>
+        <h2>웹 표준에 기반한 접근</h2>
+        <p>WebMCP는 Google이 제안하는 웹 표준입니다. 이 플랫폼은 그 표준의 개념을 실무에 구현합니다.</p>
+      </div>
+
+      <div class="standard-note">
+        <div class="badge">📖</div>
+        <p>
+          <strong>WebMCP(워크플로우 모델 컨텍스트 프로토콜)</strong>는 AI 에이전트를 위한 구조화된 도구를 빌드하고 노출하는 데 도움이 되는
+          <strong>제안된 웹 표준</strong>입니다(Chrome for Developers, 2026). JavaScript를 제공하고 HTML 폼 요소를 주석 처리하여
+          에이전트가 페이지 기능과 정확히 상호작용할 수 있도록 하며, 이를 통해 에이전트 동작의 <strong>성능과 안정성</strong>을 크게 개선합니다.
+        </p>
+      </div>
+
+      <div class="standard-list">
+        <div class="standard-item">
+          <div class="dot"></div>
+          <div>
+            <h3>선언적 도구 정의</h3>
+            <p>검색·구매 등 명시적 목적을 JSON 스키마로 선언해, 에이전트가 요소의 목적을 추측하는 대신 정확히 이해하도록 합니다.</p>
+          </div>
+        </div>
+        <div class="standard-item">
+          <div class="dot"></div>
+          <div>
+            <h3>인간 중심 인터페이스 보존</h3>
+            <p>도구가 웹페이지에서 눈에 띄게 실행되어 사용자가 작업이 예상대로 완료된다는 신뢰를 얻고, 브랜드와 디자인을 그대로 유지합니다.</p>
+          </div>
+        </div>
+        <div class="standard-item">
+          <div class="dot"></div>
+          <div>
+            <h3>오리진 격리 & 권한 정책</h3>
+            <p>도구 등록은 오리진 격리된 문서에서만 허용되고, 권한 정책으로 최상위·동일 오리진으로 제한해 보안을 강화합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="standard-ref">
+        참고: <a href="https://developer.chrome.com/docs/ai/webmcp?hl=ko" target="_blank" rel="noopener">Chrome for Developers — WebMCP 공식 문서</a> ·
+        <a href="https://github.com/webmachinelearning/webmcp" target="_blank" rel="noopener">Web Machine Learning Community Group (GitHub)</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="samples" class="dark">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-tag">Live Samples</div>
+        <h2>WebMCP 샘플</h2>
+        <p>실제로 동작하는 AI 비서를 직접 체험해 보세요.</p>
+      </div>
+      <div class="sample">
+        <a class="sample-card" href="yonja.html">
+          <div class="sample-cover yonja">💘</div>
+          <div class="sample-body">
+            <span class="tag">서비스 플랫폼</span>
+            <h3>연애의 자격</h3>
+            <p>서비스·가격·상담사 정보를 안내하는 AI 비서 데모입니다.</p>
+            <span class="link">데모 열기 →</span>
+          </div>
+        </a>
+        <a class="sample-card" href="hospital.html">
+          <div class="sample-cover hospital">🏥</div>
+          <div class="sample-body">
+            <span class="tag">의료</span>
+            <h3>생생병원</h3>
+            <p>진료과·의사·예약 안내를 제공하는 병원 AI 비서 데모입니다.</p>
+            <span class="link">데모 열기 →</span>
+          </div>
+        </a>
+        <a class="sample-card" href="genisev.html">
+          <div class="sample-cover genisev">🔋</div>
+          <div class="sample-body">
+            <span class="tag">제조·부품</span>
+            <h3>제니스코리아</h3>
+            <p>충전 솔루션·BMS·문의를 안내하는 전기차 부품 기업 AI 비서 데모입니다.</p>
+            <span class="link">데모 열기 →</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap cta-inner">
+      <h2>지금 WebMCP를 시작하세요</h2>
+      <p>복잡한 AI 인프라 없이, 안전하고 검증된 AI 비서를 웹사이트에 붙여보세요.</p>
+      <a class="btn btn-primary" href="#samples">샘플 체험하기</a>
+    </div>
+  </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <div class="foot-brand">WebMCP</div>
+      <div class="foot-links">
+        <a href="#define">정의</a>
+        <a href="#why">왜 WebMCP인가</a>
+        <a href="#usecase">활용</a>
+        <a href="#value">가치</a>
+        <a href="#samples">샘플</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

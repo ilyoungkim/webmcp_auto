@@ -1,0 +1,200 @@
+<!doctype html>
+<!--
+  ============================================================================
+  memory-test.html — 🧠 대화 기억(Memory) 기능 로컬 테스트 페이지
+  ============================================================================
+  백엔드 API 없이 로컬스토리지만 사용하는 메모리 기능을 검증합니다.
+
+  테스트 항목:
+    1. memoryAdd() — 질문-답변 쌍 저장
+    2. memoryLoad() — 저장된 메모리 읽기
+    3. findSimilar() — 유사 질문 유추 (임계값 0.35)
+    4. buildMemoryContext() — 유사 질문이 있을 때 컨텍스트 조립
+    5. 새로고침 후에도 메모리 유지 (localStorage)
+
+  실행 방법:
+    - 이 파일을 브라우저에서 열고 "메모리 테스트 실행" 버튼 클릭
+    - 결과가 아래 패널에 표시됩니다.
+  ============================================================================
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>🧠 WebMCP 메모리 테스트</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Noto Sans KR", sans-serif;
+        background: #f0f2f5;
+        color: #1f2937;
+        line-height: 1.6;
+      }
+      .wrap { max-width: 760px; margin: 0 auto; }
+      h1 { font-size: 22px; }
+      .docs { font-size: 14px; margin-bottom: 20px; }
+      .docs code { background: #eef; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+      button {
+        background: #85176d; color: #fff; border: none; border-radius: 8px;
+        padding: 10px 18px; font-size: 14px; cursor: pointer; margin-right: 8px;
+      }
+      button:hover { opacity: 0.85; }
+      button.secondary { background: #6b7280; }
+      #result {
+        background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+        padding: 16px; margin-top: 20px; font-size: 13px; white-space: pre-wrap;
+        word-break: break-word; min-height: 120px;
+      }
+      .pass { color: #16a34a; font-weight: 700; }
+      .fail { color: #dc2626; font-weight: 700; }
+      .info { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>🧠 WebMCP 대화 기억(Memory) 로컬 테스트</h1>
+      <div class="docs">
+        <p>
+          백엔드 API 없이 <b>로컬스토리지만 사용</b>하는 메모리 기능을 검증합니다.
+          아래 버튼을 눌러 각 테스트를 실행하세요.
+        </p>
+        <p>
+          <b>테스트 시나리오:</b> "재회 상담 가격" 질문을 저장한 뒤,
+          "재회 상담 비용"이라는 유사 질문을 하면 이전 답변을 기억해 컨텍스트로
+          사용하는지 확인합니다.
+        </p>
+      </div>
+
+      <button id="runAll">▶ 전체 테스트 실행</button>
+      <button id="clearMemory" class="secondary">🗑 메모리 초기화</button>
+
+      <div id="result">결과가 여기에 표시됩니다...</div>
+    </div>
+
+    <script>
+      // ════════════════════════════════════════════════════════════════════
+      // webmcp-widget.js 의 메모리 모듈과 동일한 로직을 복제해 테스트합니다.
+      // (실제 위젯과 동일한 동작을 보장하기 위해 같은 구현 사용)
+      // ════════════════════════════════════════════════════════════════════
+      var MEMORY_KEY = 'wmcpMemory';
+      var MEMORY_MAX = 50;
+      var MEMORY_SIMILARITY = 0.35;
+
+      function memoryLoad() {
+        try {
+          var raw = localStorage.getItem(MEMORY_KEY);
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+      }
+      function memorySave(list) {
+        try { localStorage.setItem(MEMORY_KEY, JSON.stringify(list)); } catch (e) {}
+      }
+      function memoryAdd(q, a) {
+        var list = memoryLoad();
+        list.push({ q: q, a: a, ts: new Date().toISOString() });
+        if (list.length > MEMORY_MAX) list = list.slice(-MEMORY_MAX);
+        memorySave(list);
+      }
+      function tokenize(text) {
+        return (text || '')
+          .toLowerCase()
+          .replace(/[^\w\s가-힣]/g, ' ')
+          .split(/\s+/)
+          .filter(function (t) { return t.length > 1; });
+      }
+      function similarity(a, b) {
+        var ta = tokenize(a), tb = tokenize(b);
+        if (!ta.length || !tb.length) return 0;
+        var set = {};
+        ta.forEach(function (t) { set[t] = true; });
+        var hit = 0;
+        tb.forEach(function (t) { if (set[t]) hit++; });
+        return hit / Math.max(ta.length, tb.length);
+      }
+      function findSimilar(q) {
+        var list = memoryLoad();
+        var best = null, bestScore = 0;
+        list.forEach(function (item) {
+          var s = similarity(q, item.q);
+          if (s > bestScore) { bestScore = s; best = item; }
+        });
+        return bestScore >= MEMORY_SIMILARITY ? best : null;
+      }
+      function buildMemoryContext(q) {
+        var similar = findSimilar(q);
+        if (!similar) return '';
+        return (
+          '[이전 대화 기억]\n' +
+          '사용자가 이전에 비슷한 질문을 한 적이 있습니다. 아래 내용을 참고해 일관되게 답하세요.\n' +
+          '이전 질문: ' + similar.q + '\n' +
+          '이전 답변: ' + similar.a + '\n\n'
+        );
+      }
+
+      // ── 테스트 실행 ─────────────────────────────────────────
+      var resultEl = document.getElementById('result');
+      var log = [];
+      function addLine(text, cls) {
+        log.push((cls ? '<span class="' + cls + '">' : '') + text + (cls ? '</span>' : ''));
+      }
+
+      function runAll() {
+        log = [];
+        addLine('===== 🧠 메모리 기능 테스트 시작 =====', 'info');
+        addLine('');
+
+        // 1) 메모리 초기화
+        memorySave([]);
+        addLine('[1] 메모리 초기화 완료 (빈 배열)', 'info');
+
+        // 2) 질문-답변 저장
+        memoryAdd('재회 상담 가격이 얼마인가요?', '재회 기본상담은 350,000원입니다.');
+        memoryAdd('급상담은 얼마인가요?', '급상담은 100,000원입니다.');
+        addLine('[2] 2개의 질문-답변 쌍 저장 완료', 'info');
+
+        // 3) 저장 확인
+        var list = memoryLoad();
+        var ok3 = list.length === 2;
+        addLine('[3] 저장된 메모리 개수: ' + list.length + '개 → ' + (ok3 ? '✅ PASS' : '❌ FAIL'), ok3 ? 'pass' : 'fail');
+
+        // 4) 유사 질문 유추 (재회 상담 비용)
+        var similar = findSimilar('재회 상담 비용은 얼마인가요?');
+        var ok4 = similar && similar.q.indexOf('재회 상담 가격') !== -1;
+        addLine('[4] 유사 질문 유추: ' + (similar ? '찾음 → "' + similar.q + '"' : '못 찾음') + ' → ' + (ok4 ? '✅ PASS' : '❌ FAIL'), ok4 ? 'pass' : 'fail');
+
+        // 5) 컨텍스트 조립
+        var ctx = buildMemoryContext('재회 상담 비용은 얼마인가요?');
+        var ok5 = ctx.indexOf('[이전 대화 기억]') !== -1 && ctx.indexOf('350,000원') !== -1;
+        addLine('[5] 컨텍스트 조립: ' + (ok5 ? '✅ PASS (이전 답변 포함)' : '❌ FAIL'), ok5 ? 'pass' : 'fail');
+        if (ctx) addLine('    └ ' + ctx.replace(/\n/g, '\n    └ '), 'info');
+
+        // 6) 무관한 질문은 유사로 판단하지 않음
+        var unrelated = findSimilar('오늘 날씨가 좋네요');
+        var ok6 = !unrelated;
+        addLine('[6] 무관한 질문 유사 판단 안 함: ' + (ok6 ? '✅ PASS' : '❌ FAIL (잘못 유사 판단)'), ok6 ? 'pass' : 'fail');
+
+        // 7) localStorage 영속성 확인
+        var raw = localStorage.getItem(MEMORY_KEY);
+        var ok7 = !!raw && raw.length > 0;
+        addLine('[7] localStorage 영속성: ' + (ok7 ? '✅ PASS (데이터 저장됨)' : '❌ FAIL'), ok7 ? 'pass' : 'fail');
+
+        addLine('');
+        addLine('===== 테스트 완료 =====', 'info');
+        addLine('💡 새로고침 후에도 메모리가 유지되는지 확인하려면 [4]번 결과가 그대로 남아있는지 보세요.', 'info');
+
+        resultEl.innerHTML = log.join('\n');
+      }
+
+      document.getElementById('runAll').addEventListener('click', runAll);
+      document.getElementById('clearMemory').addEventListener('click', function () {
+        memorySave([]);
+        resultEl.innerHTML = '🗑 메모리가 초기화되었습니다.';
+      });
+
+      // 페이지 로드 시 자동 실행
+      runAll();
+    </script>
+  </body>
+</html>

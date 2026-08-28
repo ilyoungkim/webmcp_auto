@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+staticfiles/
+
+# Django
+db.sqlite3
+db.sqlite3-wal
+db.sqlite3-shm
+
+# 환경변수 (시크릿)
+.env
+
+# Node / Nuxt
+node_modules/
+.nuxt/
+.output/
+dist/
+
+# OS
+.DS_Store

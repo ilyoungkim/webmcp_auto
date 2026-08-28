@@ -1,0 +1,285 @@
+<script setup lang="ts">
+definePageMeta({ middleware: 'auth' })
+
+interface Project {
+  id: number
+  publicId: string
+  name: string
+  url: string
+  domainTypeCode: string
+  status: string
+  progress: number
+}
+
+const projects = ref<Project[]>([])
+const editingId = ref<number | null>(null)
+const editForm = ref({ name: '', url: '', domainTypeCode: 'hospital' })
+const domainTypes = ref<any[]>([])
+const saving = ref(false)
+const isAdmin = ref(false)
+const userEmail = ref('')
+
+// 사용자 메뉴 (비밀번호 변경 / 로그아웃)
+const userMenuOpen = ref(false)
+const pwModalOpen = ref(false)
+const pwForm = ref({ current: '', new: '', confirm: '' })
+const pwSaving = ref(false)
+const pwError = ref('')
+const pwSuccess = ref('')
+
+const STATUS_LABELS: Record<string, string> = {
+  queued: '예약',
+  crawling: '진행중',
+  generating: '진행중',
+  completed: '완료',
+  failed: '실패',
+}
+
+function statusLabel(s: string): string {
+  return STATUS_LABELS[s] || s
+}
+
+async function loadProjects() {
+  projects.value = await useApi('/api/projects/')
+  try {
+    const me = await useApi('/api/auth/me/')
+    isAdmin.value = me?.role === 'admin'
+    userEmail.value = me?.email || ''
+  } catch {
+    isAdmin.value = false
+  }
+}
+
+// ── 사용자 메뉴 ──────────────────────────────────────────────
+function toggleUserMenu() {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+function openPwModal() {
+  pwForm.value = { current: '', new: '', confirm: '' }
+  pwError.value = ''
+  pwSuccess.value = ''
+  pwModalOpen.value = true
+  userMenuOpen.value = false
+}
+
+async function changePassword() {
+  pwError.value = ''
+  pwSuccess.value = ''
+  if (pwForm.value.new !== pwForm.value.confirm) {
+    pwError.value = '새 비밀번호가 일치하지 않습니다.'
+    return
+  }
+  if (pwForm.value.new.length < 8) {
+    pwError.value = '새 비밀번호는 8자 이상이어야 합니다.'
+    return
+  }
+  pwSaving.value = true
+  try {
+    await useApi('/api/auth/password/', {
+      method: 'POST',
+      body: { current: pwForm.value.current, new: pwForm.value.new },
+    })
+    pwSuccess.value = '비밀번호가 변경되었습니다.'
+    pwForm.value = { current: '', new: '', confirm: '' }
+  } catch (e: any) {
+    pwError.value = e?.data?.detail || e?.data?.current?.[0] || '비밀번호 변경에 실패했습니다.'
+  } finally {
+    pwSaving.value = false
+  }
+}
+
+async function logout() {
+  try {
+    await useApi('/api/auth/logout/', { method: 'POST' })
+  } catch {
+    // 로그아웃 실패해도 로컬 세션 정리 후 이동
+  }
+  navigateTo('/login')
+}
+
+function startEdit(p: Project) {
+  editingId.value = p.id
+  editForm.value = {
+    name: p.name,
+    url: p.url,
+    domainTypeCode: p.domainTypeCode || 'hospital',
+  }
+}
+
+function cancelEdit() {
+  editingId.value = null
+}
+
+async function saveEdit(id: number) {
+  saving.value = true
+  try {
+    await useApi(`/api/projects/${id}/`, {
+      method: 'PATCH',
+      body: editForm.value,
+    })
+    editingId.value = null
+    await loadProjects()
+  } finally {
+    saving.value = false
+  }
+}
+
+async function removeProject(p: Project) {
+  if (!confirm(`'${p.name}' 프로젝트를 삭제하시겠습니까?`)) return
+  await useApi(`/api/projects/${p.id}/`, { method: 'DELETE' })
+  await loadProjects()
+}
+
+onMounted(async () => {
+  domainTypes.value = await useApi('/api/domain-types/')
+  await loadProjects()
+})
+</script>
+
+<template>
+  <main class="wrap">
+    <header>
+      <h1>내 프로젝트</h1>
+      <div class="head-actions">
+        <NuxtLink v-if="isAdmin" to="/admin/projects" class="btn">🛠 프로젝트 관리</NuxtLink>
+        <NuxtLink v-if="isAdmin" to="/admin/chat-errors" class="btn">📮 오류 신고</NuxtLink>
+        <NuxtLink to="/projects/new" class="btn primary">+ 새 프로젝트</NuxtLink>
+        <div class="user-menu">
+          <button class="btn user-btn" @click="toggleUserMenu">
+            👤 {{ userEmail || '내 계정' }} ▾
+          </button>
+          <div v-if="userMenuOpen" class="user-dropdown">
+            <button class="menu-item" @click="openPwModal">🔑 비밀번호 변경</button>
+            <button class="menu-item danger" @click="logout">🚪 로그아웃</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 비밀번호 변경 모달 -->
+    <div v-if="pwModalOpen" class="modal-overlay" @click.self="pwModalOpen = false">
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3>비밀번호 변경</h3>
+          <button class="close-btn" @click="pwModalOpen = false">&times;</button>
+        </header>
+        <div class="modal-body">
+          <label>현재 비밀번호
+            <input v-model="pwForm.current" type="password" placeholder="현재 비밀번호" />
+          </label>
+          <label>새 비밀번호
+            <input v-model="pwForm.new" type="password" placeholder="8자 이상" />
+          </label>
+          <label>새 비밀번호 확인
+            <input v-model="pwForm.confirm" type="password" placeholder="새 비밀번호 다시 입력" />
+          </label>
+          <p v-if="pwError" class="err">{{ pwError }}</p>
+          <p v-if="pwSuccess" class="ok">{{ pwSuccess }}</p>
+        </div>
+        <footer class="modal-footer">
+          <button class="btn" @click="pwModalOpen = false">취소</button>
+          <button class="btn primary" :disabled="pwSaving" @click="changePassword">
+            {{ pwSaving ? '변경 중...' : '비밀번호 변경' }}
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <ul class="project-list">
+      <li v-for="p in projects" :key="p.id" class="project-item">
+        <!-- 일반 보기 모드 -->
+        <div v-if="editingId !== p.id" class="item-view">
+          <div class="item-main">
+            <NuxtLink :to="`/projects/${p.id}`" class="item-title">{{ p.name }}</NuxtLink>
+            <span class="item-url">{{ p.url }}</span>
+          </div>
+          <div class="item-actions">
+            <span class="badge" :class="p.status">{{ statusLabel(p.status) }} {{ p.progress }}%</span>
+            <span v-if="p.status === 'failed'" class="fail-msg">실패했습니다. 수정 후 다시 시도하거나 문의 02-888-9999로 연락 주세요.</span>
+            <button class="btn sm" @click="startEdit(p)">수정</button>
+            <button class="btn sm danger" @click="removeProject(p)">삭제</button>
+          </div>
+        </div>
+
+        <!-- 인라인 수정 모드 -->
+        <div v-else class="item-edit">
+          <div class="form-row">
+            <label>이름 <input v-model="editForm.name" /></label>
+            <label>URL <input v-model="editForm.url" /></label>
+            <label>유형
+              <select v-model="editForm.domainTypeCode">
+                <option v-for="dt in domainTypes" :key="dt.code" :value="dt.code">{{ dt.name }}</option>
+              </select>
+            </label>
+          </div>
+          <div class="edit-actions">
+            <button class="btn sm" @click="cancelEdit">취소</button>
+            <button class="btn sm primary" :disabled="saving" @click="saveEdit(p.id)">
+              {{ saving ? '저장 중...' : '저장' }}
+            </button>
+          </div>
+        </div>
+      </li>
+    </ul>
+
+    <p v-if="!projects.length" class="empty">등록된 프로젝트가 없습니다.</p>
+  </main>
+</template>
+
+<style>
+.wrap { max-width: 780px; margin: 48px auto; padding: 0 24px; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.head-actions .btn { text-decoration: none; padding: 8px 14px; font-size: 13px; }
+
+/* 사용자 메뉴 */
+.user-menu { position: relative; }
+.user-btn { white-space: nowrap; }
+.user-dropdown { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); min-width: 160px; z-index: 100; overflow: hidden; }
+.menu-item { display: block; width: 100%; text-align: left; padding: 10px 14px; border: none; background: none; cursor: pointer; font-size: 13px; color: #111827; }
+.menu-item:hover { background: #f9fafb; }
+.menu-item.danger { color: #b91c1c; }
+.menu-item.danger:hover { background: #fef2f2; }
+
+/* 비밀번호 변경 모달 */
+.modal-body label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #374151; }
+.modal-body input { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+.err { color: #b91c1c; font-size: 13px; margin: 4px 0 0; }
+.ok { color: #047857; font-size: 13px; margin: 4px 0 0; }
+
+.project-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.project-item { padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.item-view { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.item-main { display: flex; flex-direction: column; gap: 4px; }
+.item-title { font-size: 16px; font-weight: 600; color: #111827; text-decoration: none; }
+.item-title:hover { color: #0e7490; }
+.item-url { font-size: 12px; color: #6b7280; word-break: break-all; }
+.item-actions { display: flex; gap: 6px; align-items: center; }
+.badge { color: #0e7490; font-size: 12px; padding: 2px 8px; background: #f0f9ff; border-radius: 9999px; }
+.badge.failed { color: #b91c1c; background: #fef2f2; }
+.badge.completed { color: #047857; background: #ecfdf5; }
+.fail-msg { color: #b91c1c; font-size: 12px; }
+.btn { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; cursor: pointer; font-size: 13px; text-decoration: none; display: inline-block; }
+.btn.sm { padding: 4px 8px; font-size: 12px; }
+.btn.primary { background: #0e7490; color: #fff; border-color: #0e7490; }
+.btn.danger { color: #b91c1c; border-color: #fca5a5; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.item-edit { display: flex; flex-direction: column; gap: 10px; }
+.form-row { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 8px; }
+.form-row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #374151; }
+.form-row input, .form-row select { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+.edit-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.empty { color: #6b7280; text-align: center; margin-top: 32px; }
+
+/* 모달 스타일 */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.modal-card { background: #fff; border-radius: 12px; width: 640px; max-width: 90vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
+.modal-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280; }
+.modal-desc { padding: 12px 20px 0 20px; font-size: 13px; color: #4b5563; margin: 0; }
+.modal-loading { padding: 40px 20px; text-align: center; color: #6b7280; font-size: 14px; }
+.modal-body { padding: 12px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px; }
+</style>

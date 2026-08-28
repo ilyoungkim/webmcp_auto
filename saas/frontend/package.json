@@ -1,0 +1,14 @@
+{
+  "name": "webmcp-auto-console",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 53300 --host 127.0.0.1",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "devDependencies": {
+    "nuxt": "^3.13.0"
+  }
+}

@@ -1,0 +1,9 @@
+# ============================================================================
+# webmcp/dashboard/requirements.txt — Streamlit 대시보드 의존성
+# ============================================================================
+streamlit>=1.30.0
+pymysql
+cryptography
+pandas
+plotly
+python-dotenv

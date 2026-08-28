@@ -1,0 +1,11 @@
+# WebMCP Auto SaaS — backend
+Django>=5.0,<6.0
+djangorestframework>=3.15
+whitenoise>=6.6
+python-dotenv>=1.0
+httpx>=0.27
+# 크롤 (무거우면 주석 처리 → httpx 폴백으로 동작)
+# crawl4ai
+
+# 위젯 bundle.zip JS 난독화·최적화는 frontend/node_modules 의 terser 를 사용한다.
+# (core/minify.py — TERSER_CMD/TERSER_CWD 설정. terser 없으면 원본 JS 그대로 제공)
