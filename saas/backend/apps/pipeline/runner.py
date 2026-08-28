@@ -503,8 +503,9 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
                 answer = existing.answer_md if existing and existing.answer_md else ''
 
         answer = _finalize_answer(answer)
+        from core.llm import resolve_openrouter_model
         qna_rows.append(GeneratedQnA(
             project=project, menu_label=menu.label,
-            question=question, answer_md=answer, model=settings.OPENROUTER_MODEL,
+            question=question, answer_md=answer, model=resolve_openrouter_model(),
         ))
     return qna_rows

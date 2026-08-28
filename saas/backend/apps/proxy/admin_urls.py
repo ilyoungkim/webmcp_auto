@@ -1,4 +1,5 @@
 """관리자 API (role=admin 전용)."""
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import path
 from rest_framework.decorators import api_view, permission_classes
@@ -181,6 +182,97 @@ def admin_project_toggle(request, pk):
     return Response({'ok': True, 'enabled': p.enabled})
 
 
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def admin_project_llm(request, pk):
+    """프로젝트(테넌트)별 LLM 설정 조회/수정 (관리자 전용).
+
+    GET: 현재 프로젝트에 저장된 테넌트 설정과 전역 기본값을 함께 반환.
+    PATCH: 프로젝트별 Gemini API 키/모델을 저장. 빈 문자열로 보내면 해당
+    항목을 초기화해 전역 settings(.env) 값을 사용하도록 되돌린다.
+    (OpenRouter는 전역 .env 로만 관리한다.)
+    """
+    _require_admin(request)
+    from apps.projects.models import Project
+
+    p = Project.objects.filter(pk=pk).first()
+    if p is None:
+        raise ValidationError('프로젝트 없음')
+
+    if request.method == 'GET':
+        return Response({
+            'projectId': p.id,
+            'projectName': p.name,
+            # 테넌트에 저장된 값 (빈 문자열 = 전역 사용)
+            'geminiApiKey': p.gemini_api_key,
+            'geminiModel': p.gemini_model,
+            # 전역 기본값 (참고용)
+            'defaults': {
+                'geminiModel': settings.GEMINI_MODEL,
+            },
+        })
+
+    # PATCH — 저장/초기화 (Gemini 전용)
+    fields = {
+        'geminiApiKey': 'gemini_api_key',
+        'geminiModel': 'gemini_model',
+    }
+    changed = []
+    for api_field, model_field in fields.items():
+        if api_field in request.data:
+            val = (request.data[api_field] or '').strip()
+            setattr(p, model_field, val)
+            changed.append(api_field)
+    if changed:
+        p.save(update_fields=list(fields.values()) + ['updated_at'])
+    return Response({'ok': True, 'changed': changed})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_project_llm_test(request, pk):
+    """프로젝트(테넌트)별 Gemini API 키 테스트 + 적용 (관리자 전용).
+
+    요청 본문에 geminiApiKey/geminiModel 을 받는다.
+    - 키가 주어지면 그 키로 실제 호출해 검증한다.
+    - 키가 비어 있으면 프로젝트에 저장된 키(없으면 전역 .env 키)로 테스트.
+    - 테스트가 성공하면 해당 키/모델을 프로젝트에 저장(적용)한다.
+    - 테스트가 실패하면 저장하지 않고 오류 메시지를 반환한다.
+    """
+    _require_admin(request)
+    from apps.projects.models import Project
+    from core.llm import GeminiError, test_gemini_key
+
+    p = Project.objects.filter(pk=pk).first()
+    if p is None:
+        raise ValidationError('프로젝트 없음')
+
+    # 테스트할 키/모델 결정: 요청값 > 프로젝트 저장값 > 전역
+    api_key = (request.data.get('geminiApiKey') or '').strip()
+    model = (request.data.get('geminiModel') or '').strip()
+    if not api_key:
+        api_key = p.gemini_api_key
+    if not model:
+        model = p.gemini_model
+
+    try:
+        reply = test_gemini_key(api_key, model)
+    except GeminiError as e:
+        return Response({'ok': False, 'error': str(e)}, status=400)
+
+    # 테스트 성공 → 프로젝트에 적용(저장). 빈 값이면 전역 사용으로 초기화.
+    p.gemini_api_key = api_key
+    p.gemini_model = model
+    p.save(update_fields=['gemini_api_key', 'gemini_model', 'updated_at'])
+
+    return Response({
+        'ok': True,
+        'reply': reply,
+        'model': model or settings.GEMINI_MODEL,
+        'applied': True,
+    })
+
+
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def admin_project_delete(request, pk):
@@ -272,6 +364,8 @@ urlpatterns = [
     path('projects/', admin_projects),
     path('projects/<int:pk>/regenerate/', admin_project_regenerate),
     path('projects/<int:pk>/toggle/', admin_project_toggle),
+    path('projects/<int:pk>/llm/', admin_project_llm),
+    path('projects/<int:pk>/llm/test/', admin_project_llm_test),
     path('projects/<int:pk>/', admin_project_delete),
     path('support/', admin_support),
     path('support/<int:pk>/answer/', admin_support_answer),

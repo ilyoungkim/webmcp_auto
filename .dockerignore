@@ -1,0 +1,13 @@
+# ── 백엔드 빌드에서 제외 ─────────────────────
+**/.venv/
+**/__pycache__/
+**/db.sqlite3*
+**/logs/
+**/crawled/
+**/staticfiles/
+
+# ── 프론트 빌드에서 제외 ─────────────────────
+**/node_modules/
+**/.nuxt/
+**/.output/
+**/.git/

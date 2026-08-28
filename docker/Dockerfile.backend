@@ -1,0 +1,36 @@
+# ── 백엔드 (Django + DRF + gunicorn) ─────────────────────────
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# 시스템 의존성 (httpx + psycopg[binary] — PostgreSQL 드라이버)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python 의존성
+COPY saas/backend/requirements.txt /app/backend/requirements.txt
+RUN pip install -r /app/backend/requirements.txt
+
+# Node (terser — bundle.zip JS 난독화용)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g terser \
+    && rm -rf /var/lib/apt/lists/*
+
+# 소스 복사
+COPY saas/backend/ /app/backend/
+COPY saas/widget-dist/ /app/widget-dist/
+COPY docker/docker-entrypoint.sh /app/backend/docker-entrypoint.sh
+
+WORKDIR /app/backend
+RUN chmod +x /app/backend/docker-entrypoint.sh
+
+# gunicorn 실행 (entrypoint에서 migrate/seed 후 기동)
+EXPOSE 8000
+CMD ["/app/backend/docker-entrypoint.sh"]

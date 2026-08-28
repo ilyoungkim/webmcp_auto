@@ -92,7 +92,8 @@ def chat(request):
     prompt = f"{widget.system_prompt}\n\n{memory}\n사용자 질문: {question}"
     try:
         # 실시간 채팅: 응답 토큰 상한과 짧은 타임아웃으로 지연 최소화
-        answer = ask(prompt, max_tokens=1024, timeout=30.0)
+        # 테넌트(project)별 Gemini 키/모델 설정을 우선 적용한다.
+        answer = ask(prompt, max_tokens=1024, timeout=30.0, project=project)
     except Exception as e:  # noqa: BLE001
         _log(request, 'blocked_401', f'llm_error:{str(e)[:120]}', public_id)
         return JsonResponse({'error': 'AI 호출 실패'}, status=502)

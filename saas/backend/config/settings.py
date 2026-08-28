@@ -63,17 +63,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# ── DB: SQLite (검증 단계) ────────────────────────────────────
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'OPTIONS': {
-            'timeout': 20,
-            'init_command': "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;",
-        },
+# ── DB ────────────────────────────────────────────────────────
+# DATABASE_URL 가 있으면 (Docker 등) PostgreSQL, 없으면 SQLite(로컬 검증).
+# 예: postgres://user:pass@host:5432/dbname
+_DATABASE_URL = env('DATABASE_URL', '')
+if _DATABASE_URL:
+    from urllib.parse import urlsplit
+    _dbu = urlsplit(_DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': (_dbu.path or '/webmcp').lstrip('/'),
+            'USER': _dbu.username or '',
+            'PASSWORD': _dbu.password or '',
+            'HOST': _dbu.hostname or 'localhost',
+            'PORT': _dbu.port or 5432,
+            'CONN_MAX_AGE': 60,
+            'OPTIONS': {'connect_timeout': 10},
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                'timeout': 20,
+                'init_command': "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;",
+            },
+        }
+    }
 
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -147,8 +166,10 @@ PLANS = {
 # ── 로깅 (콘솔 + 파일) ───────────────────────────────────────
 # 500 에러 등은 logs/django.log 에도 기록되어 상황 파악이 가능합니다.
 # 2000줄 초과 시 django_YYYYMMDD_N.log 형식으로 일자/넘버링 백업 후 새 파일을 생성합니다.
+# 백업 로그는 retention_days(기본 28일 = 4주)가 지나면 자동 삭제됩니다.
 LOG_DIR = BASE_DIR / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
+LOG_RETENTION_DAYS = int(env('LOG_RETENTION_DAYS', '28'))
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -161,6 +182,7 @@ LOGGING = {
             'class': 'core.logging.LineCountRotatingFileHandler',
             'filename': LOG_DIR / 'django.log',
             'max_lines': 2000,
+            'retention_days': LOG_RETENTION_DAYS,
             'formatter': 'verbose',
         },
     },

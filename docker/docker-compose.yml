@@ -1,0 +1,110 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: webmcp-postgres
+    environment:
+      - POSTGRES_USER=webmcp
+      - POSTGRES_PASSWORD=webmcp_dev_pass
+      - POSTGRES_DB=webmcp
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webmcp -d webmcp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose:
+      - "5432"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "28"
+  backend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: webmcp-backend
+    env_file:
+      - ../saas/backend/.env
+    environment:
+      - DJANGO_DEBUG=false
+      - ALLOWED_HOSTS=127.0.0.1,localhost,backend
+      - SAAS_PUBLIC_URL=http://localhost:8080
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8080
+      - TERSER_CMD=terser
+      - DATABASE_URL=postgres://webmcp:webmcp_dev_pass@postgres:5432/webmcp
+      - GUNICORN_WORKERS=2
+      - GUNICORN_THREADS=2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "28"
+
+  worker:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: webmcp-worker
+    command: ["python", "manage.py", "run_pipeline_worker", "--interval", "2.0"]
+    env_file:
+      - ../saas/backend/.env
+    environment:
+      - DJANGO_DEBUG=false
+      - ALLOWED_HOSTS=127.0.0.1,localhost,backend
+      - SAAS_PUBLIC_URL=http://localhost:8080
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8080
+      - TERSER_CMD=terser
+      - DATABASE_URL=postgres://webmcp:webmcp_dev_pass@postgres:5432/webmcp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "28"
+
+  frontend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        API_HOST: http://backend:8000
+    container_name: webmcp-frontend
+    depends_on:
+      - backend
+    expose:
+      - "3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "28"
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: webmcp-nginx
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "28"
+
+volumes:
+  postgres_data:

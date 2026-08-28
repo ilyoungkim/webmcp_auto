@@ -29,6 +29,14 @@ class Project(models.Model):
     menus_edited = models.BooleanField(default=False)  # 빠른메뉴 질문 편집 1회 제한
     theme = models.CharField(max_length=32, blank=True, default='blue_sky')  # 위젯 테마 코드
     enabled = models.BooleanField(default=True)  # 사용중지 여부 (False = 위젯 서빙 중지)
+
+    # ── 테넌트(프로젝트)별 Gemini 설정 ─────────────────────────
+    # 비어 있으면 전역 settings(.env) 값을 사용한다. 관리자가 프로젝트별로
+    # Gemini API 키/모델을 지정하면 해당 프로젝트의 Gemini 호출에 우선 적용된다.
+    # (OpenRouter는 전역 .env 로만 관리한다.)
+    gemini_api_key = models.CharField(max_length=512, blank=True, default='')
+    gemini_model = models.CharField(max_length=128, blank=True, default='')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

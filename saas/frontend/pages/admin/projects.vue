@@ -24,6 +24,15 @@ const regenerating = ref<Record<number, boolean>>({})
 const toggling = ref<Record<number, boolean>>({})
 const message = ref('')
 
+// 테넌트(프로젝트)별 LLM 설정
+const llmOpen = ref<Set<number>>(new Set())
+const llmLoading = ref<Record<number, boolean>>({})
+const llmSaving = ref<Record<number, boolean>>({})
+const llmData = ref<Record<number, any>>({})
+const llmDrafts = ref<Record<number, any>>({})
+const llmTesting = ref<Record<number, boolean>>({})
+const llmTestResult = ref<Record<number, { ok: boolean; message: string }>>({})
+
 // 고객센터 Q&A 상태
 const supportItems = ref<any[]>([])
 const supportPage = ref(1)
@@ -178,6 +187,83 @@ async function removeProject(p: Project) {
   }
 }
 
+// ── 테넌트(프로젝트)별 Gemini 설정 ─────────────────────────
+function toggleLlm(p: Project) {
+  const s = new Set(llmOpen.value)
+  if (s.has(p.id)) {
+    s.delete(p.id)
+  } else {
+    s.add(p.id)
+    loadLlm(p)
+  }
+  llmOpen.value = s
+}
+
+async function loadLlm(p: Project) {
+  llmLoading.value[p.id] = true
+  try {
+    const res = await useApi(`/api/admin/projects/${p.id}/llm/`)
+    llmData.value[p.id] = res
+    llmDrafts.value[p.id] = {
+      geminiApiKey: res.geminiApiKey || '',
+      geminiModel: res.geminiModel || '',
+    }
+  } catch (e: any) {
+    message.value = e?.data?.detail || 'LLM 설정을 불러오지 못했습니다.'
+  } finally {
+    llmLoading.value[p.id] = false
+  }
+}
+
+async function resetLlm(p: Project) {
+  if (!confirm(`'${p.name}' 프로젝트의 LLM 설정을 초기화해 전역(.env) 값을 사용하도록 되돌리시겠습니까?`)) return
+  llmSaving.value[p.id] = true
+  message.value = ''
+  try {
+    await useApi(`/api/admin/projects/${p.id}/llm/`, {
+      method: 'PATCH',
+      body: {
+        geminiApiKey: '',
+        geminiModel: '',
+      },
+    })
+    message.value = `'${p.name}' LLM 설정이 전역 기본값으로 초기화되었습니다.`
+    await loadLlm(p)
+  } catch (e: any) {
+    message.value = e?.data?.detail || 'LLM 설정 초기화에 실패했습니다.'
+  } finally {
+    llmSaving.value[p.id] = false
+  }
+}
+
+async function testLlm(p: Project) {
+  llmTesting.value[p.id] = true
+  llmTestResult.value[p.id] = { ok: false, message: '테스트 중...' }
+  try {
+    const draft = llmDrafts.value[p.id] || {}
+    const res = await useApi(`/api/admin/projects/${p.id}/llm/test/`, {
+      method: 'POST',
+      body: {
+        geminiApiKey: (draft.geminiApiKey || '').trim(),
+        geminiModel: (draft.geminiModel || '').trim(),
+      },
+    })
+    llmTestResult.value[p.id] = {
+      ok: true,
+      message: `연결 성공 (${res.model}) — 응답: ${res.reply} (적용됨)`,
+    }
+    // 테스트 성공 시 적용되었으므로 저장된 값 갱신
+    await loadLlm(p)
+  } catch (e: any) {
+    llmTestResult.value[p.id] = {
+      ok: false,
+      message: e?.data?.error || e?.data?.detail || '테스트에 실패했습니다.',
+    }
+  } finally {
+    llmTesting.value[p.id] = false
+  }
+}
+
 onMounted(loadUsers)
 </script>
 
@@ -232,7 +318,43 @@ onMounted(loadUsers)
             <button class="btn" :disabled="toggling[p.id]" @click="toggleEnabled(p)">
               {{ toggling[p.id] ? '처리 중...' : (p.enabled ? '사용중지' : '사용재개') }}
             </button>
+            <button class="btn" @click="toggleLlm(p)">⚙ LLM 설정</button>
             <button class="btn danger" @click="removeProject(p)">삭제</button>
+          </div>
+
+          <!-- 테넌트별 Gemini 설정 패널 -->
+          <div v-if="llmOpen.has(p.id)" class="llm-panel">
+            <div v-if="llmLoading[p.id]" class="muted">LLM 설정 불러오는 중...</div>
+            <template v-else-if="llmData[p.id]">
+              <div class="llm-panel-head">
+                <h3>LLM 설정 — {{ p.name }}</h3>
+                <span class="muted">비워두면 전역(.env) 값을 사용합니다. (OpenRouter는 .env 로만 관리)</span>
+              </div>
+              <div class="llm-grid">
+                <div class="llm-field">
+                  <label class="field-label">Gemini API Key</label>
+                  <input v-model="llmDrafts[p.id].geminiApiKey" type="password" placeholder="전역 값 사용" class="llm-input" />
+                </div>
+                <div class="llm-field">
+                  <label class="field-label">Gemini 모델</label>
+                  <input v-model="llmDrafts[p.id].geminiModel" :placeholder="'기본: ' + (llmData[p.id]?.defaults?.geminiModel || '')" class="llm-input" />
+                </div>
+                <div class="llm-field">
+                  <label class="field-label">Gemini 키 테스트 후 적용</label>
+                  <div class="llm-test-row">
+                    <button class="btn primary" :disabled="llmTesting[p.id]" @click="testLlm(p)">
+                      {{ llmTesting[p.id] ? '테스트 중...' : '🔌 테스트 후 적용' }}
+                    </button>
+                    <span v-if="llmTestResult[p.id]" class="llm-test-result" :class="llmTestResult[p.id].ok ? 'ok' : 'fail'">
+                      {{ llmTestResult[p.id].message }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="llm-actions">
+                <button class="btn" :disabled="llmSaving[p.id]" @click="resetLlm(p)">전역 값으로 초기화</button>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -332,6 +454,19 @@ onMounted(loadUsers)
 .btn.danger { color: #b91c1c; border-color: #fca5a5; }
 .project-card.disabled { background: #f9fafb; opacity: 0.75; }
 .project-card.disabled .project-name { color: #6b7280; }
+
+/* 테넌트별 LLM 설정 */
+.llm-panel { border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; background: #fafafa; padding: 14px; margin-top: -10px; margin-bottom: 10px; }
+.llm-panel-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.llm-panel-head h3 { margin: 0; font-size: 15px; color: #111827; }
+.llm-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.llm-field { display: flex; flex-direction: column; gap: 4px; }
+.llm-input { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; }
+.llm-test-row { display: flex; align-items: center; gap: 10px; }
+.llm-test-result { font-size: 12px; word-break: break-all; }
+.llm-test-result.ok { color: #047857; }
+.llm-test-result.fail { color: #b91c1c; }
+.llm-actions { display: flex; gap: 8px; margin-top: 14px; }
 
 /* 고객센터 Q&A 게시판 */
 .support-section { margin-top: 32px; padding-top: 24px; border-top: 2px solid #e5e7eb; }

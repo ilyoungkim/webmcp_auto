@@ -26,6 +26,7 @@
 | M5 문서 | 랜딩·매뉴얼(manual) | ✅ 완료 |
 | M6 3유형 시나리오+쿼터 | 병원/법률/회사 외 **25종 도메인** + 429 쿼터 | ✅ 완료 |
 | M7 (예정) | PostgreSQL 전환, 선택 Celery | ⏳ 미착수 |
+| 추가(2026-08-29) | **테넌트별 Gemini 설정(테스트 후 적용)**, 프로젝트 수정 시 이름/URL 변경 금지, 프로젝트 5개 한도 안내, 이용약관 아코디언 | ✅ 완료 |
 
 ### 0.2 실데이터 증거 (`saas/backend/db.sqlite3`)
 
@@ -67,6 +68,9 @@
 | 데이터 플레인 | `/api/chat/report/` 오류 신고 저장(ChatErrorReport) | `apps/proxy/views.py` |
 | 위젯 | 위젯 JS 4종 **신규 계약 반영** — `{question, publicId, memory}`만 전송, 기억 키 `wmcpMemory:{publicId}` | `saas/widget-dist/` |
 | 관리자 | 사용자(role/plan/active), 사용량 집계, 챗 오류 신고(new/read/resolved), 프로젝트(검색/Q&A 재생성/토글/삭제), 고객센터 답변 | `apps/proxy/admin_urls.py` + `pages/admin/*.vue` |
+| 관리자 | **테넌트(프로젝트)별 Gemini 설정** — API 키/모델을 프로젝트 단위로 지정(비우면 전역 `.env` 사용), **테스트 후 적용**(실제 호출로 검증 성공 시에만 저장), OpenRouter는 전역 `.env`로만 관리 | `admin_project_llm` + `admin_project_llm_test` + `pages/admin/projects.vue` |
+| 프로젝트 | **수정 시 이름/URL 변경 금지** — 도메인 유형·위젯 테마만 변경 가능(백엔드에서도 name/url 무시) | `apps/projects/views.py` + `pages/projects/[id].vue` |
+| 프로젝트 | **프로젝트 생성 한도 안내(최대 5개)** + 하단 이용약관 아코디언(사용자권리/LLM 주의사항/개인정보보호/프로그램 사용동의) | `pages/projects/[id].vue` |
 | 운영 | `/health`, `/ready`(Gemini 키), 로깅(2000줄 날짜·넘버링 로테이션), SSRF 가드, CSRF, 세션 쿠키 | `apps/widgets`, `core/` |
 
 ### 0.4 모든 스펙 (구현 기준 수치)
@@ -86,6 +90,8 @@
 | 파이프라인 | `JOB_LOCK_MINUTES=15`, 폴링 간격 2.0s, 잠금 만료 시 재큐/실패 |
 | 게시판 | 질문 2000자 제한, 10개/페이지 |
 | 소스 재선택 | 최대 10개, 빠른메뉴 질문 편집 **1회 제한**(`menus_edited`) |
+| 테넌트 LLM | 프로젝트별 Gemini 키/모델 지정(비우면 전역 `.env`), **테스트 후 적용**(실제 호출 검증 성공 시에만 저장), OpenRouter는 전역 전용 |
+| 프로젝트 수정 | 이름/URL 변경 금지, 도메인 유형·위젯 테마만 변경 가능 |
 
 ### 0.5 사용된 LLM
 
@@ -99,6 +105,7 @@
 - 과거 `GEMINI_MODEL=gemma-4-31b-it`(개발 초기) → 현재 `gemini-3.5-flash-lite`.
 - 키는 **Django `.env`에만** 존재하고 Nuxt 번들·위젯에 비노출. Nuxt는 `{question, publicId, memory}`만 중계.
 - OpenRouter는 위젯 생성(배치)처럼 **긴 답변·안정성**이 필요한 작업에, Gemini는 **실시간 채팅(저지연)** 에 사용.
+- **테넌트(프로젝트)별 Gemini 설정(2026-08-29)**: 관리자가 프로젝트 단위로 `gemini_api_key`/`gemini_model`을 지정할 수 있다. 비어 있으면 전역 `.env` 값을 사용한다. `core/llm._gemini_config(project)`가 테넌트 지정값을 우선 적용하며, 실시간 채팅(`proxy/views.py`), 사이트 요약(`generator._site_summary`)에 반영된다. **OpenRouter는 테넌트 설정 없이 전역 `.env`로만 관리**한다(`ask_openrouter`는 전역 전용).
 
 ### 0.6 아키텍처 구조 (구현 기준)
 
@@ -488,7 +495,7 @@ Django `contrib.sessions`를 쓰므로 별도 `sessions` 테이블을 만들지 
 |--------|------|------|
 | GET | `/api/domain-types/` | 유형 + 빠른메뉴 (enabled만) |
 | GET/POST | `/api/projects/` | 목록 / 생성(플랜 한도 검사 후 job enqueue, `selectedUrls` 최대 10개) |
-| GET/PATCH/DELETE | `/api/projects/<id>/` | 상세 / 수정(URL·테마 변경 시 위젯 재빌드) / 삭제 |
+| GET/PATCH/DELETE | `/api/projects/<id>/` | 상세 / 수정(**이름·URL 변경 금지**, 도메인 유형·테마만 변경, 테마 변경 시 위젯 재빌드) / 삭제 |
 | GET | `/api/projects/<id>/status/` | 폴링 (status/progress/statusMessage) |
 | GET | `/api/projects/sitemap-urls/` | 신규 생성 전 sitemap 상위 30개 URL |
 | GET | `/api/projects/<id>/sitemap-urls/` | 수정 폼용 sitemap URL (`?url=` 오버라이드) |
@@ -519,6 +526,8 @@ Django `contrib.sessions`를 쓰므로 별도 `sessions` 테이블을 만들지 
 | GET | `/api/admin/projects/` | 전체 프로젝트 (`?user_id=`) |
 | POST | `/api/admin/projects/<id>/regenerate/` | 저장된 markdown으로 Q&A 재생성 + 위젯 갱신 |
 | POST | `/api/admin/projects/<id>/toggle/` | 사용중지/재개 |
+| GET/PATCH | `/api/admin/projects/<id>/llm/` | 테넌트(프로젝트)별 Gemini 키/모델 조회·저장(빈 값=전역 사용) |
+| POST | `/api/admin/projects/<id>/llm/test/` | Gemini 키 **테스트 후 적용** — 실제 호출 검증 성공 시에만 저장 |
 | DELETE | `/api/admin/projects/<id>/` | 삭제 |
 | GET/POST | `/api/admin/support/` `.../<id>/answer/` | 고객센터 Q&A 목록 / 답변 등록 |
 

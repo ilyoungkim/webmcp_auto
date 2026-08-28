@@ -122,9 +122,13 @@ function startEdit() {
 async function saveEdit() {
   saving.value = true
   try {
+    // 이름/URL은 변경 불가 — 도메인 유형과 테마만 전송
     project.value = await useApi(`/api/projects/${id}/`, {
       method: 'PATCH',
-      body: editForm.value,
+      body: {
+        domainTypeCode: editForm.value.domainTypeCode,
+        theme: editForm.value.theme,
+      },
     })
     snippet.value = project.value.installSnippet
     editing.value = false
@@ -280,9 +284,10 @@ onUnmounted(() => clearInterval(timer))
       </div>
     </header>
 
+    <p class="plan-note">📌 내 프로젝트는 <b>최대 5개</b>까지 생성할 수 있습니다.</p>
+
     <section v-if="editing" class="edit-panel">
-      <label>이름 <input v-model="editForm.name" /></label>
-      <label>URL <input v-model="editForm.url" /></label>
+      <p class="note">이름과 URL은 변경할 수 없습니다. 도메인 유형과 위젯 테마만 변경할 수 있습니다.</p>
       <label>도메인 유형
         <select v-model="editForm.domainTypeCode">
           <option v-for="dt in domainTypes" :key="dt.code" :value="dt.code">{{ dt.name }}</option>
@@ -301,7 +306,7 @@ onUnmounted(() => clearInterval(timer))
           </button>
         </div>
       </label>
-      <p class="note">URL 또는 도메인 유형 변경 후 <b>'재생성'</b> 버튼을 누르면 새 사이트맵 기반으로 다시 수집합니다. 테마는 저장 즉시 위젯에 반영됩니다.</p>
+      <p class="note">도메인 유형 변경 후 <b>'재생성'</b> 버튼을 누르면 새 사이트맵 기반으로 다시 수집합니다. 테마는 저장 즉시 위젯에 반영됩니다.</p>
       <div class="edit-actions">
         <button class="btn" @click="editing = false">취소</button>
         <button class="btn primary" :disabled="saving" @click="saveEdit">{{ saving ? '저장 중...' : '저장' }}</button>
@@ -471,6 +476,62 @@ onUnmounted(() => clearInterval(timer))
       </div>
     </section>
 
+    <!-- 이용 약관 아코디언 -->
+    <section class="terms-section">
+      <details class="terms-accordion">
+        <summary>📋 사용자 권리</summary>
+        <div class="terms-body">
+          <ul>
+            <li>회원은 본 서비스에서 제공하는 AI 비서 위젯을 자신의 홈페이지에 설치·운영할 권리가 있습니다.</li>
+            <li>회원은 생성된 프로젝트의 정보(이름, URL, 도메인 유형, 위젯 테마)를 확인하고, 도메인 유형과 위젯 테마를 변경할 수 있습니다.</li>
+            <li>회원은 빠른메뉴 질문을 <b>1회</b> 편집할 수 있으며, 고객센터 Q&A를 통해 문의할 권리가 있습니다.</li>
+            <li>회원은 언제든지 본 서비스 이용을 중단하고 프로젝트를 삭제할 수 있습니다.</li>
+            <li>회원은 본인의 개인정보 열람·정정·삭제를 요청할 권리가 있습니다.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="terms-accordion">
+        <summary>⚠️ LLM 사용 주의사항</summary>
+        <div class="terms-body">
+          <ul>
+            <li>AI 비서의 답변은 대규모 언어 모델(LLM)이 생성한 것으로, <b>사실과 다를 수 있으며</b> 의학적·법률적·재정적 조언으로 간주해서는 안 됩니다.</li>
+            <li>중요한 결정(진료, 법률, 투자 등)은 반드시 전문가와 상담하시기 바랍니다.</li>
+            <li>AI 답변은 수집된 홈페이지 정보를 기반으로 생성되며, 홈페이지에 없는 정보는 정확하지 않을 수 있습니다.</li>
+            <li>AI가 생성한 답변으로 인한 손해에 대해 서비스 제공자는 책임을 지지 않습니다.</li>
+            <li>AI 답변 품질은 사용량·모델 상태에 따라 달라질 수 있으며, 서비스는 이를 보장하지 않습니다.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="terms-accordion">
+        <summary>🔒 개인정보보호</summary>
+        <div class="terms-body">
+          <ul>
+            <li>본 서비스는 회원의 이메일, 이름 등 최소한의 개인정보만 수집하며, 서비스 제공 목적으로만 사용합니다.</li>
+            <li>회원의 홈페이지에서 수집된 콘텐츠는 AI 비서 답변 생성 목적으로만 사용됩니다.</li>
+            <li>회원의 개인정보는 동의 없이 제3자에게 제공되지 않으며, 관련 법령에 따라 안전하게 보호됩니다.</li>
+            <li>회원은 언제든지 개인정보 처리에 대한 문의 및 삭제를 요청할 수 있습니다.</li>
+            <li>AI 채팅 과정에서 입력된 질문은 서비스 품질 개선을 위해 저장될 수 있습니다.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="terms-accordion">
+        <summary>✅ 프로그램 사용동의</summary>
+        <div class="terms-body">
+          <ul>
+            <li>본 서비스(WebMCP AI 비서)를 사용함으로써 아래 내용에 동의한 것으로 간주됩니다.</li>
+            <li>회원은 본 서비스의 위젯을 불법적이거나 부적절한 목적으로 사용해서는 안 됩니다.</li>
+            <li>회원은 본 서비스의 소스코드·콘텐츠를 무단 복제·배포·수정할 수 없습니다.</li>
+            <li>회원은 AI 비서를 통해 생성된 답변에 대해 책임을 지며, 이를 악용해서는 안 됩니다.</li>
+            <li>서비스 제공자는 천재지변, 시스템 점검 등 불가항력적 사유로 서비스가 중단될 수 있습니다.</li>
+            <li>본 약관은 서비스 정책 변경에 따라 사전 고지 후 변경될 수 있습니다.</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
     <!-- 재생성 소스 선택 모달 -->
     <div v-if="rerunModalOpen" class="modal-overlay" @click.self="rerunModalOpen = false">
       <div class="modal-card">
@@ -629,6 +690,20 @@ pre { background: #f3f4f6; padding: 12px; border-radius: 8px; overflow-x: auto; 
 /* 고객센터 Q&A 게시판 */
 .support-section { margin-top: 32px; padding-top: 24px; border-top: 2px solid #e5e7eb; }
 .support-section h2 { font-size: 18px; margin: 0 0 6px; }
+
+/* 프로젝트 생성 한도 안내 */
+.plan-note { margin: 12px 0 0; padding: 10px 14px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; font-size: 13px; color: #0c4a6e; }
+.plan-note b { color: #0369a1; }
+
+/* 이용 약관 아코디언 */
+.terms-section { margin-top: 40px; padding-top: 24px; border-top: 2px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px; }
+.terms-accordion { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; background: #fafafa; }
+.terms-accordion summary { cursor: pointer; font-weight: 600; font-size: 14px; color: #111827; }
+.terms-accordion summary:hover { color: #0e7490; }
+.terms-body { margin-top: 10px; }
+.terms-body ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.terms-body li { font-size: 13px; color: #4b5563; line-height: 1.6; }
+.terms-body b { color: #1f2937; }
 .support-form { margin: 12px 0 20px; }
 .support-form textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; }
 .support-form-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }

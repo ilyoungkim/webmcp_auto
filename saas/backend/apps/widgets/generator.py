@@ -106,7 +106,8 @@ def build_widget(project, menus, markdown: str, qna_rows=None) -> Widget:
 def _site_summary(project, markdown: str) -> str:
     try:
         return ask(
-            f'아래 사이트 내용을 800자 이내 한국어 요약으로 정리하세요. 핵심 사실(이름·서비스·연락처·특징) 위주.\n\n{markdown[:20000]}'
+            f'아래 사이트 내용을 800자 이내 한국어 요약으로 정리하세요. 핵심 사실(이름·서비스·연락처·특징) 위주.\n\n{markdown[:20000]}',
+            project=project,
         )
     except Exception:  # noqa: BLE001 — 요약 실패 시 markdown 앞부분 사용
         return markdown[:1500]

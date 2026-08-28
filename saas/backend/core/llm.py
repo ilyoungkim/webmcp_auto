@@ -97,14 +97,18 @@ def strip_instruction_echo(text: str) -> str:
 
 
 def ask(prompt: str, *, temperature: float = 0.2, retries: int = 1, timeout: float = 60.0,
-        max_tokens: int = 1024) -> str:
+        max_tokens: int = 1024, project=None) -> str:
     """단일 프롬프트 → 텍스트 응답 (Gemini).
 
     max_tokens: 생성 토큰 상한. 응답이 길어질수록 지연이 커지므로
     채팅 등 실시간 응답은 적당한 상한(기본 1024)으로 제한해 속도를 확보한다.
     429(분당 요청 한도)는 백오프를 늘려가며 최대 4회 재시도한다.
+
+    project: 테넌트(Project) 객체. 프로젝트별로 gemini_api_key/gemini_model 을
+    지정했다면 전역 settings 값 대신 해당 값을 사용한다.
     """
-    url = f'{settings.GEMINI_BASE}/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}'
+    api_key, model = _gemini_config(project)
+    url = f'{settings.GEMINI_BASE}/models/{model}:generateContent?key={api_key}'
     payload = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
         'generationConfig': {'temperature': temperature, 'topK': 3, 'maxOutputTokens': max_tokens},
@@ -147,6 +151,8 @@ def ask_openrouter(prompt: str, *, temperature: float = 0.2, retries: int = 1,
 
     모델 폴백: 주 모델(OPENROUTER_MODEL)이 실패하면
     폴백 모델(OPENROUTER_FALLBACK_MODEL)로 자동 전환해 재시도한다.
+
+    OpenRouter 설정은 전역 settings(.env) 값만 사용한다.
     """
     api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
     if not api_key:
@@ -172,6 +178,75 @@ def ask_openrouter(prompt: str, *, temperature: float = 0.2, retries: int = 1,
             # 폴백 모델이 남아있으면 다음 모델로 전환
             continue
     raise GeminiError(str(last_err))
+
+
+def _gemini_config(project=None) -> tuple[str, str]:
+    """Gemini API 키/모델 결정. 테넌트(project) 지정값 우선, 없으면 전역 settings."""
+    api_key = settings.GEMINI_API_KEY
+    model = settings.GEMINI_MODEL
+    if project is not None:
+        if getattr(project, 'gemini_api_key', ''):
+            api_key = project.gemini_api_key
+        if getattr(project, 'gemini_model', ''):
+            model = project.gemini_model
+    return api_key, model
+
+
+def test_gemini_key(api_key: str, model: str | None = None, *, timeout: float = 30.0) -> str:
+    """Gemini API 키 유효성 검증.
+
+    주어진 키로 짧은 프롬프트를 실제 호출해 성공 여부를 확인한다.
+    성공 시 모델 응답 텍스트를, 실패 시 GeminiError를 던진다.
+    model이 비어 있으면 전역 settings.GEMINI_MODEL을 사용한다.
+    """
+    if not api_key:
+        api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        raise GeminiError('API 키가 비어 있습니다.')
+    model = model or settings.GEMINI_MODEL
+    url = f'{settings.GEMINI_BASE}/models/{model}:generateContent?key={api_key}'
+    payload = {
+        'contents': [{'role': 'user', 'parts': [{'text': '한 단어로 "안녕"이라고만 답하세요.'}]}],
+        'generationConfig': {'temperature': 0, 'maxOutputTokens': 20},
+    }
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, json=payload)
+    except httpx.HTTPError as e:
+        raise GeminiError(f'연결 실패: {e}') from e
+    if resp.status_code == 401 or resp.status_code == 403:
+        raise GeminiError(f'API 키가 유효하지 않습니다 (HTTP {resp.status_code}).')
+    if resp.status_code == 400:
+        # Gemini는 잘못된 키를 400 INVALID_ARGUMENT 로도 반환한다.
+        raise GeminiError('API 키가 유효하지 않습니다 (HTTP 400).')
+    if resp.status_code == 429:
+        raise GeminiError('요청 한도 초과 (429). 잠시 후 다시 시도하세요.')
+    if resp.status_code != 200:
+        raise GeminiError(f'Gemini {resp.status_code}: {resp.text[:200]}')
+    try:
+        data = resp.json()
+        parts = data['candidates'][0]['content']['parts']
+        text = ''.join(p.get('text', '') for p in parts).strip()
+    except (KeyError, IndexError, ValueError) as e:
+        raise GeminiError(f'응답 파싱 실패: {e}') from e
+    if not text:
+        raise GeminiError('빈 응답')
+    return text
+
+
+def _openrouter_config() -> tuple[str, str, str, str]:
+    """OpenRouter 키/주모델/폴백모델/베이스 (전역 settings(.env) 전용)."""
+    api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
+    primary = getattr(settings, 'OPENROUTER_MODEL', 'mistralai/mistral-nemo')
+    fallback = getattr(settings, 'OPENROUTER_FALLBACK_MODEL', '~deepseek/deepseek-v4-flash-latest')
+    base = getattr(settings, 'OPENROUTER_BASE', 'https://openrouter.ai/api/v1')
+    return api_key, primary, fallback, base
+
+
+def resolve_openrouter_model() -> str:
+    """전역 OpenRouter 주 모델명 반환 (GeneratedQnA.model 기록용)."""
+    _, primary, _, _ = _openrouter_config()
+    return primary
 
 
 def _openrouter_call(api_key: str, base: str, model: str, prompt: str, *,

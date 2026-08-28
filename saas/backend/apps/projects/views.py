@@ -68,13 +68,7 @@ def project_detail(request, pk):
         return Response({'ok': True})
     if request.method in ('PUT', 'PATCH'):
         data = request.data
-        if 'name' in data:
-            p.name = (data['name'] or '').strip() or p.name
-        url = (data.get('url') or '').strip()
-        if url and url != p.url:
-            p.url = url
-            p.origin = normalize_origin(url)
-            TenantOrigin.objects.get_or_create(origin=p.origin, defaults={'project': p})
+        # 이름/URL은 변경 불가 — 도메인 유형과 테마만 변경 가능
         code = (data.get('domainTypeCode') or '').strip()
         if code:
             dt = DomainType.objects.filter(code=code, enabled=True).first()
