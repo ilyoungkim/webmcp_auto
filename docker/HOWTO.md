@@ -108,7 +108,23 @@ cp .env.example .env
 
 ## 4. 빌드 & 실행
 
-### 4.1 이미지 빌드
+### 4.0 빌드 스크립트 (권장)
+
+`build.sh`가 이미지 컴파일(빌드) + (옵션) 기동 + health 체크를 한 번에 처리한다.
+
+```bash
+cd webMCP_Auto/docker
+
+./build.sh                  # 기본(ko) 사일로만 빌드
+./build.sh --silo           # ko(8080) + en(8081) 사일로 모두 빌드
+./build.sh --en             # en 사일로만 빌드
+./build.sh --no-cache       # 캐시 무시 완전 재빌드
+./build.sh --run            # 빌드 후 ko 사일로 기동 + health 체크까지
+./build.sh --run --silo     # 빌드 후 ko + en 모두 기동
+./build.sh --help           # 사용법
+```
+
+### 4.1 이미지 빌드 (수동)
 
 ```bash
 cd webMCP_Auto/docker   # docker-compose.yml 위치
