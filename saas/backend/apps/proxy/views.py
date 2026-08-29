@@ -89,7 +89,9 @@ def chat(request):
         _log(request, 'ok', 'cached_qna', public_id)
         return _gemini_shape(cleaned)
 
-    prompt = f"{widget.system_prompt}\n\n{memory}\n사용자 질문: {question}"
+    # 언어 사일로 — en 위젯은 영어 라벨 사용 (한국어 라벨이 언어 혼용 유도 방지)
+    user_turn = 'User question:' if (getattr(project, 'lang', '') or 'ko') == 'en' else '사용자 질문'
+    prompt = f"{widget.system_prompt}\n\n{memory}\n{user_turn}: {question}"
     try:
         # 실시간 채팅: 응답 토큰 상한과 짧은 타임아웃으로 지연 최소화
         # 테넌트(project)별 Gemini 키/모델 설정을 우선 적용한다.

@@ -599,11 +599,33 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
                 answer = existing.answer_md if existing and existing.answer_md else ''
 
         answer = _finalize_answer(answer)
+        # 언어 안전장치 — en 사일로인데 한국어가 섞여 나오면 재생성 1회
+        if lang == 'en' and _has_korean(question + ' ' + answer):
+            try:
+                answer2 = ask_openrouter(_answer_prompt(markdown, project, menu, question), lang=lang)
+                answer2 = _finalize_answer(answer2)
+                if not _has_korean(answer2):
+                    answer = answer2
+            except GeminiError:
+                pass
         qna_rows.append(GeneratedQnA(
             project=project, menu_label=menu.label,
             question=question, answer_md=answer, model=resolve_openrouter_model(lang),
         ))
     return qna_rows
+
+
+# en 사일로 강제: 결과 텍스트에 한글이 5% 초과 포함되면 언어 위반으로 간주한다.
+# (사이트 고유명사·한문 표기 등은 소량 허용 — 실제 사이트 데이터와 섞일 수 있다)
+_HANGUL_RE = re.compile(r'[가-힣]')
+
+
+def _has_korean(text: str) -> bool:
+    """문자열에 한글 비율이 의미 있는 수준(>5%)이면 True."""
+    if not text:
+        return False
+    korean = len(_HANGUL_RE.findall(text))
+    return korean > 0 and korean / max(len(text), 1) > 0.05
 
 
 def _required_menu_answer(project: Project) -> str:
