@@ -19,6 +19,8 @@ const saving = ref(false)
 const isAdmin = ref(false)
 const userEmail = ref('')
 
+const { t, load: loadSilo } = useSilo()
+
 // 사용자 메뉴 (비밀번호 변경 / 로그아웃)
 const userMenuOpen = ref(false)
 const pwModalOpen = ref(false)
@@ -27,16 +29,15 @@ const pwSaving = ref(false)
 const pwError = ref('')
 const pwSuccess = ref('')
 
-const STATUS_LABELS: Record<string, string> = {
-  queued: '예약',
-  crawling: '진행중',
-  generating: '진행중',
-  completed: '완료',
-  failed: '실패',
-}
-
 function statusLabel(s: string): string {
-  return STATUS_LABELS[s] || s
+  const map: Record<string, string> = {
+    queued: t('proj.status.queued'),
+    crawling: t('proj.status.crawling'),
+    generating: t('proj.status.generating'),
+    completed: t('proj.status.completed'),
+    failed: t('proj.status.failed'),
+  }
+  return map[s] || s
 }
 
 async function loadProjects() {
@@ -67,11 +68,11 @@ async function changePassword() {
   pwError.value = ''
   pwSuccess.value = ''
   if (pwForm.value.new !== pwForm.value.confirm) {
-    pwError.value = '새 비밀번호가 일치하지 않습니다.'
+    pwError.value = t('dash.pw.mismatch')
     return
   }
   if (pwForm.value.new.length < 8) {
-    pwError.value = '새 비밀번호는 8자 이상이어야 합니다.'
+    pwError.value = t('dash.pw.tooShort')
     return
   }
   pwSaving.value = true
@@ -80,10 +81,10 @@ async function changePassword() {
       method: 'POST',
       body: { current: pwForm.value.current, new: pwForm.value.new },
     })
-    pwSuccess.value = '비밀번호가 변경되었습니다.'
+    pwSuccess.value = t('dash.pw.changed')
     pwForm.value = { current: '', new: '', confirm: '' }
   } catch (e: any) {
-    pwError.value = e?.data?.detail || e?.data?.current?.[0] || '비밀번호 변경에 실패했습니다.'
+    pwError.value = e?.data?.detail || e?.data?.current?.[0] || t('dash.pw.failed')
   } finally {
     pwSaving.value = false
   }
@@ -129,12 +130,13 @@ async function saveEdit(id: number) {
 }
 
 async function removeProject(p: Project) {
-  if (!confirm(`'${p.name}' 프로젝트를 삭제하시겠습니까?`)) return
+  if (!confirm(t('proj.edit.deleteConfirm', { name: p.name }))) return
   await useApi(`/api/projects/${p.id}/`, { method: 'DELETE' })
   await loadProjects()
 }
 
 onMounted(async () => {
+  await loadSilo()
   domainTypes.value = await useApi('/api/domain-types/')
   await loadProjects()
 })
@@ -143,49 +145,49 @@ onMounted(async () => {
 <template>
   <main class="wrap">
     <header>
-      <h1>내 프로젝트</h1>
+      <h1>{{ t('dash.title') }}</h1>
       <div class="head-actions">
-        <NuxtLink v-if="isAdmin" to="/admin/projects" class="btn">🛠 프로젝트 관리</NuxtLink>
-        <NuxtLink v-if="isAdmin" to="/admin/chat-errors" class="btn">📮 오류 신고</NuxtLink>
-        <NuxtLink to="/projects/new" class="btn primary">+ 새 프로젝트</NuxtLink>
+        <NuxtLink v-if="isAdmin" to="/admin/projects" class="btn">🛠 {{ t('dash.adminProjects') }}</NuxtLink>
+        <NuxtLink v-if="isAdmin" to="/admin/chat-errors" class="btn">📮 {{ t('dash.errorReports') }}</NuxtLink>
+        <NuxtLink to="/projects/new" class="btn primary">+ {{ t('dash.newProject') }}</NuxtLink>
         <div class="user-menu">
           <button class="btn user-btn" @click="toggleUserMenu">
-            👤 {{ userEmail || '내 계정' }} ▾
+            👤 {{ userEmail || t('dash.myAccount') }} ▾
           </button>
           <div v-if="userMenuOpen" class="user-dropdown">
-            <button class="menu-item" @click="openPwModal">🔑 비밀번호 변경</button>
-            <button class="menu-item danger" @click="logout">🚪 로그아웃</button>
+            <button class="menu-item" @click="openPwModal">🔑 {{ t('dash.changePw') }}</button>
+            <button class="menu-item danger" @click="logout">🚪 {{ t('common.logout') }}</button>
           </div>
         </div>
       </div>
     </header>
 
-    <p class="plan-note">📌 내 프로젝트는 <b>최대 5개</b>까지 생성할 수 있습니다.</p>
+    <p class="plan-note">{{ t('dash.planNote') }}</p>
 
     <!-- 비밀번호 변경 모달 -->
     <div v-if="pwModalOpen" class="modal-overlay" @click.self="pwModalOpen = false">
       <div class="modal-card">
         <header class="modal-header">
-          <h3>비밀번호 변경</h3>
+          <h3>{{ t('dash.changePw') }}</h3>
           <button class="close-btn" @click="pwModalOpen = false">&times;</button>
         </header>
         <div class="modal-body">
-          <label>현재 비밀번호
-            <input v-model="pwForm.current" type="password" placeholder="현재 비밀번호" />
+          <label>{{ t('dash.pw.current') }}
+            <input v-model="pwForm.current" type="password" :placeholder="t('dash.pw.current')" />
           </label>
-          <label>새 비밀번호
-            <input v-model="pwForm.new" type="password" placeholder="8자 이상" />
+          <label>{{ t('dash.pw.new') }}
+            <input v-model="pwForm.new" type="password" :placeholder="t('dash.pw.newPlaceholder')" />
           </label>
-          <label>새 비밀번호 확인
-            <input v-model="pwForm.confirm" type="password" placeholder="새 비밀번호 다시 입력" />
+          <label>{{ t('dash.pw.confirm') }}
+            <input v-model="pwForm.confirm" type="password" :placeholder="t('dash.pw.confirmPlaceholder')" />
           </label>
           <p v-if="pwError" class="err">{{ pwError }}</p>
           <p v-if="pwSuccess" class="ok">{{ pwSuccess }}</p>
         </div>
         <footer class="modal-footer">
-          <button class="btn" @click="pwModalOpen = false">취소</button>
+          <button class="btn" @click="pwModalOpen = false">{{ t('proj.edit.cancel') }}</button>
           <button class="btn primary" :disabled="pwSaving" @click="changePassword">
-            {{ pwSaving ? '변경 중...' : '비밀번호 변경' }}
+            {{ pwSaving ? t('dash.pw.changing') : t('dash.changePw') }}
           </button>
         </footer>
       </div>
@@ -201,34 +203,34 @@ onMounted(async () => {
           </div>
           <div class="item-actions">
             <span class="badge" :class="p.status">{{ statusLabel(p.status) }} {{ p.progress }}%</span>
-            <span v-if="p.status === 'failed'" class="fail-msg">실패했습니다. 수정 후 다시 시도하거나 문의 02-888-9999로 연락 주세요.</span>
-            <button class="btn sm" @click="startEdit(p)">수정</button>
-            <button class="btn sm danger" @click="removeProject(p)">삭제</button>
+            <span v-if="p.status === 'failed'" class="fail-msg">{{ t('proj.edit.failMsg') }}</span>
+            <button class="btn sm" @click="startEdit(p)">{{ t('proj.btn.edit') }}</button>
+            <button class="btn sm danger" @click="removeProject(p)">{{ t('proj.btn.delete') }}</button>
           </div>
         </div>
 
         <!-- 인라인 수정 모드 -->
         <div v-else class="item-edit">
           <div class="form-row">
-            <label>이름 <input v-model="editForm.name" /></label>
+            <label>{{ t('dash.pw.nameLabel') }} <input v-model="editForm.name" /></label>
             <label>URL <input v-model="editForm.url" /></label>
-            <label>유형
+            <label>{{ t('proj.edit.domainType') }}
               <select v-model="editForm.domainTypeCode">
                 <option v-for="dt in domainTypes" :key="dt.code" :value="dt.code">{{ dt.name }}</option>
               </select>
             </label>
           </div>
           <div class="edit-actions">
-            <button class="btn sm" @click="cancelEdit">취소</button>
+            <button class="btn sm" @click="cancelEdit">{{ t('proj.edit.cancel') }}</button>
             <button class="btn sm primary" :disabled="saving" @click="saveEdit(p.id)">
-              {{ saving ? '저장 중...' : '저장' }}
+              {{ saving ? t('proj.edit.saving') : t('proj.edit.save') }}
             </button>
           </div>
         </div>
       </li>
     </ul>
 
-    <p v-if="!projects.length" class="empty">등록된 프로젝트가 없습니다.</p>
+    <p v-if="!projects.length" class="empty">{{ t('dash.empty') }}</p>
   </main>
 </template>
 

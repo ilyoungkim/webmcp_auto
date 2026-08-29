@@ -85,6 +85,8 @@ services:
       dockerfile: docker/Dockerfile.frontend
       args: { API_HOST: "http://backend-ko:8000" }
     container_name: webmcp-ko-frontend
+    environment:
+      - NUXT_PUBLIC_SILO_LANG=ko
     depends_on: [backend-ko]
     expose: ["3000"]
     logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
@@ -163,6 +165,8 @@ services:
       dockerfile: docker/Dockerfile.frontend
       args: { API_HOST: "http://backend-en:8000" }
     container_name: webmcp-en-frontend
+    environment:
+      - NUXT_PUBLIC_SILO_LANG=en
     depends_on: [backend-en]
     expose: ["3000"]
     logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }

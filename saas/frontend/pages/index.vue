@@ -1,9 +1,14 @@
+<script setup lang="ts">
+const { t, load: loadSilo } = useSilo()
+await useAsyncData('silo-info', async () => { await loadSilo(); return true })
+</script>
+
 <template>
   <main class="wrap">
     <h1>WebMCP Auto</h1>
-    <p>URL만 입력하면 AI 비서 위젯이 자동 생성됩니다.</p>
-    <NuxtLink to="/signup">무료로 시작하기</NuxtLink>
-    <NuxtLink to="/login">로그인</NuxtLink>
+    <p>{{ t('index.tagline') }}</p>
+    <NuxtLink to="/signup">{{ t('index.cta') }}</NuxtLink>
+    <NuxtLink to="/login">{{ t('login.submit') }}</NuxtLink>
   </main>
 </template>
 

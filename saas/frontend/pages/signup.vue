@@ -1,4 +1,7 @@
 <script setup lang="ts">
+const { t, load: loadSilo } = useSilo()
+await useAsyncData('silo-info', async () => { await loadSilo(); return true })
+
 const email = ref('')
 const name = ref('')
 const password = ref('')
@@ -14,19 +17,19 @@ async function submit() {
     navigateTo('/dashboard')
   } catch (e: any) {
     const data = e?.data
-    error.value = typeof data === 'object' ? Object.values(data).flat().join(' ') : '가입 실패'
+    error.value = typeof data === 'object' ? Object.values(data).flat().join(' ') : t('signup.failed')
   }
 }
 </script>
 
 <template>
   <main class="wrap">
-    <h1>회원가입</h1>
+    <h1>{{ t('signup.title') }}</h1>
     <form @submit.prevent="submit">
-      <input v-model="email" type="email" placeholder="이메일" required />
-      <input v-model="name" type="text" placeholder="이름" />
-      <input v-model="password" type="password" placeholder="비밀번호 (8자 이상)" required minlength="8" />
-      <button type="submit">가입</button>
+      <input v-model="email" type="email" :placeholder="t('login.email')" required />
+      <input v-model="name" type="text" :placeholder="t('signup.name')" />
+      <input v-model="password" type="password" :placeholder="t('signup.pwPlaceholder')" required minlength="8" />
+      <button type="submit">{{ t('signup.submit') }}</button>
       <p v-if="error" class="err">{{ error }}</p>
     </form>
   </main>

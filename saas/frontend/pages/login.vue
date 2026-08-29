@@ -1,4 +1,7 @@
 <script setup lang="ts">
+const { t, load: loadSilo } = useSilo()
+await useAsyncData('silo-info', async () => { await loadSilo(); return true })
+
 const email = ref('')
 const password = ref('')
 const error = ref('')
@@ -13,21 +16,21 @@ async function submit() {
     })
     navigateTo((route.query.next as string) || '/dashboard')
   } catch (e: any) {
-    error.value = e?.data?.detail || '로그인 실패'
+    error.value = e?.data?.detail || t('login.failed')
   }
 }
 </script>
 
 <template>
   <main class="wrap">
-    <h1>로그인</h1>
+    <h1>{{ t('login.title') }}</h1>
     <form @submit.prevent="submit">
-      <input v-model="email" type="email" placeholder="이메일" required />
-      <input v-model="password" type="password" placeholder="비밀번호" required />
-      <button type="submit">로그인</button>
+      <input v-model="email" type="email" :placeholder="t('login.email')" required />
+      <input v-model="password" type="password" :placeholder="t('login.password')" required />
+      <button type="submit">{{ t('login.submit') }}</button>
       <p v-if="error" class="err">{{ error }}</p>
     </form>
-    <NuxtLink to="/signup">회원가입</NuxtLink>
+    <NuxtLink to="/signup">{{ t('login.signupLink') }}</NuxtLink>
   </main>
 </template>
 

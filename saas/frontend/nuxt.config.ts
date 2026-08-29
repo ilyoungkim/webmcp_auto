@@ -22,6 +22,11 @@ export default defineNuxtConfig({
     '/ready/**': { proxy: 'http://127.0.0.1:8000/ready/**' },
   },
   runtimeConfig: {
-    public: { apiBase: '' },
+    public: {
+      apiBase: '',
+      // 컨테이너 언어(사일로) — 도커에서 NUXT_PUBLIC_SILO_LANG=en 으로 주입
+      // 이 값이 있으면 SSR이 API 호출 없이 해당 언어로 확정 렌더링한다
+      siloLang: '',
+    },
   },
 })

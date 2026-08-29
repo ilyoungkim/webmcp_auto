@@ -80,6 +80,8 @@ services:
       args:
         API_HOST: http://backend:8000
     container_name: webmcp-frontend
+    environment:
+      - NUXT_PUBLIC_SILO_LANG=ko
     depends_on:
       - backend
     expose:

@@ -13,6 +13,43 @@ interface SiloState {
 // 위젯(webmcp-widget.js)의 I18N과 동일한 규격으로, 콘솔 페이지 문구를 담는다.
 const MESSAGES: Record<SiloLang, Record<string, string>> = {
   ko: {
+    // 공통 / 레이아웃
+    'common.logout': '로그아웃',
+    // 랜딩/인증
+    'index.tagline': 'URL만 입력하면 AI 비서 위젯이 자동 생성됩니다.',
+    'index.cta': '무료로 시작하기',
+    'login.title': '로그인',
+    'login.email': '이메일',
+    'login.password': '비밀번호',
+    'login.submit': '로그인',
+    'login.signupLink': '회원가입',
+    'login.failed': '로그인 실패',
+    'signup.title': '회원가입',
+    'signup.name': '이름',
+    'signup.pwPlaceholder': '비밀번호 (8자 이상)',
+    'signup.submit': '가입',
+    'signup.failed': '가입 실패',
+    'preview.liveTag': '위젯 실시간 미리보기',
+    // 대시보드
+    'dash.title': '내 프로젝트',
+    'dash.adminProjects': '프로젝트 관리',
+    'dash.errorReports': '오류 신고',
+    'dash.newProject': '새 프로젝트',
+    'dash.myAccount': '내 계정',
+    'dash.changePw': '비밀번호 변경',
+    'dash.planNote': '📌 내 프로젝트는 최대 5개까지 생성할 수 있습니다.',
+    'dash.pw.current': '현재 비밀번호',
+    'dash.pw.new': '새 비밀번호',
+    'dash.pw.newPlaceholder': '8자 이상',
+    'dash.pw.confirm': '새 비밀번호 확인',
+    'dash.pw.confirmPlaceholder': '새 비밀번호 다시 입력',
+    'dash.pw.mismatch': '새 비밀번호가 일치하지 않습니다.',
+    'dash.pw.tooShort': '새 비밀번호는 8자 이상이어야 합니다.',
+    'dash.pw.changed': '비밀번호가 변경되었습니다.',
+    'dash.pw.failed': '비밀번호 변경에 실패했습니다.',
+    'dash.pw.changing': '변경 중...',
+    'dash.pw.nameLabel': '이름',
+    'dash.empty': '등록된 프로젝트가 없습니다.',
     // projects/new.vue
     'new.title': '새 프로젝트',
     'new.namePlaceholder': '프로젝트명 (예: OO병원)',
@@ -92,6 +129,43 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'common.next': '다음',
   },
   en: {
+    // 공통 / 레이아웃
+    'common.logout': 'Log out',
+    // 랜딩/인증
+    'index.tagline': 'Enter your URL and an AI assistant widget is generated automatically.',
+    'index.cta': 'Get started free',
+    'login.title': 'Log in',
+    'login.email': 'Email',
+    'login.password': 'Password',
+    'login.submit': 'Log in',
+    'login.signupLink': 'Sign up',
+    'login.failed': 'Login failed',
+    'signup.title': 'Sign Up',
+    'signup.name': 'Name',
+    'signup.pwPlaceholder': 'Password (8+ characters)',
+    'signup.submit': 'Sign up',
+    'signup.failed': 'Sign up failed',
+    'preview.liveTag': 'Widget live preview',
+    // 대시보드
+    'dash.title': 'My Projects',
+    'dash.adminProjects': 'Manage Projects',
+    'dash.errorReports': 'Error Reports',
+    'dash.newProject': 'New Project',
+    'dash.myAccount': 'My Account',
+    'dash.changePw': 'Change Password',
+    'dash.planNote': '📌 You can create up to 5 projects.',
+    'dash.pw.current': 'Current password',
+    'dash.pw.new': 'New password',
+    'dash.pw.newPlaceholder': '8+ characters',
+    'dash.pw.confirm': 'Confirm new password',
+    'dash.pw.confirmPlaceholder': 'Re-enter new password',
+    'dash.pw.mismatch': 'New passwords do not match.',
+    'dash.pw.tooShort': 'New password must be at least 8 characters.',
+    'dash.pw.changed': 'Password changed successfully.',
+    'dash.pw.failed': 'Failed to change password.',
+    'dash.pw.changing': 'Changing...',
+    'dash.pw.nameLabel': 'Name',
+    'dash.empty': 'No projects yet.',
     // projects/new.vue
     'new.title': 'New Project',
     'new.namePlaceholder': 'Project name (e.g., City Hospital)',
@@ -173,17 +247,25 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
 }
 
 // ── 전역 공유 상태 ──────────────────────────────────────────
-// 모듈 스코프에 cache를 두어 모든 컴포넌트가 같은 lang을 공유한다.
-// (컴포넌트별 ref는 호출마다 새로 생성되어 페이지 간 동기화가 안 된다)
-// Nuxt는 composable을 앱 인스턴스별로 캐시하므로 useState를 쓴다.
-let _cached: SiloState | null = null
-
 export function useSilo(): SiloState {
   // useState: SSR/클라이언트 간 공유 + 앱 인스턴스 싱글턴
-  const lang = useState<SiloLang>('silo-lang', () => 'ko')
+  // 우선순위: 1) 컨테이너 env(NUXT_PUBLIC_SILO_LANG) — SSR 100% 확정
+  //          2) 백엔드 /api/silo-info/ 동적 조회 (폴백)
+  const lang = useState<SiloLang>('silo-lang', () => {
+    const envLang = (useRuntimeConfig().public as any)?.siloLang
+    return (envLang === 'en' || envLang === 'ko') ? envLang : 'ko'
+  })
   const ready = useState<boolean>('silo-ready', () => false)
 
   const load = async () => {
+    // env로 이미 확정된 경우(운영 도커) API 호출 불필요
+    const envLang = (useRuntimeConfig().public as any)?.siloLang
+    if (envLang === 'en' || envLang === 'ko') {
+      if (ready.value) return
+      lang.value = envLang as SiloLang
+      ready.value = true
+      return
+    }
     if (ready.value) return
     try {
       const config = useRuntimeConfig()
