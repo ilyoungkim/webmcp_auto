@@ -9,7 +9,14 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
 
-const { t, load: loadSilo } = useSilo()
+const { t, lang, load: loadSilo } = useSilo()
+// SSR에서도 silo 언어를 로드해 첫 렌더부터 영어 UI가 나오도록 한다
+await useAsyncData('silo-info', async () => { await loadSilo(); return true })
+// lang은 useState ref — .value 접근 필요
+const isEn = computed(() => (lang as any).value === 'en')
+// en 사일로용 설치 가이드/약관 컴포넌트
+import InstallGuideEn from './terms/InstallGuideEn.vue'
+import TermsEn from './terms/TermsEn.vue'
 
 const project = ref<any>(null)
 const qna = ref<any[]>([])
@@ -329,19 +336,20 @@ onUnmounted(() => clearInterval(timer))
 
         <!-- 실패한 페이지 안내 -->
         <div v-if="project.failedUrls?.length" class="failed-card">
-          <h3>⚠️ 크롤링 실패 ({{ project.failedUrls.length }}개)</h3>
+          <h3>⚠️ {{ t('proj.crawl.failedTitle', { n: project.failedUrls.length }) }}</h3>
           <ul class="failed-list">
             <li v-for="(f, idx) in project.failedUrls" :key="'f' + idx">
               <span class="failed-url">{{ f.url }}</span>
-              <span class="failed-err">{{ f.error || '크롤링 실패' }}</span>
+              <span class="failed-err">{{ f.error || t('proj.crawl.failed') }}</span>
             </li>
           </ul>
-          <p class="failed-note">실패한 페이지는 재생성 시 다시 시도됩니다. 지속적으로 실패하면 사이트 구조(JS 렌더링, 로그인 등)를 확인해 주세요.</p>
+          <p class="failed-note">{{ t('proj.crawl.failedNote') }}</p>
         </div>
       </div>
 
-      <!-- 설치 및 사용 방법 (아코디언, 닫힌 상태) -->
-      <details class="install-accordion">
+      <!-- 설치 및 사용 방법 (아코디언, 닫힌 상태) — 사일로 언어별 전환 -->
+      <InstallGuideEn v-if="isEn" :project-id="id" />
+      <details v-else class="install-accordion">
         <summary>📦 설치 및 사용 방법</summary>
         <div class="install-body">
           <p class="note">아래 <b>5개 파일</b>을 홈페이지 서버에 업로드하고, 설치할 페이지의 <code>&lt;/body&gt;</code> 직전에 스크립트를 추가하면 AI 비서 위젯이 표시됩니다.</p>
@@ -387,10 +395,10 @@ onUnmounted(() => clearInterval(timer))
 
       <!-- 미리보기 버튼 -->
       <div class="action-buttons">
-        <NuxtLink :to="`/preview/${id}`" class="btn primary">👁 미리보기</NuxtLink>
+        <NuxtLink :to="`/preview/${id}`" class="btn primary">👁 {{ t('proj.btn.preview') }}</NuxtLink>
       </div>
 
-      <h2>빠른메뉴 - 자동화된 질문 및 답변</h2>
+      <h2>{{ t('proj.qna.title') }}</h2>
 
       <details v-for="(q, i) in qna" :key="i" class="qna-item">
         <summary><span class="q-marker">Q:</span> <b>{{ q.menuLabel }}</b> — {{ q.question }}</summary>
@@ -399,22 +407,22 @@ onUnmounted(() => clearInterval(timer))
 
       <!-- 빠른메뉴 질문 편집 (가장 아래, 아코디언) -->
       <details class="menu-edit-accordion">
-        <summary>✏️ 빠른메뉴 질문 편집</summary>
+        <summary>✏️ {{ t('proj.menuEdit.title') }}</summary>
         <div class="menu-edit-card">
-          <p v-if="menuEdited" class="note locked-note">🔒 빠른메뉴 질문 편집은 <b>1회만</b> 가능합니다. 이미 편집이 완료되어 더 이상 수정할 수 없습니다.</p>
-          <p v-else class="note">질문을 수정한 뒤 <b>'답변 재생성'</b>을 누르면, 이미 수집된 소스를 기반으로 답변이 다시 생성됩니다. (재크롤링 없음 · 편집은 1회만 가능)</p>
+          <p v-if="menuEdited" class="note locked-note">{{ t('proj.menuEdit.locked') }}</p>
+          <p v-else class="note">{{ t('proj.menuEdit.note') }}</p>
 
-          <div v-if="menuLoading" class="menu-loading">빠른메뉴 불러오는 중...</div>
+          <div v-if="menuLoading" class="menu-loading">{{ t('proj.menuEdit.loading') }}</div>
 
           <div v-else class="menu-edit-body">
             <div v-for="(m, i) in menuItems" :key="i" class="menu-edit-row">
               <label class="menu-label">{{ m.label }}</label>
-              <input v-model="m.question" class="menu-question" placeholder="질문을 입력하세요" :disabled="menuEdited" />
+              <input v-model="m.question" class="menu-question" :placeholder="t('proj.menuEdit.placeholder')" :disabled="menuEdited" />
             </div>
 
             <div class="menu-edit-actions">
               <button class="btn primary" :disabled="menuSaving || menuEdited" @click="regenerateMenus">
-                {{ menuSaving ? '재생성 중...' : (menuEdited ? '편집 완료' : '답변 재생성') }}
+                {{ menuSaving ? t('proj.menuEdit.regenerating') : (menuEdited ? t('proj.menuEdit.edited') : t('proj.menuEdit.regenerate')) }}
               </button>
             </div>
             <p v-if="menuError" class="err">{{ menuError }}</p>
@@ -426,16 +434,16 @@ onUnmounted(() => clearInterval(timer))
 
     <!-- 고객센터 Q&A 게시판 -->
     <section class="support-section">
-      <h2>고객센터 Q&A</h2>
-      <p class="note">궁금한 점을 질문해 주세요. 관리자가 답변을 등록하면 확인할 수 있습니다.</p>
+      <h2>{{ t('proj.support.title') }}</h2>
+      <p class="note">{{ t('proj.support.note') }}</p>
 
       <!-- 질문 등록 폼 -->
       <div class="support-form">
-        <textarea v-model="supportQuestion" rows="3" placeholder="질문 내용을 입력하세요 (2000자 이내)" maxlength="2000"></textarea>
+        <textarea v-model="supportQuestion" rows="3" :placeholder="t('proj.support.placeholder')" maxlength="2000"></textarea>
         <div class="support-form-actions">
           <span class="support-count">{{ supportQuestion.length }}/2000</span>
           <button class="btn primary" :disabled="supportSubmitting" @click="submitSupport">
-            {{ supportSubmitting ? '등록 중...' : '질문 등록' }}
+            {{ supportSubmitting ? t('proj.support.submitting') : t('proj.support.submit') }}
           </button>
         </div>
         <p v-if="supportError" class="err">{{ supportError }}</p>
@@ -443,12 +451,12 @@ onUnmounted(() => clearInterval(timer))
       </div>
 
       <!-- Q&A 목록 -->
-      <div v-if="supportLoading" class="support-loading">불러오는 중...</div>
-      <div v-else-if="supportItems.length === 0" class="support-empty">등록된 Q&A가 없습니다.</div>
+      <div v-if="supportLoading" class="support-loading">{{ t('common.loading') }}</div>
+      <div v-else-if="supportItems.length === 0" class="support-empty">{{ t('proj.support.empty') }}</div>
       <div v-else class="support-list">
         <div v-for="t in supportItems" :key="t.id" class="support-item" :class="{ answered: t.status === 'answered' }">
           <div class="support-q">
-            <span class="support-badge" :class="t.status">{{ t.status === 'answered' ? '답변완료' : '답변대기' }}</span>
+            <span class="support-badge" :class="t.status">{{ t.status === 'answered' ? t('proj.support.answered') : t('proj.support.pending') }}</span>
             <span class="support-question">{{ t.question }}</span>
             <span class="support-time">{{ fmtSupportTime(t.createdAt) }}</span>
           </div>
@@ -464,18 +472,19 @@ onUnmounted(() => clearInterval(timer))
 
       <!-- 페이지네이션 (10개/페이지) -->
       <div v-if="supportTotalPages > 1" class="pagination">
-        <button class="page-btn" :disabled="supportPage <= 1" @click="supportPageBtn(supportPage - 1)">← 이전</button>
+        <button class="page-btn" :disabled="supportPage <= 1" @click="supportPageBtn(supportPage - 1)">← {{ t('common.prev') }}</button>
         <button
           v-for="p in supportTotalPages" :key="p"
           class="page-btn" :class="{ active: p === supportPage }"
           @click="supportPageBtn(p)"
         >{{ p }}</button>
-        <button class="page-btn" :disabled="supportPage >= supportTotalPages" @click="supportPageBtn(supportPage + 1)">다음 →</button>
+        <button class="page-btn" :disabled="supportPage >= supportTotalPages" @click="supportPageBtn(supportPage + 1)">{{ t('common.next') }} →</button>
       </div>
     </section>
 
-    <!-- 이용약관 아코디언 -->
-    <section class="terms-section">
+    <!-- 이용약관 아코디언 — 사일로 언어별 전환 -->
+    <TermsEn v-if="isEn" />
+    <section v-else class="terms-section">
       <div class="terms-title">
         <h2>읽어볼 내용</h2>
         <p class="note">WebMCP AI 비서 서비스의 이용 조건 및 절차, 이용자와 서비스 제공자의 권리·의무, 책임사항을 규정합니다.</p>
@@ -744,24 +753,22 @@ onUnmounted(() => clearInterval(timer))
     <div v-if="rerunModalOpen" class="modal-overlay" @click.self="rerunModalOpen = false">
       <div class="modal-card">
         <header class="modal-header">
-          <h3>재생성 소스 페이지 선택</h3>
+          <h3>{{ t('proj.rerun.title') }}</h3>
           <button class="close-btn" @click="rerunModalOpen = false">&times;</button>
         </header>
 
-        <p class="modal-desc">
-          <b>{{ project?.name }}</b> 사이트맵에서 검색된 <b>Root URL에 가장 가까운 상위 30개 URL</b> 중 크롤링할 페이지를 <b>최대 10개</b> 선택하세요.
-        </p>
+        <p class="modal-desc">{{ t('new.selectStep.desc', { name: project?.name || '' }) }}</p>
 
         <div v-if="loadingUrls" class="modal-loading">
-          사이트맵에서 URL 목록을 가져오는 중...
+          {{ t('proj.rerun.fetching') }}
         </div>
 
         <div v-else class="modal-body">
           <div class="select-bar">
-            <span>선택됨: <b>{{ selectedUrls.length }}</b> / 10개</span>
+            <span>{{ t('new.selectStep.selected', { n: selectedUrls.length }) }}</span>
             <div class="bar-actions">
-              <button class="btn sm" @click="selectAllTop10">상위 10개 선택</button>
-              <button class="btn sm" @click="clearSelection">전체 해제</button>
+              <button class="btn sm" @click="selectAllTop10">{{ t('new.selectStep.top10') }}</button>
+              <button class="btn sm" @click="clearSelection">{{ t('new.selectStep.clear') }}</button>
             </div>
           </div>
 
@@ -778,9 +785,9 @@ onUnmounted(() => clearInterval(timer))
         </div>
 
         <footer class="modal-footer">
-          <button class="btn" @click="rerunModalOpen = false">취소</button>
+          <button class="btn" @click="rerunModalOpen = false">{{ t('proj.edit.cancel') }}</button>
           <button class="btn primary" :disabled="submittingRerun || selectedUrls.length === 0" @click="submitRerun">
-            {{ submittingRerun ? '요청 중...' : `선택한 ${selectedUrls.length}개로 재생성 시작` }}
+            {{ submittingRerun ? t('proj.rerun.requesting') : t('proj.rerun.start', { n: selectedUrls.length }) }}
           </button>
         </footer>
       </div>

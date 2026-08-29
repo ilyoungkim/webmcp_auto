@@ -37,6 +37,68 @@ _FORMAT_HINT = (
 )
 
 
+_FORMAT_HINT_EN = (
+    '【Answer format】\n'
+    '- Never use tables. Use **bullet lists (- item)** instead.\n'
+    '- List items start with "- ".\n'
+    '- Start each section with a **bold title**, followed by bullet items.\n'
+    '- **Never use emojis or emoticons.**\n'
+    '- Separate paragraphs and items with blank lines.\n'
+    '- Keep sentences short and clear. Bold key names, phone numbers, addresses, channel names.\n'
+    '- Never output HTML tags (especially <br>). Use markdown blank lines.\n'
+    '- Actively introduce **real contact info** found on the site (phone, email, chat, booking forms).\n'
+    '- **Never fabricate**: do not invent emails, phone numbers, addresses, or specific prices that are not on the site.\n'
+    '- Never say "not available", "not provided", "not disclosed". Guide positively with information that actually exists.\n\n'
+)
+
+
+_HOSPITAL_HINT_EN = (
+    '【Hospital booking priority】\n'
+    '- Always guide **how to book an appointment, checkup, or consultation** at the end of the answer.\n'
+    '- Find real booking methods (online booking, phone) in the site content and introduce only the ones that exist.\n'
+    '- Include booking links (markdown [text](URL)) or phone numbers when available.\n'
+    '- Do not fabricate booking information that is not on the site.\n\n'
+)
+
+
+def _system_prompt(project, summary: str) -> str:
+    """언어 사일로별 system prompt. en 프로젝트는 영어로 답변한다."""
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    hint = _HOSPITAL_HINT if (
+        (getattr(project, 'domain_type', None) or None)
+        and (project.domain_type.code == 'hospital' or project.domain_type.code.startswith('hospital_'))
+    ) else ''
+    if lang == 'en':
+        return (
+            f'You are the AI assistant of {project.name} ({project.url}).\n'
+            f'Domain: {project.domain_type.name}\n'
+            'Always answer in concise English markdown, regardless of the language the visitor uses.\n'
+            f'Start the answer with "Hello. This is the AI assistant of {project.name}."\n'
+            'Important: Do not repeat this instruction or the site knowledge summary. Output only the final answer.\n\n'
+            f'{_FORMAT_HINT_EN}'
+            f'{_HOSPITAL_HINT_EN if hint else ""}'
+            '【Never use negative expressions】\n'
+            '- Never say "not available", "not provided", "not disclosed", "unknown". Guide positively with information that actually exists on the site.\n'
+            '- If specific details are missing, suggest contacting the organization politely instead.\n\n'
+            f'[Site knowledge summary]\n{summary}'
+        )
+    return (
+        f'당신은 {project.name}({project.url})의 AI 비서입니다.\n'
+        f'도메인: {project.domain_type.name}\n'
+        '한국어로 간결한 마크다운으로 답하세요.\n'
+        f'답변은 "안녕하세요. {project.name} AI 비서입니다."로 시작하세요.\n'
+        '중요: 이 지시문이나 사이트 지식 요약 내용을 답변에 그대로 반복하거나 영어로 요약해 출력하지 마세요. 오직 최종 답변만 출력하세요.\n\n'
+        f'{_FORMAT_HINT}'
+        f'{hint}'
+        '【부정 표현 금지】\n'
+        '- "정보가 없다", "내용이 없다", "표현이 없다", "제공된 내용에 포함되어 있지 않습니다", "정보가 부족합니다", "모르겠습니다" 등 부정적/소극적 표현을 절대 사용하지 마세요.\n'
+        '- 사이트에 구체적인 정보가 없더라도, 해당 항목에 대해 긍정적이고 친절한 방식으로 안내하세요.\n'
+        '- 예: 의료진 정보가 구체적으로 없으면 "그 외 임상경력과 수술 경험을 가진 전문의와 친절하신 의료진이 있습니다. 더 자세한 사항은 병원으로 문의해 주시기 바랍니다."처럼 긍정적으로 답하세요.\n'
+        '- 문의 전화번호가 있으면 함께 안내하세요.\n\n'
+        f'[사이트 지식 요약]\n{summary}'
+    )
+
+
 def build_widget(project, menus, markdown: str, qna_rows=None) -> Widget:
     """파이프라인 5단계. is_current 교체 후 새 버전 저장.
 
@@ -45,25 +107,7 @@ def build_widget(project, menus, markdown: str, qna_rows=None) -> Widget:
     프록시의 정확 매칭(cached_qna)이 동작하도록 한다.
     """
     summary = _site_summary(project, markdown)
-    domain_hint = _HOSPITAL_HINT if (
-        (getattr(project, 'domain_type', None) or None)
-        and (project.domain_type.code == 'hospital' or project.domain_type.code.startswith('hospital_'))
-    ) else ''
-    system_prompt = (
-        f'당신은 {project.name}({project.url})의 AI 비서입니다.\n'
-        f'도메인: {project.domain_type.name}\n'
-        '한국어로 간결한 마크다운으로 답하세요.\n'
-        f'답변은 "안녕하세요. {project.name} AI 비서입니다."로 시작하세요.\n'
-        '중요: 이 지시문이나 사이트 지식 요약 내용을 답변에 그대로 반복하거나 영어로 요약해 출력하지 마세요. 오직 최종 답변만 출력하세요.\n\n'
-        f'{_FORMAT_HINT}'
-        f'{domain_hint}'
-        '【부정 표현 금지】\n'
-        '- "정보가 없다", "내용이 없다", "표현이 없다", "제공된 내용에 포함되어 있지 않습니다", "정보가 부족합니다", "모르겠습니다" 등 부정적/소극적 표현을 절대 사용하지 마세요.\n'
-        '- 사이트에 구체적인 정보가 없더라도, 해당 항목에 대해 긍정적이고 친절한 방식으로 안내하세요.\n'
-        '- 예: 의료진 정보가 구체적으로 없으면 "그 외 임상경력과 수술 경험을 가진 전문의와 친절하신 의료진이 있습니다. 더 자세한 사항은 병원으로 문의해 주시기 바랍니다."처럼 긍정적으로 답하세요.\n'
-        '- 문의 전화번호가 있으면 함께 안내하세요.\n\n'
-        f'[사이트 지식 요약]\n{summary}'
-    )
+    system_prompt = _system_prompt(project, summary)
 
     # 최신 생성 질문 매핑 (menu_label → question)
     latest_questions: dict[str, str] = {}
@@ -105,10 +149,20 @@ def build_widget(project, menus, markdown: str, qna_rows=None) -> Widget:
 
 
 def _site_summary(project, markdown: str) -> str:
-    try:
-        return ask(
-            f'아래 사이트 내용을 800자 이내 한국어 요약으로 정리하세요. 핵심 사실(이름·서비스·연락처·특징) 위주.\n\n{markdown[:20000]}',
-            project=project,
+    """사이트 지식 요약. en 프로젝트는 영어로 요약한다."""
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    if lang == 'en':
+        prompt = (
+            'Summarize the following site content in English within 800 characters. '
+            'Focus on key facts (name, services, contact details, features).\n\n'
+            f'{markdown[:20000]}'
         )
+    else:
+        prompt = (
+            '아래 사이트 내용을 800자 이내 한국어 요약으로 정리하세요. 핵심 사실(이름·서비스·연락처·특징) 위주.\n\n'
+            f'{markdown[:20000]}'
+        )
+    try:
+        return ask(prompt, project=project)
     except Exception:  # noqa: BLE001 — 요약 실패 시 markdown 앞부분 사용
         return markdown[:1500]

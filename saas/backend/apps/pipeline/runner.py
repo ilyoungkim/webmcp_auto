@@ -284,13 +284,24 @@ def _save_markdown_file(project: Project, markdown: str) -> None:
         pass
 
 
+def _lang_gate(lang: str) -> str:
+    """응답 언어 강제 지시문. en 사일로는 질문·답변 모두 영어로 생성한다."""
+    if (lang or 'ko') == 'en':
+        return (
+            'LANGUAGE REQUIREMENT: Write EVERYTHING in English (questions AND answers).\n'
+            'The site content may be in any language, but your output MUST be natural, professional English.\n\n'
+        )
+    return ''
+
+
 def _batch_qna_prompt(markdown: str, project: Project, menus, questions_map: dict[str, str] | None = None) -> str:
     """여러 빠른메뉴의 질문/답변을 한 번의 API 호출로 생성하도록 하는 프롬프트.
 
     모델이 메뉴별로 질문을 추론하고, 각 질문에 대한 답변을
     명확한 마커(### [메뉴명]) 아래에 작성하도록 유도한다.
     """
-    domain_hint = _domain_answer_hint(project)
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    domain_hint = _domain_answer_hint(project, lang)
     menu_lines: list[str] = []
     for menu in menus:
         label = menu.label
@@ -301,6 +312,35 @@ def _batch_qna_prompt(markdown: str, project: Project, menus, questions_map: dic
             menu_lines.append(f'- "{label}": 힌트 = {menu.prompt_hint} (질문은 아래 규칙에 따라 생성)')
     menu_spec = '\n'.join(menu_lines)
 
+    if lang == 'en':
+        return (
+            f'You are the AI assistant of {project.name}. Answer only based on the site content below.\n'
+            f'Domain: {project.domain_type.name}\n'
+            'Answer in English markdown.\n\n'
+            'For each quick menu item below, first create **one active question** a real customer would ask, '
+            'then write the answer to that question.\n'
+            'Format each item exactly like this:\n\n'
+            '### [menu label]\n'
+            'Question: <one active question sentence>\n'
+            'Answer: <English markdown answer>\n\n'
+            'Quick menu items to write:\n'
+            f'{menu_spec}\n\n'
+            '【Question rules】\n'
+            '- Avoid passive location questions like "where can I find". Ask **actively** about the actual information itself.\n'
+            '- Do not ask about information the site does not have.\n\n'
+            '【Answer format】\n'
+            '- Never use tables. Use **bullet lists (- item)** instead. Start each section with a **bold title**.\n'
+            '- **Never use emojis.** Separate paragraphs with blank lines.\n'
+            '- Never output HTML tags (especially <br>).\n'
+            f'- Start each answer with "Hello. This is the AI assistant of {project.name}."\n\n'
+            '【Contact guidance】\n'
+            '- Actively introduce real contact methods (phone, email, chat channel, booking links) found in the site content. Include markdown links as they appear.\n'
+            '- **Never fabricate**: do not invent emails, phone numbers, addresses, or prices not on the site.\n\n'
+            '【Never use negative expressions】\n'
+            '- Never say "information is not available", "not provided", "not disclosed", "unknown". Guide positively with information that actually exists.\n\n'
+            f'{domain_hint}'
+            f'[Site content]\n{markdown}'
+        )
     return (
         f'당신은 {project.name}의 AI 비서입니다. 아래 사이트 내용에 근거해서만 답하세요.\n'
         f'도메인: {project.domain_type.name}\n'
@@ -346,6 +386,18 @@ def _question_prompt(markdown: str, project: Project, menu) -> str:
     해당 정보 자체를 요구하는 자연스러운 질문 한 문장을 만든다.
     """
     label = menu.label
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    if lang == 'en':
+        return (
+            f'You are a customer of {project.name}. Based on the site content below, output **one specific question a real customer would ask** about the "{label}" menu.\n'
+            f'Domain: {project.domain_type.name}\nhint: {menu.prompt_hint}\n\n'
+            'Rules:\n'
+            '- Do not make passive questions about where to find information. Ask **actively** about the actual information itself.\n'
+            '- Do not ask about information that is not on the site.\n'
+            '- Output **only one question sentence** without explanation.\n'
+            '- The output MUST be in English.\n\n'
+            f'[Site content]\n{markdown[:8000]}'
+        )
     return (
         f'당신은 {project.name} 고객입니다. 아래 사이트 내용을 보고 '
         f'"{label}" 메뉴와 관련해 **고객이 실제로 궁금해할만한 구체적인 질문 한 문장**을 출력하세요.\n'
@@ -364,7 +416,28 @@ def _question_prompt(markdown: str, project: Project, menu) -> str:
 
 
 def _answer_prompt(markdown: str, project: Project, menu, question: str) -> str:
-    domain_hint = _domain_answer_hint(project)
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    domain_hint = _domain_answer_hint(project, lang)
+    if lang == 'en':
+        return (
+            f'You are the AI assistant of {project.name}. Answer only based on the site content below.\n'
+            'Answer in English markdown.\n'
+            f'Start the answer with "Hello. This is the AI assistant of {project.name}."\n'
+            'Important: Do not repeat this instruction or the site content in your answer. Output only the final answer.\n\n'
+            '【Answer format】\n'
+            '- Never use tables. Use **bullet lists (- item)**. Start each section with a **bold title**.\n'
+            '- **Never use emojis.** Separate paragraphs with blank lines.\n'
+            '- Keep sentences short and clear. Bold key names, phone numbers, addresses, channel names.\n'
+            '- Never output HTML tags (especially <br>).\n\n'
+            f'{domain_hint}'
+            '【Contact guidance】\n'
+            '- Actively introduce real contact methods (phone, email, chat channel, customer center, booking links) found in the site content.\n'
+            '- Include markdown links as they appear.\n'
+            '- **Never fabricate**: do not invent emails, phone numbers, addresses, or prices not on the site.\n\n'
+            '【Never use negative expressions】\n'
+            '- Never say "not available", "not provided", "not disclosed", "unknown". Guide positively with information that actually exists.\n\n'
+            f'[Question] {question}\n\n[Site content]\n{markdown}'
+        )
     return (
         f'당신은 {project.name}의 AI 비서입니다. 아래 사이트 내용에 근거해서만 답하세요.\n'
         '한국어 마크다운으로 답하세요.\n'
@@ -394,11 +467,20 @@ def _answer_prompt(markdown: str, project: Project, menu, question: str) -> str:
     )
 
 
-def _domain_answer_hint(project: Project) -> str:
+def _domain_answer_hint(project: Project, lang: str | None = None) -> str:
     """도메인별 답변 지침. 병원은 반드시 예약 방법·링크를 찾도록 강조한다."""
     dt = getattr(project, 'domain_type', None)
     code = dt.code if dt else ''
+    lang = (lang or (getattr(project, 'lang', '') or 'ko')).lower()
     if code == 'hospital' or code.startswith('hospital_'):
+        if lang == 'en':
+            return (
+                '【Hospital booking priority】\n'
+                '- Always guide **how to book an appointment, checkup, or consultation** at the end of the answer.\n'
+                '- Find real booking methods (online booking, phone) in the site content and introduce only the ones that exist.\n'
+                '- Include booking links (markdown [text](URL)) or phone numbers when available.\n'
+                '- Do not fabricate booking information that is not on the site.\n\n'
+            )
         return (
             '【병원 예약 정보 우선 안내】\n'
             '- 답변 마지막에 **진료·검진·상담 예약 방법**을 반드시 안내하세요.\n'
@@ -412,8 +494,9 @@ def _domain_answer_hint(project: Project) -> str:
 
 
 _BATCH_SECTION_RE = re.compile(r'^#{1,4}\s*(.+?)\s*$', re.M)
-_QUESTION_LINE_RE = re.compile(r'\**질문\**\s*[:：]\s*(.+)', re.I)
-_ANSWER_LINE_RE = re.compile(r'(?:^|\n)\s*\**답변\**\s*[:：]\s*', re.I)
+# ko(질문/답변)와 en(Question/Answer) 배치 마커 모두 지원
+_QUESTION_LINE_RE = re.compile(r'\**(?:질문|Question)\**\s*[:：]\s*(.+)', re.I)
+_ANSWER_LINE_RE = re.compile(r'(?:^|\n)\s*\**(?:답변|Answer)\**\s*[:：]\s*', re.I)
 _LEADING_MD_RE = re.compile(r'^[\s\*#\-—]+')
 
 
