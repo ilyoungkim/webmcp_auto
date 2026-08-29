@@ -1,9 +1,0 @@
-# ============================================================================
-# webmcp/backend/requirements.txt
-# ============================================================================
-fastapi
-uvicorn[standard]
-pymysql
-cryptography
-httpx
-python-dotenv
