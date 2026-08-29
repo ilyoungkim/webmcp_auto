@@ -39,10 +39,14 @@
 
   function widgetTemplate() {
     return (
-      '<button id="webmcpLauncher" class="wmcp-launcher" type="button" aria-label="AI 비서 열기">💬</button>' +
+      '<button id="webmcpLauncher" class="wmcp-launcher" type="button" aria-label="AI 비서 열기">' +
+      '  <span class="wmcp-launcher-ai">AI</span>' +
+      '  <span class="wmcp-launcher-spark">✦</span>' +
+      '</button>' +
       '<div id="webmcpPanel" class="wmcp-panel" hidden>' +
       '  <header class="wmcp-header">' +
-      '    <h1 id="wmcpTitle">💘 AI 비서</h1>' +
+      '    <span class="wmcp-header-logo">AI</span>' +
+      '    <h1 id="wmcpTitle">✨ AI 비서</h1>' +
       '    <span class="wmcp-status" id="wmcpStatus">연결 확인 중...</span>' +
       '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="크게 보기">⤢</button>' +
       '    <button id="wmcpClose" class="wmcp-close" type="button" title="닫기">✕</button>' +
@@ -52,9 +56,12 @@
       '    <div id="wmcpPills" class="wmcp-pills"></div>' +
       '    <div class="wmcp-inputrow">' +
       '      <textarea id="wmcpInput" placeholder="메시지를 입력하세요..." rows="1"></textarea>' +
+      '      <button id="wmcpMic" class="wmcp-mic" type="button" title="음성 입력">' +
+      '        <span class="wmcp-mic-text">음성<br/>입력</span>' +
+      '      </button>' +
       '      <button id="wmcpAsk" class="wmcp-ask" type="button" title="보내기">➤</button>' +
       '    </div>' +
-      '    <div class="wmcp-loader" id="wmcpLoader">💬 답변 생성 중...</div>' +
+      '    <div class="wmcp-loader" id="wmcpLoader">✨ 답변 생성 중...</div>' +
       '  </div>' +
       '  <details class="wmcp-accordion">' +
       '    <summary>⚙️ 동작 방식</summary>' +
@@ -80,12 +87,12 @@
     var names = cfg.names || {};
     // 사이트별 헤더 제목 — SaaS 생성 config.title 우선, 없으면 기존 하드코딩 폴백
     var titles = {
-      yonja: '💘 연애의 자격 AI 비서',
+      yonja: '✨ 연애의 자격 AI 비서',
       hospital: '🏥 생생병원 AI 비서',
       genisev: '🔋 제니스코리아 AI 비서',
     };
     return {
-      title: cfg.title || titles[ns] || '💘 AI 비서',
+      title: cfg.title || titles[ns] || '✨ AI 비서',
       ns: ns,
       names: names,
       theme: cfg.theme || {},
@@ -284,8 +291,19 @@
   function setLoading(on) {
     var loader = $('#wmcpLoader');
     var ask = $('#wmcpAsk');
+    var input = $('#wmcpInput');
+    var mic = $('#wmcpMic');
     if (loader) loader.classList.toggle('show', on);
     if (ask) ask.disabled = on;
+    // 답변 생성 중에는 입력을 받지 않도록 비활성화
+    if (input) {
+      input.disabled = on;
+      input.placeholder = on ? '답변 생성 중...' : '메시지를 입력하세요...';
+    }
+    if (mic) mic.disabled = on;
+    // 퀵 메뉴(빠른메뉴 pill)도 비활성화
+    var pills = document.querySelectorAll('#webmcp-widget .wmcp-pill');
+    for (var i = 0; i < pills.length; i++) pills[i].disabled = on;
   }
 
   function welcome() {
@@ -450,12 +468,13 @@
     }
 
     // 2) 백엔드 헬스체크 (프록시가 실제 응답하는지)
+    //    위젯은 같은 오리진에서 서빙되므로 상대경로로 호출한다.
+    //    (proxyEndpoint 가 절대 URL(localhost 등)이면 127.0.0.1 접속 시 CORS 로 차단됨)
     try {
-      var proxy = window.WebMCP.proxyEndpoint || '/api/chat/';
-      var healthUrl = proxy.replace(/\/api\/chat\/?$/, '/api/health/');
+      var healthUrl = '/api/health/';
       var res = await fetch(healthUrl, { method: 'GET' });
       if (!res.ok) {
-        healthUrl = proxy.replace(/\/api\/chat\/?$/, '/health/');
+        healthUrl = '/health/';
         res = await fetch(healthUrl, { method: 'GET' });
       }
       if (res.ok) {
@@ -499,12 +518,77 @@
     }
     var ask = $('#wmcpAsk');
     if (ask) ask.addEventListener('click', handleAsk);
+    initMic(); // 음성 입력
     // 사이트별 헤더 제목 설정
     var titleEl = $('#wmcpTitle');
     if (titleEl) titleEl.textContent = siteConfig().title;
     initPills();
     initChatLinks();
     refresh(); // 연결 상태 배지 갱신
+  }
+
+  // ── 음성 입력 (Web Speech API) ─────────────────────────────
+  var recognition = null;
+  var listening = false;
+
+  function initMic() {
+    var mic = $('#wmcpMic');
+    if (!mic) return;
+    // Web Speech API 지원 여부 확인
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      mic.style.display = 'none'; // 미지원 브라우저에서는 숨김
+      return;
+    }
+    recognition = new SR();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = true;   // 실시간 인식 결과 표시
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;      // 말이 끝나면 자동 종료
+
+    recognition.onresult = function (e) {
+      var input = $('#wmcpInput');
+      if (!input) return;
+      var transcript = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      input.value = transcript;
+      input.focus();
+    };
+    recognition.onerror = function (e) {
+      setMicState(false);
+    };
+    recognition.onend = function () {
+      setMicState(false);
+      // 음성 인식이 끝나면 입력된 내용이 있으면 자동으로 질문 전송
+      var input = $('#wmcpInput');
+      if (input && input.value.trim()) {
+        handleAsk();
+      }
+    };
+
+    mic.addEventListener('click', function () {
+      if (listening) {
+        recognition.stop();
+        setMicState(false);
+      } else {
+        try {
+          recognition.start();
+          setMicState(true);
+        } catch (err) {
+          setMicState(false);
+        }
+      }
+    });
+  }
+
+  function setMicState(on) {
+    listening = on;
+    var mic = $('#wmcpMic');
+    if (!mic) return;
+    mic.classList.toggle('wmcp-mic--active', on);
+    mic.title = on ? '음성 입력 중지' : '음성 입력';
   }
 
   if (document.readyState === 'loading') {

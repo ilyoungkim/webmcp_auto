@@ -38,6 +38,9 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=64, blank=True, default='')
     role = models.CharField(max_length=16, default='user')  # user | admin
+    # IP 화이트리스트 — 줄바꿈/콤마 구분. 비어 있으면 제한 없음(모든 IP 허용).
+    # 단일 IP(203.0.113.10) 또는 CIDR(203.0.113.0/24) 지원.
+    allowed_ips = models.TextField(blank=True, default='')
     plan = models.CharField(max_length=16, default='free')  # free | pro | admin
     must_change_password = models.BooleanField(default=False)
 

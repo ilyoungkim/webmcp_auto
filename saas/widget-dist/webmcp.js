@@ -9,9 +9,9 @@
 (function () {
   'use strict';
 
-  var PROXY_ENDPOINT = window.WebMCPConfig && window.WebMCPConfig.proxyEndpoint
-    ? window.WebMCPConfig.proxyEndpoint
-    : '/api/chat/';
+  // 위젯은 같은 오리진에서 서빋되므로 상대경로로 호출한다.
+  // (proxyEndpoint 가 절대 URL(localhost 등)이면 127.0.0.1 접속 시 CORS 로 차단됨)
+  var PROXY_ENDPOINT = '/api/chat/';
 
   function publicId() {
     return (window.WebMCPConfig && (window.WebMCPConfig.publicId || window.WebMCPConfig.siteNs)) || '';

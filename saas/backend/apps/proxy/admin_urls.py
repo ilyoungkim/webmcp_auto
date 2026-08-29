@@ -21,7 +21,7 @@ def users(request):
     _require_admin(request)
     return Response([
         {'id': u.id, 'email': u.email, 'name': u.name, 'role': u.role,
-         'plan': u.plan, 'active': u.is_active}
+         'plan': u.plan, 'active': u.is_active, 'allowedIps': u.allowed_ips}
         for u in User.objects.order_by('id')
     ])
 
@@ -38,6 +38,8 @@ def user_patch(request, pk):
             setattr(u, field, request.data[field])
     if 'active' in request.data:
         u.is_active = bool(request.data['active'])
+    if 'allowedIps' in request.data:
+        u.allowed_ips = (request.data['allowedIps'] or '').strip()
     u.save()
     return Response({'ok': True})
 

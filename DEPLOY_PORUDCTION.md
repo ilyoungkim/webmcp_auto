@@ -145,6 +145,87 @@ server {
 
 ---
 
+## 4.1 SAAS_PUBLIC_URL — 위젯 config에 박제되는 값 (가장 중요)
+
+위젯이 생성될 때 `build_widget()`(`apps/widgets/generator.py`)은 이 값을 그대로 config에 박제한다:
+
+```json
+{
+  "assetBase": "http://localhost:8080/widget-dist/",
+  "proxyEndpoint": "http://localhost:8080/api/chat/"
+}
+```
+
+| 값 | 역할 |
+|---|---|
+| `assetBase` | 고객 사이트에서 위젯 JS/CSS(`webmcp.js`·`widget.js`·`widget.css`)를 로드하는 위치 |
+| `proxyEndpoint` | 위젯이 채팅 요청을 보낼 API 주소 |
+
+> 즉, **운영에 설치하면 이 값은 운영 서버의 실제 도메인**이어야 한다.
+> `localhost`/`127.0.0.1`이 남아 있으면 고객 방문자의 브라우저가 자기 자신(localhost)을 호출하게 되어 위젯이 동작하지 않는다.
+
+### 4.1.1 운영에서 반드시 HTTPS 도메인을 써야 하는 이유
+
+| 이유 | 설명 |
+|---|---|
+| **음성 입력(필수)** | `Web Speech API`는 대부분의 브라우저에서 **HTTPS 안전 컨텍스트에서만 동작**한다. HTTP에서는 마이크 접근 자체가 차단된다. |
+| **Secure 쿠키** | `DEBUG=false`이면 세션/CSRF 쿠키가 `Secure`로 설정되어 HTTP에서는 전송되지 않는다. |
+| **혼합 콘텐츠 차단** | 고객의 HTTPS 사이트에서 HTTP 스크립트/요청은 브라우저가 차단한다(Mixed Content). |
+| **CSP** | 고객 사이트 CSP에 SaaS 도메인을 `script-src`로 추가해야 한다(HTTPS 권장). |
+
+IP 주소로도 동작은 가능하지만 **도메인 + HTTPS를 권장**한다(위젯 기능, 인증서 관리, 향후 이전 편의성).
+
+### 4.1.2 값을 바꾼 뒤 반드시 해야 할 작업
+
+`SAAS_PUBLIC_URL`은 **위젯 생성(또는 재생성) 시점의 스냅샷**이다. 값만 바꾼다고 끝나지 않는다.
+
+1. `.env`의 `SAAS_PUBLIC_URL`을 운영 도메인으로 변경
+   ```dotenv
+   SAAS_PUBLIC_URL=https://saas.example.com
+   ```
+2. `docker/docker-compose.yml`의 환경변수(backend/worker 각각)도 동기화
+   ```yaml
+   - SAAS_PUBLIC_URL=https://saas.example.com
+   - CSRF_TRUSTED_ORIGINS=https://saas.example.com
+   ```
+3. 백엔드 재시작
+   ```bash
+   docker compose up -d backend worker
+   ```
+4. **기존 프로젝트 위젯 재빌드** — config에 옛 주소가 박제되어 있으므로 반드시 실행
+   - 콘솔 `/admin/projects` → 각 프로젝트 **"Q&A 재생성"** (내부적으로 `build_widget` 재실행)
+   - 또는 API: `POST /api/admin/projects/<id>/regenerate/`
+5. 고객이 이미 배포한 **`bundle.zip` 재다운로드·재설치** 필요
+   - `webmcp-config.js` 안의 `assetBase`/`proxyEndpoint`가 옛 주소이기 때문
+   - **1줄 임베드**(포스터 `/embed/<publicId>.js`) 사용 고객은 재설치 불필요 — 임베드 로더가 항상 서버에서 최신 config를 받아옴
+6. 검증
+   ```bash
+   curl https://saas.example.com/api/projects/<id>/widget/ | grep -E 'assetBase|proxyEndpoint'
+   # 또는 고객 사이트에서 생성된 config 직접 확인
+   ```
+
+### 4.1.3 접속 주소 불일치와 CORS/CSRF 주의 (검증 완료 사항)
+
+같은 서버라도 접속 주소 표기가 다르면 다른 오리진으로 취급된다(`localhost` vs `127.0.0.1`).
+
+| 상황 | 결과 | 대응 |
+|---|---|---|
+| 접속 `127.0.0.1:8080`, CSRF origin에 미등록 | 로그인 403 | `CSRF_TRUSTED_ORIGINS`에 `http://127.0.0.1:8080` 포함 확인 |
+| 위젯 chat/health를 절대 URL로 호출 | CORS 차단 | 이미 **상대경로**(`/api/chat/`, `/api/health/`) 사용으로 해결됨 |
+| `SAAS_PUBLIC_URL`과 실제 접속 도메인 불일치 | 위젯 정적 자산 404/차단 | `assetBase`는 절대 URL이므로 운영 도메인으로 통일 |
+
+> 로컬/운영 모두에서 위젯 통신은 상대경로 기반이므로 개발 환경에서는 origin 불일치 문제가 없다. 다만 1줄 임베드 방식은 `assetBase`가 SaaS 호스트를 가리켜야 하므로 운영 도메인 설정이 필수다.
+
+### 4.1.4 요약
+
+- [ ] `SAAS_PUBLIC_URL=https://운영도메인` (HTTPS 필수 권장 — 음성 입력·Secure 쿠키)
+- [ ] compose의 `CSRF_TRUSTED_ORIGINS` 동기화
+- [ ] 기존 프로젝트 위젯 **재빌드(재생성)** — 박제된 config 갱신
+- [ ] 고객 배포본(`bundle.zip`) **재다운로드 안내** (1줄 임베드 고객은 불필요)
+- [ ] `curl https://도메인/api/projects/<id>/widget/`로 최종 확인
+
+---
+
 ## 5. Docker 포트 보안
 
 운영 서버 nginx가 외부 HTTPS를 담당하므로 Docker nginx의 8080 포트는 인터넷에 직접 열 필요가 없다.
@@ -326,6 +407,9 @@ docker/backups/logs/logs_YYYYMMDD_HHMMSS/
 | 외부 nginx 경유 시 HTTPS가 HTTP로 인식 | TLS를 외부 nginx에서 종료 | `X-Forwarded-Proto https` 전달 + Docker nginx 보존 + Django `SECURE_PROXY_SSL_HEADER` 설정 |
 | 포트 8080이 외부에 노출 | compose `"8080:80"` | `"127.0.0.1:8080:80"` 사용, 외부 nginx만 프록시 |
 | 설치 코드가 `localhost:8080`으로 생성 | `SAAS_PUBLIC_URL`이 개발 값 | 실제 `https://도메인`으로 변경 후 위젯 재생성 |
+| `SAAS_PUBLIC_URL` 변경 후에도 위젯이 옛 주소 사용 | config는 **생성 시점에 박제**됨 | 콘솔에서 "Q&A 재생성"으로 위젯 재빌드 + 고객 번들 재다운로드(§4.1.2) |
+| 채팅은 되는데 위젯이 "연결 안 됨" 표시 | config 절대 URL과 접속 오리진 불일치(CORS) | 이미 상대경로(`/api/health/`)로 해결됨. 재발 시 위젯 재빌드 |
+| 음성 입력 버튼이 동작하지 않음 | HTTP 환경(Web Speech API 제한) | `SAAS_PUBLIC_URL`을 **HTTPS** 도메인으로 설정 |
 | Docker 이미지/볼륨이 프로젝트 폴더에 없음 | Docker daemon이 전용 저장소에서 관리 | 정상 동작. 중요 데이터는 `pg_dump` 기반 `backup.sh`로 백업 |
 | PostgreSQL 18이 시작되지 않음 | 구 경로 `/var/lib/postgresql/data` 마운트 | PostgreSQL 18+는 `/var/lib/postgresql` 마운트 |
 | `docker compose down -v` 후 데이터 소실 | 볼륨까지 제거 | 운영에서 `-v` 금지, 실행 전 `backup.sh --db-only` 수행 |
@@ -340,6 +424,9 @@ docker/backups/logs/logs_YYYYMMDD_HHMMSS/
 
 - [ ] 실제 HTTPS 도메인 연결 및 인증서 정상
 - [ ] `SAAS_PUBLIC_URL=https://실제도메인`
+- [ ] **기존 프로젝트 위젯 재빌드 완료** (config에 `assetBase`/`proxyEndpoint` 박제 — §4.1)
+- [ ] **고객 배포 bundle.zip 재다운로드 안내 완료** (1줄 임베드 고객 제외)
+- [ ] 위젯에서 "연결됨" 배지·음성 입력(HTTPS) 동작 확인
 - [ ] `DJANGO_DEBUG=false`
 - [ ] `DJANGO_SECRET_KEY` 교체
 - [ ] Gemini/OpenRouter 키가 `.env`에 안전하게 등록됨

@@ -155,7 +155,7 @@ def project_menus(request, pk):
     from apps.catalogs.models import QuickMenu
     from apps.pipeline.models import GeneratedQnA
 
-    menus = QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True)
+    menus = QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True, is_required=False)
     qna_map = {q.menu_label: q for q in GeneratedQnA.objects.filter(project=p)}
     return Response({
         'edited': p.menus_edited,
@@ -193,11 +193,11 @@ def project_menus_regenerate(request, pk):
     if content is None or not content.markdown:
         raise ValidationError('수집된 소스가 없습니다. 먼저 크롤링/재생성을 실행하세요.')
 
-    menus = list(QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True))
+    menus = list(QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True, is_required=False))
     if not menus:
         raise ValidationError('빠른메뉴가 설정되지 않았습니다.')
 
-    # 사용자가 편집한 질문 매핑 (menu_label → question)
+    # 사용자가 편집한 질문 매핑 (menu_label → question) — 필수 메뉴는 제외
     questions_map: dict[str, str] = {}
     for d in (request.data.get('menus') or []):
         if isinstance(d, dict) and d.get('label'):

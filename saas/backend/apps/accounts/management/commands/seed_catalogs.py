@@ -1,6 +1,25 @@
 from django.core.management.base import BaseCommand
+from django.db import models
 
 from apps.catalogs.models import DomainType, QuickMenu
+
+# 필수 메뉴 "AI비서란?" 의 공통 답변 — 모든 프로젝트에서 동일하게 사용 (DB에서 관리)
+REQUIRED_MENU_LABEL = 'AI비서란?'
+REQUIRED_MENU_QUESTION = 'AI비서가 무엇이고, 어떻게 사용하나요?'
+REQUIRED_MENU_HINT = 'AI비서의 소개·사용 방법·문의 안내 중심'
+REQUIRED_MENU_ANSWER = (
+    '**AI비서란?**\n\n'
+    'AI비서는 홈페이지에 설치된 인공지능 상담 챗봇입니다. '
+    '홈페이지의 정보를 학습하여 방문자에게 빠르고 정확한 답변을 제공합니다.\n\n'
+    '**사용 방법**\n'
+    '- 우하단 **AI** 버튼을 클릭하면 채팅창이 열립니다.\n'
+    '- 빠른 메뉴(퀵 질문) 버튼을 누르면 자동으로 질문이 입력됩니다.\n'
+    '- 직접 질문을 입력하거나 **🎤 음성 입력**으로 질문할 수 있습니다.\n'
+    '- 답변은 수집된 홈페이지 정보를 기반으로 생성됩니다.\n\n'
+    '**문의 안내**\n'
+    '- 궁금한 점이 있으면 홈페이지의 **고객센터 Q&A**에 질문을 남겨주세요.\n'
+    '- 또는 [AI 아카이브](https://ai-archive.co.kr/ko)에서 더 자세한 정보를 확인하실 수 있습니다.'
+)
 
 # 도메인 유형 세분화 템플릿.
 # 포맷: (code, name, description, icon, [(label, question, hint), ...])
@@ -210,4 +229,25 @@ class Command(BaseCommand):
                 QuickMenu.objects.filter(pk=qm.pk).update(
                     question=question, prompt_hint=hint, sort_order=i,
                 )
+            # 필수 메뉴 "AI비서란?" — 모든 도메인 유형에 마지막에 자동 추가 (편집/삭제 불가)
+            self._ensure_required_menu(dt)
         self.stdout.write(self.style.SUCCESS('카탈로그 시드 완료 (25개 도메인)'))
+
+    def _ensure_required_menu(self, dt):
+        """모든 도메인 유형에 'AI비서란?' 필수 메뉴를 마지막에 추가한다."""
+        label = REQUIRED_MENU_LABEL
+        question = REQUIRED_MENU_QUESTION
+        hint = REQUIRED_MENU_HINT
+        answer = REQUIRED_MENU_ANSWER
+        # 기존 메뉴 중 마지막 sort_order 다음에 배치
+        last_order = QuickMenu.objects.filter(domain_type=dt).aggregate(m=models.Max('sort_order'))['m'] or 0
+        qm, created = QuickMenu.objects.get_or_create(
+            domain_type=dt, label=label,
+            defaults={'question': question, 'prompt_hint': hint, 'sort_order': last_order + 1, 'is_required': True, 'answer_md': answer},
+        )
+        if created:
+            return
+        # 이미 존재하면 필수로 표시하고, 공통 답변을 최신값으로 갱신, 마지막 위치로 이동
+        QuickMenu.objects.filter(pk=qm.pk).update(
+            question=question, prompt_hint=hint, is_required=True, answer_md=answer, sort_order=last_order + 1,
+        )

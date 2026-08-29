@@ -31,7 +31,7 @@ services:
       - DJANGO_DEBUG=false
       - ALLOWED_HOSTS=127.0.0.1,localhost,backend
       - SAAS_PUBLIC_URL=http://localhost:8080
-      - CSRF_TRUSTED_ORIGINS=http://localhost:8080
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
       - TERSER_CMD=terser
       - DATABASE_URL=postgres://webmcp:webmcp_dev_pass@postgres:5432/webmcp
       - GUNICORN_WORKERS=2
@@ -59,7 +59,7 @@ services:
       - DJANGO_DEBUG=false
       - ALLOWED_HOSTS=127.0.0.1,localhost,backend
       - SAAS_PUBLIC_URL=http://localhost:8080
-      - CSRF_TRUSTED_ORIGINS=http://localhost:8080
+      - CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
       - TERSER_CMD=terser
       - DATABASE_URL=postgres://webmcp:webmcp_dev_pass@postgres:5432/webmcp
     depends_on:

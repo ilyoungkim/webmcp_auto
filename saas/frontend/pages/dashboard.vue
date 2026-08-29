@@ -95,6 +95,9 @@ async function logout() {
   } catch {
     // 로그아웃 실패해도 로컬 세션 정리 후 이동
   }
+  // 세션 쿠키(sessionid)를 명시적으로 삭제해 비정상 접속을 차단
+  document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+  document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
   navigateTo('/login')
 }
 
@@ -156,6 +159,8 @@ onMounted(async () => {
         </div>
       </div>
     </header>
+
+    <p class="plan-note">📌 내 프로젝트는 <b>최대 5개</b>까지 생성할 수 있습니다.</p>
 
     <!-- 비밀번호 변경 모달 -->
     <div v-if="pwModalOpen" class="modal-overlay" @click.self="pwModalOpen = false">
@@ -232,6 +237,8 @@ onMounted(async () => {
 header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .head-actions .btn { text-decoration: none; padding: 8px 14px; font-size: 13px; }
+.plan-note { margin: 0 0 20px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; font-size: 13px; color: #0c4a6e; }
+.plan-note b { color: #0369a1; }
 
 /* 사용자 메뉴 */
 .user-menu { position: relative; }

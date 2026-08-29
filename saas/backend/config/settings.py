@@ -153,9 +153,14 @@ TERSER_CWD = env('TERSER_CWD', str(Path(BASE_DIR).parent / 'frontend'))
 
 # 개발: Nuxt(53300)가 /api 를 Django(8000)로 프록시할 때 브라우저 Origin 이
 # 53300 이므로 CSRF 오리진 검증을 위해 신뢰 오리진에 추가한다.
-CSRF_TRUSTED_ORIGINS = [SAAS_PUBLIC_URL]
-if '127.0.0.1' in SAAS_PUBLIC_URL:
-    CSRF_TRUSTED_ORIGINS.append('http://localhost:53300')
+# CSRF_TRUSTED_ORIGINS env(콤마 구분)가 있으면 우선 사용하고, 없으면 SAAS_PUBLIC_URL 기반으로 구성한다.
+_csrf_env = env('CSRF_TRUSTED_ORIGINS', '')
+if _csrf_env:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_env.split(',') if o.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [SAAS_PUBLIC_URL]
+    if '127.0.0.1' in SAAS_PUBLIC_URL:
+        CSRF_TRUSTED_ORIGINS.append('http://localhost:53300')
 
 PLANS = {
     'free':  {'max_projects': 5,   'monthly_chat': 200,   'per_minute': 10, 'concurrent_jobs': 1},

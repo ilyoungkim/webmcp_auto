@@ -10,7 +10,7 @@ from django.utils import timezone
 from apps.catalogs.models import QuickMenu
 from apps.projects.models import Project, TenantOrigin
 from apps.widgets.generator import build_widget
-from core.llm import GeminiError, ask_openrouter
+from core.llm import GeminiError, ask_openrouter, resolve_openrouter_model
 from core.origins import validate_crawl_url
 
 from .crawler import crawl_many
@@ -481,6 +481,16 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
         parsed = {}
 
     for menu in menus:
+        # 필수 메뉴("AI비서란?")는 DB에 저장된 공통 답변 사용 — LLM 호출 없이 안내
+        if getattr(menu, 'is_required', False):
+            qna_rows.append(GeneratedQnA(
+                project=project, menu_label=menu.label,
+                question=menu.question,
+                answer_md=menu.answer_md or _required_menu_answer(project),
+                model=resolve_openrouter_model(),
+            ))
+            continue
+
         meta = parsed.get(menu.label, {})
         question = (questions_map or {}).get(menu.label, '').strip() or meta.get('question', '').strip()
         answer = meta.get('answer', '').strip()
@@ -503,9 +513,25 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
                 answer = existing.answer_md if existing and existing.answer_md else ''
 
         answer = _finalize_answer(answer)
-        from core.llm import resolve_openrouter_model
         qna_rows.append(GeneratedQnA(
             project=project, menu_label=menu.label,
             question=question, answer_md=answer, model=resolve_openrouter_model(),
         ))
     return qna_rows
+
+
+def _required_menu_answer(project: Project) -> str:
+    """필수 메뉴 'AI비서란?' 의 고정 답변 — AI비서 소개·사용 방법·문의 안내."""
+    return (
+        f'**AI비서란?**\n\n'
+        f'AI비서는 {project.name} 홈페이지에 설치된 인공지능 상담 챗봇입니다. '
+        '홈페이지의 정보를 학습하여 방문자에게 빠르고 정확한 답변을 제공합니다.\n\n'
+        '**사용 방법**\n'
+        '- 우하단 **AI** 버튼을 클릭하면 채팅창이 열립니다.\n'
+        '- 빠른 메뉴(퀵 질문) 버튼을 누르면 자동으로 질문이 입력됩니다.\n'
+        '- 직접 질문을 입력하거나 **🎤 음성 입력**으로 질문할 수 있습니다.\n'
+        '- 답변은 수집된 홈페이지 정보를 기반으로 생성됩니다.\n\n'
+        '**문의 안내**\n'
+        '- 궁금한 점이 있으면 홈페이지의 **고객센터 Q&A**에 질문을 남겨주세요.\n'
+        '- 또는 [AI 아카이브](https://ai-archive.co.kr/ko)에서 더 자세한 정보를 확인하실 수 있습니다.'
+    )

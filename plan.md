@@ -27,6 +27,7 @@
 | M6 3유형 시나리오+쿼터 | 병원/법률/회사 외 **25종 도메인** + 429 쿼터 | ✅ 완료 |
 | M7 (예정) | PostgreSQL 전환, 선택 Celery | ⏳ 미착수 |
 | 추가(2026-08-29) | **테넌트별 Gemini 설정(테스트 후 적용)**, 프로젝트 수정 시 이름/URL 변경 금지, 프로젝트 5개 한도 안내, 이용약관 아코디언 | ✅ 완료 |
+| 추가(2026-08-29) | **"AI비서란?" 필수 메뉴**(DB 공통 답변, 편집 불가), 위젯 AI 로고 아이콘, 음성 입력, 답변 생성 중 입력 잠금, 로그아웃 세션 확실 삭제, 전 페이지 noindex·robots.txt·llms.txt | ✅ 완료 |
 
 ### 0.2 실데이터 증거 (`saas/backend/db.sqlite3`)
 
@@ -67,10 +68,17 @@
 | 데이터 플레인 | `/api/chat/` — Origin 화이트리스트 또는 세션 소유자, 쿼터, **저장된 Q&A 유사도 매칭(≥0.6)**, Gemini 실시간, Gemini 응답 형태 유지, RequestLog | `apps/proxy/views.py` |
 | 데이터 플레인 | `/api/chat/report/` 오류 신고 저장(ChatErrorReport) | `apps/proxy/views.py` |
 | 위젯 | 위젯 JS 4종 **신규 계약 반영** — `{question, publicId, memory}`만 전송, 기억 키 `wmcpMemory:{publicId}` | `saas/widget-dist/` |
+| 위젯 | **AI 로고 런처**(테마 그라데이션 + "AI" 텍스트 + ✦), 헤더 AI 로고 박스 | `webmcp-widget.js` + `widget.css` |
+| 위젯 | **음성 입력**(Web Speech API, ko-KR, 실시간 인식, 말 끝나면 자동 전송, 두 줄 "음성/입력" 버튼) | `webmcp-widget.js` + `widget.css` |
+| 위젯 | **답변 생성 중 입력 잠금** — 입력창·음성·보내기·퀵메뉴 비활성화 | `webmcp-widget.js` + `widget.css` |
+| 위젯 | **"AI비서란?" 필수 메뉴** — 모든 도메인에 마지막 배치, DB 공통 답변(`answer_md`), 편집/삭제 불가(`is_required`) | `seed_catalogs` + `runner._required_menu_answer` |
 | 관리자 | 사용자(role/plan/active), 사용량 집계, 챗 오류 신고(new/read/resolved), 프로젝트(검색/Q&A 재생성/토글/삭제), 고객센터 답변 | `apps/proxy/admin_urls.py` + `pages/admin/*.vue` |
 | 관리자 | **테넌트(프로젝트)별 Gemini 설정** — API 키/모델을 프로젝트 단위로 지정(비우면 전역 `.env` 사용), **테스트 후 적용**(실제 호출로 검증 성공 시에만 저장), OpenRouter는 전역 `.env`로만 관리 | `admin_project_llm` + `admin_project_llm_test` + `pages/admin/projects.vue` |
 | 프로젝트 | **수정 시 이름/URL 변경 금지** — 도메인 유형·위젯 테마만 변경 가능(백엔드에서도 name/url 무시) | `apps/projects/views.py` + `pages/projects/[id].vue` |
-| 프로젝트 | **프로젝트 생성 한도 안내(최대 5개)** + 하단 이용약관 아코디언(사용자권리/LLM 주의사항/개인정보보호/프로그램 사용동의) | `pages/projects/[id].vue` |
+| 프로젝트 | **프로젝트 생성 한도 안내(최대 5개)** — 대시보드(내 프로젝트 목록)에 표시 | `pages/dashboard.vue` |
+| 프로젝트 | 하단 "읽어볼 내용" 아코디언 — **이용약관**(제1~18조) / **AI 이용고지**(AI기본법 제31조, Gemini·OpenAI OSS-120B) / **개인정보처리방침**(10조, 책임자 이장원) / **프로그램 사용동의** | `pages/projects/[id].vue` |
+| 계정 | **로그아웃 세션 확실 삭제** — 순수 Django 뷰로 CSRF 우회, 세션 쿠키 명시 삭제 | `apps/accounts/views.py` + `dashboard.vue` |
+| SEO | **전 페이지 noindex·nofollow**(`nuxt.config.ts`), `robots.txt` 전체 접근 금지, `llms.txt` 제공 | `nuxt.config.ts` + `public/` |
 | 운영 | `/health`, `/ready`(Gemini 키), 로깅(2000줄 날짜·넘버링 로테이션), SSRF 가드, CSRF, 세션 쿠키 | `apps/widgets`, `core/` |
 
 ### 0.4 모든 스펙 (구현 기준 수치)
@@ -90,6 +98,12 @@
 | 파이프라인 | `JOB_LOCK_MINUTES=15`, 폴링 간격 2.0s, 잠금 만료 시 재큐/실패 |
 | 게시판 | 질문 2000자 제한, 10개/페이지 |
 | 소스 재선택 | 최대 10개, 빠른메뉴 질문 편집 **1회 제한**(`menus_edited`) |
+| 필수 메뉴 | **"AI비서란?"** — 모든 도메인에 마지막 배치, `is_required=True`(편집/삭제 불가), DB 공통 답변(`answer_md`) |
+| 위젯 아이콘 | 테마 그라데이션 원형 런처 + "AI" 텍스트 + ✦ 스파크, 헤더 AI 로고 박스 |
+| 음성 입력 | Web Speech API(ko-KR), 실시간 인식, 말 끝나면 자동 전송, 두 줄 "음성/입력" 버튼 |
+| 입력 잠금 | 답변 생성 중 입력창·음성·보내기·퀵메뉴 비활성화 |
+| 로그아웃 | 순수 Django 뷰(CSRF 우회) + 세션 쿠키 명시 삭제 |
+| SEO | 전 페이지 `noindex, nofollow`, `robots.txt` `Disallow: /`, `llms.txt` 제공 |
 | 테넌트 LLM | 프로젝트별 Gemini 키/모델 지정(비우면 전역 `.env`), **테스트 후 적용**(실제 호출 검증 성공 시에만 저장), OpenRouter는 전역 전용 |
 | 프로젝트 수정 | 이름/URL 변경 금지, 도메인 유형·위젯 테마만 변경 가능 |
 

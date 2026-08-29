@@ -1,6 +1,14 @@
 export default defineNuxtConfig({
   ssr: true,
   devServer: { port: 53300 },
+  app: {
+    head: {
+      meta: [
+        // 기본적으로 모든 페이지를 검색엔진 색인·추적에서 제외
+        { name: 'robots', content: 'noindex, nofollow' },
+      ],
+    },
+  },
   routeRules: {
     '/dashboard/**': { ssr: false },
     '/projects/**': { ssr: false },
