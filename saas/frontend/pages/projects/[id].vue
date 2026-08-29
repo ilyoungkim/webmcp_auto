@@ -373,12 +373,6 @@ onUnmounted(() => clearInterval(timer))
 &lt;script src="widget.js"&gt;&lt;/script&gt;</code></pre>
           <p class="note">💡 파일을 하위 폴더(예: <code>/widget/</code>)에 업로드했다면 <code>src</code> 경로를 <code>widget/webmcp-config.js</code>처럼 해당 경로로 수정하세요.</p>
 
-          <h3>3단계: 설정 변경 (선택)</h3>
-          <ul class="install-steps">
-            <li><code>webmcp-config.js</code>의 <code>window.WebMCPConfig</code> 값을 수정해 제목·색상·빠른메뉴 질문을 조정할 수 있습니다.</li>
-            <li>수정 후 저장하면 새로고침 시 즉시 반영됩니다.</li>
-          </ul>
-
           <h3>사용 방법</h3>
           <ul class="install-steps">
             <li>우하단 💬 버튼을 클릭해 채팅창을 엽니다.</li>

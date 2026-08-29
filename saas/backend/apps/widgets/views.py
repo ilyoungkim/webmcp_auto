@@ -131,21 +131,9 @@ def _install_md(project) -> str:
         f'> 💡 파일을 루트가 아닌 하위 폴더(예: `/widget/`)에 업로드했다면, '
         f'`src` 경로를 `widget/webmcp-config.js`처럼 해당 경로로 수정하세요.\n\n'
         f'---\n\n'
-        f'## 3단계: 설정 변경 (선택)\n\n'
-        f'`webmcp-config.js`의 `window.WebMCPConfig` 값을 수정해 위젯을 커스터마이징할 수 있습니다.\n\n'
-        f'| 설정 | 설명 |\n'
-        f'|------|------|\n'
-        f'| `title` | 위젯 제목 (예: "아인뷰티 AI 비서") |\n'
-        f'| `theme.primary` | 버튼·강조 색상 (HEX) |\n'
-        f'| `theme.bg` | 채팅창 배경색 |\n'
-        f'| `names.m0.question` | 첫 번째 빠른메뉴 질문 |\n'
-        f'| `names.m1.question` | 두 번째 빠른메뉴 질문 |\n\n'
-        f'수정 후 저장하면 새로고침 시 즉시 반영됩니다.\n\n'
-        f'---\n\n'
         f'## 사용 방법\n\n'
         f'- 페이지 우측 하단의 **AI 상담 버튼**을 클릭하면 채팅창이 열립니다.\n'
         f'- 빠른메뉴 질문을 누르거나 직접 질문을 입력하면, 수집된 사이트 정보를 바탕으로 AI가 답변합니다.\n'
-        f'- 위젯의 색상·위치·메뉴·질문은 `webmcp-config.js`에서 자유롭게 조정할 수 있습니다.\n'
     )
 
 

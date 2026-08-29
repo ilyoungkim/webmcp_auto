@@ -28,12 +28,6 @@ const props = defineProps<{ projectId: string | number }>()
 &lt;script src="widget.js"&gt;&lt;/script&gt;</code></pre>
       <p class="note">💡 If you uploaded the files to a sub-folder (e.g. <code>/widget/</code>), update the <code>src</code> paths like <code>widget/webmcp-config.js</code>.</p>
 
-      <h3>Step 3: Customize (optional)</h3>
-      <ul class="install-steps">
-        <li>Edit <code>window.WebMCPConfig</code> in <code>webmcp-config.js</code> to change the title, colors, and quick menu questions.</li>
-        <li>Changes apply immediately after saving and reloading.</li>
-      </ul>
-
       <h3>How to use</h3>
       <ul class="install-steps">
         <li>Click the 💬 button at the bottom-right to open the chat window.</li>
