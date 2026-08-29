@@ -135,16 +135,31 @@ def fetch_sitemap_items(url: str, limit: int = 30) -> list[dict[str, str]]:
                 f'{origin}/sitemaps/sitemap.xml',
             ])
 
+            # 후보 정렬: 같은 호스트의 sitemap을 우선 시도한다.
+            # Hopkinsmedicine처럼 robots.txt에 다른 호스트 sitemap(profiles.xxx.org)이 먼저
+            # 나와도, 그것이 성공하는 순간 중단하지 않고 동일 호스트 sitemap까지 시도한다.
+            base_host = urlparse(origin).netloc
+            ordered: list[str] = []
+            for c in dict.fromkeys(candidates):
+                if urlparse(c).netloc == base_host:
+                    ordered.append(c)
+            for c in dict.fromkeys(candidates):
+                if urlparse(c).netloc != base_host:
+                    ordered.append(c)
+            candidates = ordered
+
             seen_sitemaps: set[str] = set()
             cap = limit * 20  # 후보군을 충분히 수집 후 depth 정렬
-            for sm in dict.fromkeys(candidates):
+            for sm in candidates:
                 _collect_sitemap(client, sm, urls, seen_sitemaps, depth=0, cap=cap)
-                if urls:
+                if not urls:
+                    continue
+                host_matched = any(urlparse(u).netloc == base_host for u in urls)
+                if host_matched:
                     break
 
             # sitemap에서 URL을 찾지 못했거나, sitemap URL의 호스트가
             # 입력 URL의 호스트와 다른 경우(punycode 도메인 등) 홈페이지 HTML 폴백
-            base_host = urlparse(origin).netloc
             host_matched = any(urlparse(u).netloc == base_host for u in urls)
             if not host_matched:
                 _collect_html_links_with_labels(client, url, urls, discovered_labels, cap=cap)

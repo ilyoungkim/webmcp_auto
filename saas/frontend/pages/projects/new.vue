@@ -1,8 +1,11 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth' })
 
-interface DomainType { id: number; code: string; name: string; icon: string; category: string; menus: { label: string }[] }
+interface DomainType { id: number; code: string; name: string; icon: string; category: string; menus: { label: string; question: string }[] }
 interface SitemapItem { url: string; title?: string }
+
+const { t, load: loadSilo } = useSilo()
+await useAsyncData('silo-info', async () => { await loadSilo(); return true })
 
 const name = ref('')
 const url = ref('')
@@ -11,14 +14,14 @@ const theme = ref('blue_sky')
 const types = ref<DomainType[]>([])
 const error = ref('')
 
-// 상위 카테고리 정의 (순서대로 표시)
-const categories = [
-  { key: 'hospital', label: '병원', icon: '🏥' },
-  { key: 'law', label: '법률', icon: '⚖️' },
-  { key: 'edu', label: '교육및상담', icon: '🎓' },
-  { key: 'company', label: '일반회사', icon: '🏢' },
-  { key: 'etc', label: '기타', icon: '📦' },
-]
+// 상위 카테고리 정의 (label은 사일로 언어 사전에서 조회 — 어이콘은 공통)
+const categories = computed(() => [
+  { key: 'hospital', label: t('cat.hospital'), icon: '🏥' },
+  { key: 'law', label: t('cat.law'), icon: '⚖️' },
+  { key: 'edu', label: t('cat.edu'), icon: '🎓' },
+  { key: 'company', label: t('cat.company'), icon: '🏢' },
+  { key: 'etc', label: t('cat.etc'), icon: '📦' },
+])
 const selectedCategory = ref('')
 
 // 선택된 카테고리의 세부 유형 목록
@@ -56,7 +59,7 @@ onMounted(async () => {
 async function fetchUrls() {
   error.value = ''
   if (!url.value || !code.value) {
-    error.value = 'URL과 도메인 유형을 입력해주세요.'
+    error.value = t('new.err.urlAndType')
     return
   }
   loadingUrls.value = true
@@ -73,7 +76,7 @@ async function fetchUrls() {
     selectedUrls.value = sitemapItems.value.slice(0, 10).map(item => item.url)
     step.value = 'select'
   } catch (e: any) {
-    error.value = e?.data?.detail || 'URL 목록을 가져오지 못했습니다.'
+    error.value = e?.data?.detail || t('new.err.fetchUrls')
   } finally {
     loadingUrls.value = false
   }
@@ -85,7 +88,7 @@ function toggleUrl(u: string) {
     selectedUrls.value.splice(idx, 1)
   } else {
     if (selectedUrls.value.length >= 10) {
-      alert('최대 10개까지만 선택할 수 있습니다.')
+      alert(t('new.err.maxPages'))
       return
     }
     selectedUrls.value.push(u)
@@ -107,7 +110,7 @@ function backToForm() {
 async function submit() {
   error.value = ''
   if (selectedUrls.value.length === 0) {
-    alert('최소 1개 이상의 페이지를 선택해주세요.')
+    alert(t('new.err.minPages'))
     return
   }
   submitting.value = true
@@ -118,7 +121,7 @@ async function submit() {
     })
     navigateTo(`/projects/${p.id}`)
   } catch (e: any) {
-    error.value = e?.data?.detail || '생성 실패'
+    error.value = e?.data?.detail || t('new.err.create')
   } finally {
     submitting.value = false
   }
@@ -127,15 +130,15 @@ async function submit() {
 
 <template>
   <main class="wrap">
-    <h1>새 프로젝트</h1>
+    <h1>{{ t('new.title') }}</h1>
 
     <!-- 1단계: 기본 정보 입력 -->
     <form v-if="step === 'form'" @submit.prevent="fetchUrls">
-      <input v-model="name" placeholder="프로젝트명 (예: OO병원)" required />
+      <input v-model="name" :placeholder="t('new.namePlaceholder')" required />
       <input v-model="url" type="url" placeholder="https://example.com" required />
 
       <!-- 1) 상위 카테고리 선택 -->
-      <label class="field-label">업종 카테고리</label>
+      <label class="field-label">{{ t('new.field.category') }}</label>
       <div class="cards">
         <button
           v-for="c in categories" :key="c.key" type="button"
@@ -147,18 +150,18 @@ async function submit() {
       </div>
 
       <!-- 2) 세분화 유형 드롭다운 -->
-      <label v-if="selectedCategory" class="field-label">세부 유형</label>
+      <label v-if="selectedCategory" class="field-label">{{ t('new.field.subtype') }}</label>
       <select v-if="selectedCategory" v-model="code" class="sub-select">
-        <option value="" disabled>세부 유형을 선택하세요</option>
-        <option v-for="t in subTypes" :key="t.code" :value="t.code">
-          {{ t.icon }} {{ t.name }}
+        <option value="" disabled>{{ t('new.subtype.placeholder') }}</option>
+        <option v-for="s in subTypes" :key="s.code" :value="s.code">
+          {{ s.icon }} {{ s.name }}
         </option>
       </select>
-      <p v-if="selectedCategory && subTypes.length === 0" class="muted">이 카테고리에 해당하는 유형이 없습니다.</p>
+      <p v-if="selectedCategory && subTypes.length === 0" class="muted">{{ t('new.subtype.empty') }}</p>
 
       <!-- 3) 선택된 유형의 빠른메뉴 미리보기 -->
       <div v-if="selectedType" class="menu-preview">
-        <label class="field-label">이 유형에서 사용할 빠른메뉴 ({{ selectedType.menus.length }}개)</label>
+        <label class="field-label">{{ t('new.field.quickMenu', { n: selectedType.menus.length }) }}</label>
         <ul class="menu-list">
           <li v-for="m in selectedType.menus" :key="m.label" class="menu-item">
             <span class="menu-badge">{{ m.label }}</span>
@@ -168,7 +171,7 @@ async function submit() {
       </div>
 
       <div class="theme-section">
-        <label class="theme-title">위젯 테마 선택</label>
+        <label class="theme-title">{{ t('new.field.theme') }}</label>
         <div class="theme-cards">
           <button
             v-for="t in themes" :key="t.code" type="button"
@@ -183,7 +186,7 @@ async function submit() {
       </div>
 
       <button type="submit" :disabled="!code || loadingUrls">
-        {{ loadingUrls ? 'URL 목록 가져오는 중...' : '다음: 소스 페이지 선택' }}
+        {{ loadingUrls ? t('new.fetchingUrls') : t('new.next') }}
       </button>
       <p v-if="error" class="err">{{ error }}</p>
     </form>
@@ -191,14 +194,14 @@ async function submit() {
     <!-- 2단계: 소스 페이지 선택 -->
     <div v-else class="select-step">
       <p class="desc">
-        <b>{{ name }}</b> 사이트맵에서 검색된 <b>Root URL에 가장 가까운 상위 30개 URL</b> 중 크롤링할 페이지를 <b>최대 10개</b> 선택하세요.
+        <b>{{ name }}</b> — {{ t('new.selectStep.desc', { name: name }) }}
       </p>
 
       <div class="select-bar">
-        <span>선택됨: <b>{{ selectedUrls.length }}</b> / 10개</span>
+        <span>{{ t('new.selectStep.selected', { n: selectedUrls.length }) }}</span>
         <div class="bar-actions">
-          <button class="btn sm" @click="selectAllTop10">상위 10개 선택</button>
-          <button class="btn sm" @click="clearSelection">전체 해제</button>
+          <button class="btn sm" @click="selectAllTop10">{{ t('new.selectStep.top10') }}</button>
+          <button class="btn sm" @click="clearSelection">{{ t('new.selectStep.clear') }}</button>
         </div>
       </div>
 
@@ -214,9 +217,9 @@ async function submit() {
       </ul>
 
       <div class="actions">
-        <button class="btn" @click="backToForm">← 이전</button>
+        <button class="btn" @click="backToForm">{{ t('new.selectStep.back') }}</button>
         <button class="btn primary" :disabled="submitting || selectedUrls.length === 0" @click="submit">
-          {{ submitting ? '생성 중...' : `선택한 ${selectedUrls.length}개로 프로젝트 생성` }}
+          {{ submitting ? t('new.creating') : t('new.selectStep.create', { n: selectedUrls.length }) }}
         </button>
       </div>
       <p v-if="error" class="err">{{ error }}</p>

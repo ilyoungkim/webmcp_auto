@@ -21,3 +21,17 @@ def domain_types(request):
     qs = DomainType.objects.filter(enabled=True, lang__in=[tag, '']) \
         if tag == 'ko' else DomainType.objects.filter(enabled=True, lang=tag)
     return Response(DomainTypeSerializer(qs, many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def silo_info(request):
+    """현재 사일로 정보 — 콘솔 UI 다국어용.
+
+    프론트엔드가 이 값을 읽어 콘솔 문구(업종 카테고리, 세부 유형, 빠른메뉴 등)를
+    사일로 언어에 맞게 표시한다. 예) en 사일로 → {'lang': 'en', ...}
+    """
+    from core.langsilo import lang_meta, silo_summary
+    summary = silo_summary()
+    meta = lang_meta(summary['lang'])
+    return Response({'lang': summary['lang'], 'label': meta.get('label', summary['lang'])})

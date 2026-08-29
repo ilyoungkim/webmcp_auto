@@ -9,6 +9,8 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
 
+const { t, load: loadSilo } = useSilo()
+
 const project = ref<any>(null)
 const qna = ref<any[]>([])
 const snippet = ref('')
@@ -53,16 +55,15 @@ const supportSubmitting = ref(false)
 const supportError = ref('')
 const supportSuccess = ref('')
 
-const STATUS_LABELS: Record<string, string> = {
-  queued: '예약',
-  crawling: '진행중',
-  generating: '진행중',
-  completed: '완료',
-  failed: '실패',
-}
-
 function statusLabel(s: string): string {
-  return STATUS_LABELS[s] || s
+  const map: Record<string, string> = {
+    queued: t('proj.status.queued'),
+    crawling: t('proj.status.crawling'),
+    generating: t('proj.status.generating'),
+    completed: t('proj.status.completed'),
+    failed: t('proj.status.failed'),
+  }
+  return map[s] || s
 }
 
 async function load() {
@@ -166,7 +167,7 @@ function toggleUrl(u: string) {
     selectedUrls.value.splice(idx, 1)
   } else {
     if (selectedUrls.value.length >= 10) {
-      alert('최대 10개까지만 선택할 수 있습니다.')
+      alert(t('new.err.maxPages'))
       return
     }
     selectedUrls.value.push(u)
@@ -183,7 +184,7 @@ function clearSelection() {
 
 async function submitRerun() {
   if (selectedUrls.value.length === 0) {
-    alert('최소 1개 이상의 페이지를 선택해주세요.')
+    alert(t('new.err.minPages'))
     return
   }
   submittingRerun.value = true
@@ -201,7 +202,7 @@ async function submitRerun() {
 }
 
 async function removeProject() {
-  if (!confirm(`'${project.value?.name}' 프로젝트를 삭제할까요?`)) return
+  if (!confirm(t('proj.edit.deleteConfirm', { name: project.value?.name || '' }))) return
   await useApi(`/api/projects/${id}/`, { method: 'DELETE' })
   router.push('/dashboard')
 }
@@ -258,6 +259,7 @@ function fmtSupportTime(iso: string): string {
 }
 
 onMounted(async () => {
+  await loadSilo()
   domainTypes.value = await useApi('/api/domain-types/')
   load()
   loadSupport()
@@ -270,28 +272,26 @@ onUnmounted(() => clearInterval(timer))
   <main v-if="project" class="wrap">
     <header>
       <div class="title-area">
-        <NuxtLink to="/dashboard" class="back-link">&larr; 목록으로</NuxtLink>
+        <NuxtLink to="/dashboard" class="back-link">&larr; {{ t('proj.backToList') }}</NuxtLink>
         <h1>{{ project.name }}</h1>
       </div>
       <div class="actions">
         <span class="badge" :class="project.status">{{ statusLabel(project.status) }} {{ project.progress }}%</span>
-        <span v-if="project.status === 'failed'" class="fail-msg">재생성하거나 문의 02-888-9999로 연락 주세요.</span>
-        <button class="btn" @click="openRerunModal">
-          재생성
-        </button>
-        <button class="btn" @click="startEdit">수정</button>
-        <button class="btn danger" @click="removeProject">삭제</button>
+        <span v-if="project.status === 'failed'" class="fail-msg">{{ t('proj.edit.failMsg') }}</span>
+        <button class="btn" @click="openRerunModal">{{ t('proj.btn.regenerate') }}</button>
+        <button class="btn" @click="startEdit">{{ t('proj.btn.edit') }}</button>
+        <button class="btn danger" @click="removeProject">{{ t('proj.btn.delete') }}</button>
       </div>
     </header>
 
     <section v-if="editing" class="edit-panel">
-      <p class="note">이름과 URL은 변경할 수 없습니다. 도메인 유형과 위젯 테마만 변경할 수 있습니다.</p>
-      <label>도메인 유형
+      <p class="note">{{ t('proj.edit.note1') }}</p>
+      <label>{{ t('proj.edit.domainType') }}
         <select v-model="editForm.domainTypeCode">
           <option v-for="dt in domainTypes" :key="dt.code" :value="dt.code">{{ dt.name }}</option>
         </select>
       </label>
-      <label class="theme-edit-label">위젯 테마
+      <label class="theme-edit-label">{{ t('proj.edit.theme') }}
         <div class="theme-cards">
           <button
             v-for="t in themes" :key="t.code" type="button"
@@ -304,10 +304,10 @@ onUnmounted(() => clearInterval(timer))
           </button>
         </div>
       </label>
-      <p class="note">도메인 유형 변경 후 <b>'재생성'</b> 버튼을 누르면 새 사이트맵 기반으로 다시 수집합니다. 테마는 저장 즉시 위젯에 반영됩니다.</p>
+      <p class="note">{{ t('proj.edit.note2') }}</p>
       <div class="edit-actions">
-        <button class="btn" @click="editing = false">취소</button>
-        <button class="btn primary" :disabled="saving" @click="saveEdit">{{ saving ? '저장 중...' : '저장' }}</button>
+        <button class="btn" @click="editing = false">{{ t('proj.edit.cancel') }}</button>
+        <button class="btn primary" :disabled="saving" @click="saveEdit">{{ saving ? t('proj.edit.saving') : t('proj.edit.save') }}</button>
       </div>
     </section>
 
@@ -315,7 +315,7 @@ onUnmounted(() => clearInterval(timer))
 
     <section v-if="project.status === 'completed'">
       <!-- 수집된 소스 정보 섹션 -->
-      <h2>수집된 소스 정보 ({{ project.sourceUrls?.length || 0 }}개 페이지)</h2>
+      <h2>{{ t('proj.sources.title') }} ({{ project.sourceUrls?.length || 0 }})</h2>
       <div class="source-card">
         <ul class="source-url-list">
           <li v-for="(u, idx) in project.sourceUrls" :key="idx">
