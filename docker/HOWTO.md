@@ -111,18 +111,29 @@ cp .env.example .env
 ### 4.0 빌드 스크립트 (권장)
 
 `build.sh`가 이미지 컴파일(빌드) + (옵션) 기동 + health 체크를 한 번에 처리한다.
+**기본값은 ko + en 모두 빌드**이며, `--ko`/`--en` 으로 특정 언어만 지정할 수 있다.
 
 ```bash
 cd webMCP_Auto/docker
 
-./build.sh                  # 기본(ko) 사일로만 빌드
-./build.sh --silo           # ko(8080) + en(8081) 사일로 모두 빌드
+./build.sh                  # ko + en 모두 빌드 (기본)
+./build.sh --ko             # ko 사일로만 빌드
 ./build.sh --en             # en 사일로만 빌드
 ./build.sh --no-cache       # 캐시 무시 완전 재빌드
-./build.sh --run            # 빌드 후 ko 사일로 기동 + health 체크까지
-./build.sh --run --silo     # 빌드 후 ko + en 모두 기동
+./build.sh --run            # 빌드 후 ko + en 모두 기동 + health 체크
+./build.sh --run ko         # 빌드 후 ko(8080)만 기동
+./build.sh --run en         # 빌드 후 en(8081)만 기동
+./build.sh --dry-run        # 실행할 명령만 출력 (실제 빌드 안 함 — 빌드 테스트)
+./build.sh --list           # 등록된 언어 사일로 목록
 ./build.sh --help           # 사용법
 ```
+
+**새 언어 추가 방법** (예: 일본어 ja, 중국어 zh, 프랑스어 fr, 스페인어 es, 포르투갈어 pt):
+
+1. `docker-compose.ja.yml` 등으로 해당 언어 사일로 스택 정의 (포트 8082 이상 순차 배정, `backend-ja`/`frontend-ja`/`nginx-ja`/`postgres-ja` 서비스 + `NUXT_PUBLIC_SILO_LANG=ja`)
+2. `build.sh` 상단의 `LANGS_JA` 주석 해제 + `ALL_LANGS` 배열에 추가
+3. `saas/backend/core/langsilo.py`의 `SUPPORTED_LANGS` 확장 + `SEED_JA` 카탈로그 작성
+4. `./build.sh --run ja` — 이후 `./build.sh`를 실행하면 ja도 함께 빌드·기동된다
 
 ### 4.1 이미지 빌드 (수동)
 
