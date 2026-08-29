@@ -8,11 +8,11 @@
 
 ---
 
-## 0. 구현 완료 현황 (2026-08-28)
+## 0. 구현 완료 현황 (2026-08-30 최신)
 
 > 검증 단계(SQLite, 단일 서버) 구현이 **전부 완료**되어 실제 E2E 동작이 확인됐다.
 > 파이프라인 워커로 5개 프로젝트가 `completed`까지 진행되었고, 위젯 임베드·채팅·미리보기·설치 번들까지 동작한다.
-> 아래 0.1~0.8은 현재 완료된 내용의 종합 요약이며, 상세 설계는 본문 §1~§16과 함께 읽는다.
+> **2026-08-29~30: 보안 강화 → 다국어 사일로(ko/en) → 콘솔·Q&A 완전 영어화 · sitemap 수집 개선 · GitHub 퍼블리시 완료** (§0.9).
 
 ### 0.1 마일스톤 완료 현황
 
@@ -25,9 +25,11 @@
 | M4 데이터 플레인 | chat·embed·preview·Origin 화이트리스트 | ✅ 완료 |
 | M5 문서 | 랜딩·매뉴얼(manual) | ✅ 완료 |
 | M6 3유형 시나리오+쿼터 | 병원/법률/회사 외 **25종 도메인** + 429 쿼터 | ✅ 완료 |
-| M7 (예정) | PostgreSQL 전환, 선택 Celery | ⏳ 미착수 |
+| M7 (도커 운영) | **PostgreSQL 18 도커 전환 완료** — docker/ (compose·backup·restore·로그 로테이션·운영 배포 문서 DEPLOY_PORUDCTION.md) | ✅ 완료 |
 | 추가(2026-08-29) | **테넌트별 Gemini 설정(테스트 후 적용)**, 프로젝트 수정 시 이름/URL 변경 금지, 프로젝트 5개 한도 안내, 이용약관 아코디언 | ✅ 완료 |
 | 추가(2026-08-29) | **"AI비서란?" 필수 메뉴**(DB 공통 답변, 편집 불가), 위젯 AI 로고 아이콘, 음성 입력, 답변 생성 중 입력 잠금, 로그아웃 세션 확실 삭제, 전 페이지 noindex·robots.txt·llms.txt | ✅ 완료 |
+| 추가(2026-08-29) | **보안 강화** — 브루트포스 방어(IP+이메일 5회 실패 15분 잠금), IP 화이트리스트(루프백·사설망 안전장치), 설치 가이드 Step3(설정 변경) 삭제 | ✅ 완료 |
+| 추가(2026-08-29~30) | **다국어 사일로(ko/en 완전 분리)** — 언어별 DB·컨테이너·LLM 엔진·카탈로그·위젯UI·콘솔UI 분리, en 사일로 Q&A 영어 강제, sitemap 수집 개선(robots.txt 동일 호스트 우선 + HTML 폴백), **GitHub 퍼블리시** | ✅ 완료 |
 
 ### 0.2 실데이터 증거 (`saas/backend/db.sqlite3`)
 
@@ -88,12 +90,13 @@
 | 스택 | Nuxt 3(`:53300`, SSR 랜딩 + CSR 대시보드) · Django 5 + DRF(`:8000`) · SQLite WAL · whitenoise |
 | 프록시 | `/api` `/preview` `/embed` `/widget-dist` `/django-admin` `/health` `/ready` → Django 8000 |
 | 플랜 | free: 프로젝트 5 / 월 200채팅 / 분당 10 / 동시 1 · pro: 5 / 5,000 / 60 / 2 · admin: 무제한 / 무제한 / 120 / 4 |
-| 도메인 유형 | 25종, 카테고리 5(병원/법률/교육및상담/일반회사/기타), 빠른메뉴 유형당 4개 |
+| 도메인 유형 | 25종(ko), 15종(en), 카테고리 5(Healthcare/Legal/Education/Company/Others), `DomainType.lang` 필터 |
 | 테마 | 5종 — `blue_sky`(#0284c7) · `red_orange`(#dc2626) · `white_snow`(#334155) · `banana_pink`(#db2777) · `black_neon`(#22d3ee) |
 | 크롤 | sitemap 상위 30개 탐색 → 소스 선택 최대 10개, 페이지당 30k자, 재시도 3회 |
 | Q&A | 배치 생성(temperature 0.3, `max_tokens` 16384), 파싱 실패 메뉴 개별 재시도, 정제 파이프라인 적용 |
 | 채팅 | `max_tokens` 1024 · timeout 30s · 저장 Q&A 유사도 ≥0.6 매칭(2초 지연) · Gemini 응답 형태 유지 |
 | 위젯 계약 | body `{question, publicId, memory}`만 전송, 시스템 프롬프트는 서버 부착, 기억 `wmcpMemory:{publicId}` |
+| 언어 사일로 | `WEBMCP_LANG(S)` env, `core/langsilo.py`, `NUXT_PUBLIC_SILO_LANG`(콘솔 SSR), `_EN` 접미사 LLM env, en DB `webmcp_en`(8081) |
 | 인증 | Django 세션 + CSRF(`X-CSRFToken`), `SameSite=Lax`, `email` 로그인 커스텀 User |
 | 파이프라인 | `JOB_LOCK_MINUTES=15`, 폴링 간격 2.0s, 잠금 만료 시 재큐/실패 |
 | 게시판 | 질문 2000자 제한, 10개/페이지 |
@@ -112,8 +115,8 @@
 | 용도 | 공급자 | 모델 | 비고 |
 |------|--------|------|------|
 | 위젯 실시간 채팅 | Google Gemini | `gemini-3.5-flash-lite` | `core/llm.ask` — `max_tokens=1024`, timeout 30s, 429 백오프(최대 4회), 지시문 echo 제거(`strip_instruction_echo`) |
-| 사이트 요약(위젯 system_prompt용) | Google Gemini | `gemini-3.5-flash-lite` | `generator._site_summary` — 실패 시 markdown 앞부분 폴백 |
-| Q&A 배치 생성 · 질문 편집 재생성 | OpenRouter | `openai/gpt-oss-120b` | `core/llm.ask_openrouter` — `max_tokens=16384`, 온도 0.3, 반복 출력 감지·재시도 |
+| 사이트 요약(위젯 system_prompt용) | Google Gemini | `gemini-3.5-flash-lite` | `generator._site_summary` — **en 사일로는 영어 요약** |
+| Q&A 배치 생성 · 질문 편집 재생성 | OpenRouter | `openai/gpt-oss-120b` | `core/llm.ask_openrouter` — `max_tokens=16384`, 온도 0.3, 반복 출력 감지·재시도, **en 사일로는 영어 프롬프트** |
 | 폴백 모델 | OpenRouter | `deepseek/deepseek-v4-flash-latest` | 주 모델 실패 시 자동 전환 |
 
 - 과거 `GEMINI_MODEL=gemma-4-31b-it`(개발 초기) → 현재 `gemini-3.5-flash-lite`.
@@ -168,7 +171,8 @@ flowchart TB
 - 엔진: **SQLite WAL**(`PRAGMA journal_mode=WAL; foreign_keys=ON`), 파일 `saas/backend/db.sqlite3`
 - `AUTH_USER_MODEL = accounts.User`(email 로그인), Django `contrib.sessions` 사용
 - 앱별 테이블: `accounts_user` · `catalogs_domaintype/quickmenu` · `projects_project/tenantorigin/downloadlog/supportticket` · `pipeline_sitecontent/generatedqna/pipelinejob` · `widgets_widget` · `proxy_usageevent/requestlog/chaterrorreport` (+ Django 기본 테이블)
-- **Project**: `public_id`(외부 식별자, urlsafe 12자), `origin`, `status(queued→crawling→generating→completed|failed)`, `progress`, `status_message`, `menus_edited`(질문 편집 1회 제한), `theme`, `enabled`(사용중지)
+- **Project**: `public_id`(외부 식별자, urlsafe 12자), `origin`, `status(queued→crawling→generating→completed|failed)`, `progress`, `status_message`, `menus_edited`(질문 편집 1회 제한), `theme`, `enabled`(사용중지), `lang`(사일로 언어 ko/en)
+- **DomainType**: `lang` 필드 — 같은 `code`도 언어별 별도 레코드(`UniqueConstraint(code, lang)`), 카탈로그 API는 사일로 언어로 필터
 - **PipelineJob**: `selected_urls`(사용자 선택 소스), `attempt`, `locked_at`(만료 시 복구), `last_error`
 - **SiteContent**: `markdown`, `char_count`, `source_urls`·`failed_urls`(JSON) — 크롤 결과
 - **Widget**: `config_json`(공개) + `system_prompt`(서버 전용) + `version` + `is_current` — 버전별 이력
@@ -182,7 +186,64 @@ flowchart TB
 - **보안**: SSRF 가드(`core/origins.validate_crawl_url`), Origin 화이트리스트, `public_id`만 외부 노출, 시스템 프롬프트/Gemini 키 비노출, 쿼터 429, `/api/chat/`는 `csrf_exempt`+Origin 검사
 - **운영**: 2000줄 날짜·넘버링 로그 로테이션(`core/logging`), `/ready`로 Gemini 키 확인, 워커 잠금 만료 복구, 위젯 버전 관리
 - **잔여 정리 대상**: `widget.js`/`webmcp-widget.js`에 레거시 `*_SYSTEM_PROMPT` 참조 코드가 일부 남아 있으나 **전송되지 않음**(동작 영향 없음). `crawl4ai`는 무거워 주석 처리, **httpx 폴백 사용 중**. M7(PostgreSQL/Celery) 미착수.
-- **커밋 상태**: git 저장소지만 아직 커밋 없음 → 운영 전 초기 커밋 권장.
+- **커밋 상태**: GitHub 퍼블리시 완료 — `https://github.com/ilyoungkim/webmcp_auto` (origin/main, 커밋 5ef119f). 기존 템플릿 파일은 강제 푸시로 제거됨.
+
+### 0.9 다국어 사일로 + 보안 강화 (2026-08-29~30 최종)
+
+#### 0.9.1 다국어 사일로 (ko / en 완전 분리)
+
+언어별로 **DB·컨테이너·LLM 엔진·카탈로그·UI가 완전히 분리된 사일로**를 구현했다.
+
+| 항목 | ko 사일로 (8080) | en 사일로 (8081) |
+|------|----------------|----------------|
+| DB | `webmcp_ko` (postgres-ko) | `webmcp_en` (postgres-en, 별도 PostgreSQL 인스턴스) |
+| 컨테이너 | webmcp-{backend,worker,frontend,nginx,postgres} | webmcp-en-{...} + webmcp-postgres-en |
+| nginx | `nginx.conf` (backend/frontend) | `nginx-en.conf` (backend-en/frontend-en) — HTTP 격리 |
+| 카탈로그 | 도메인 25종(한국어) | 도메인 15종(영어) — `seed_catalogs --langs` |
+| LLM env | 전역 (`GEMINI_API_KEY`) | `_EN` 접미사 (`GEMINI_API_KEY_EN` 등, 없으면 전역 폴백) |
+| 위젯 UI | 한국어 (안녕하세요…, 음성/입력) | 영어 (Hello…, Voice input) — `WebMCPConfig.lang` |
+| 콘솔 UI | 한국어 전면 | 영어 전면 — `NUXT_PUBLIC_SILO_LANG=en` env 주입 |
+
+주요 구현:
+- **`core/langsilo.py`** (신규) — `SUPPORTED_LANGS=('ko','en')`, `current_lang()`, `catalog_lang_tag()`, `gemini_config(lang)`, `openrouter_config(lang)`, `silo_summary()`
+- **`/api/silo-info/`** (신규) — 콘솔이 사일로 언어를 확인 (`{"lang":"en"}`)
+- **DomainType/Project에 `lang` 필드** — catalogs 0005, projects 0008 마이그레이션. `DomainType.code` unique → `(code, lang)` 조합 unique
+- **카탈로그 시드** — `seed_catalogs --langs ko,en`, `SEED_KO`(25종) / `SEED_EN`(15종: hospital, law, company 등)
+- **docker-compose.silo.yml** (신규) — en 사일로 독립 스택( 별도 DB/볼륨/8081 포트)
+- **프롬프트 언어 분기** — `_batch_qna_prompt/_question_prompt/_answer_prompt`가 `project.lang`에 따라 한국어/영어 프롬프트 생성. 영어 배치 마커 `Question:/Answer:` 파싱 지원
+- **영어 강제 안전장치** — `regenerate_qna`가 결과에 한글 >5% 감지 시 1회 재생성(`_has_korean`), 위젯 system_prompt·사이트 요약·병원 예약 힌트 영어화, 채팅 사용자 턴 라벨 분기(`User question:`)
+- **위젯 i18n** — `I18N` 사전 + `t(key)`: 런처 aria/제목/상태/placeholder/동작방식/welcome/send/micLabel
+- **콘솔 i18n** — `composables/useSilo.ts`(ko/en 사전 + `t(key, params)`), 페이지 전체(랜딩·로그인·회원가입·대시보드·New Project·상세·관리자 제외) 적용
+- **정적 문서** — en 사일로용 설치 방법(`InstallGuideEn.vue`), 이용약관/AI고지/개인정보/사용동의(`TermsEn.vue`) 별도 컴포넌트
+
+#### 0.9.2 콘솔 SSR 언어 확정
+
+**원인**: SSR에서 `$fetch('/api/silo-info/')`가 Nuxt 내부 routeRules 프록시(`127.0.0.1:8000`)로 향해 컨테이너 안 502 → SSR 언어가 `ko`로 고정(클라이언트 하이드레이션 전 HTML이 한국어로 렌더링).
+
+**해결**: **`NUXT_PUBLIC_SILO_LANG` 환경변수**로 SSR 언어 확정 — compose에서 en 사일로에 `=en`, ko에 `=ko` 주입. `useSilo`는 env 값을 최우선 사용하고, 없으면 `/api/silo-info/` 폴백(로컬 개발용).
+
+- `nuxt.config.ts` `runtimeConfig.public.siloLang` 추가
+- 랜딩·로그인·회원가입·대시보드·미리보기 모두 i18n 적용 후 **/ · /login · /signup · /dashboard SSR 모두 영어 확인**
+- `useSilo`는 **`useState` 싱글턴** 필수 — 일반 `ref`는 컴포넌트마다 새 인스턴스가 만들어져 페이지 간 언어 공유가 안 됨
+
+#### 0.9.3 sitemap 수집 개선
+
+robots.txt의 sitemap 지시를 **동일 호스트 우선**으로 정렬하고 **모든 후보를 순차 시도**한다.
+Hopkins Medicine처럼 robots.txt에 다른 호스트 sitemap(`profiles.xxx.org`)이 먼저 나와도 동일 호스트 sitemap까지 시도한다. 모든 sitemap 실패 시 기존 HTML `<a>` 폴백(최대 30개, 메뉴 라벨) 사용.
+
+검증: ai-archive(robots.txt sitemap) → 상위 10개 수집, docs.python.org(9개), httpbin(HTML 폴백 2개) 성공. Hopkins는 Cloudflare 봇 차단(403)으로 서버 측 회복 불가(예외 케이스).
+
+#### 0.9.4 보안 강화 (2026-08-29)
+
+- **브루트포스 방어** — IP+이메일 조합 실패 카운터, **5회 실패 시 15분 잠금**(HTTP 429), 로그인 성공 시 초기화
+- **IP 화이트리스트** — `User.allowed_ips`(콤마 구분) + 세션 IP 변경 감지. **안전장치**: 루프백(127.0.0.1·::1·localhost)과 사설망(10/8·172.16/12·192.168/16·Docker 게이트웨이)은 무조건 허가(락아웃 방지)
+- 설치 가이드 Step 3("설정 변경"/"Customize") 삭제 — 콘솔·bundle.zip INSTALL.md 에서 모두 제거(`webmcp-config.js` 커스터마이징 유도 제거)
+
+#### 0.9.5 GitHub 퍼블리시
+
+- `https://github.com/ilyoungkim/webmcp_auto` — main 브랜치(커밋 5ef119f)
+- 기존 Vite 템플릿 파일(index.html, package.json, src/, public/ 등)은 강제 푸시로 제거되고 현재 프로젝트로 교체됨
+- 주요 커밋: `28724a3` 다국어 사일로 → `e470108` sitemap 개선 → `1ee18f7` Q&A 영어화 → `f9c06a5` 영어 강제 → `35f11d0` SSR 영어화 → `5ef119f` 스텝3 삭제
 
 ---
 
@@ -851,3 +912,21 @@ npm run dev          # http://127.0.0.1:53300
 - 운영 시 `src` 호스트는 `SAAS_PUBLIC_URL`(예: `https://your-saas.com`)로 교체
 - 위젯은 `{question, publicId}`만 전송하고, 시스템 프롬프트는 Django가 부착(§1.2 원칙 5)
 - Origin 화이트리스트: 프로젝트 생성 시 대상 Origin이 자동 등록되며, www/스테이징은 콘솔에서 추가(§7.3 `origins/`)
+
+### 16.5 Docker로 실행 (ko / en 사일로)
+
+```bash
+cd docker
+
+# 한국어 사일로 — http://localhost:8080
+docker compose up -d --build
+
+# 영어 사일로 (별도 DB·컨테이너) — http://localhost:8081
+docker compose -f docker-compose.silo.yml up -d --build
+```
+
+- en 사일로 최초 기동 시 `docker-entrypoint.sh`가 migrate·시드를 자동 실행
+- 수동 실행: `docker compose -f docker-compose.silo.yml exec backend-en python manage.py seed_catalogs --langs en`
+- 언어 접미사 LLM env는 `saas/backend/.env`에 설정 (`GEMINI_API_KEY_EN`, `OPENROUTER_MODEL_EN` 등 — 없으면 전역 폴백)
+- 콘솔 SSR 언어는 `NUXT_PUBLIC_SILO_LANG`(ko/en) env로 확정
+- 운영 배포·백업·복원·로그 절차는 **`DEPLOY_PORUDCTION.md`** 참조 (§12 다국어 사일로 섹션 포함)
