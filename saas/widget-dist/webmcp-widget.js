@@ -25,8 +25,58 @@
 (function () {
   'use strict';
 
-  var WIDGET_VERSION = '1.1.0'; // 🧠 메모리 기능 추가
+  var WIDGET_VERSION = '1.2.0'; // 🌐 다국어(i18n) 지원
   var ROOT_ID = 'webmcp-widget';
+
+  // ── 다국어 사전 (config.lang 으로 선택) ──────────────────────
+  var I18N = {
+    ko: {
+      launcherAria: 'AI 비서 열기',
+      title: '✨ AI 비서',
+      statusChecking: '연결 확인 중...',
+      statusOk: '연결됨',
+      statusFail: '연결 안 됨',
+      statusNoProxy: '프록시 미로드',
+      inputPlaceholder: '메시지를 입력하세요...',
+      inputBusy: '답변 생성 중...',
+      micLabel: '음성<br/>입력',
+      loader: '✨ 답변 생성 중...',
+      howItWorks: '⚙️ 동작 방식',
+      howBody:
+        '      • AI비서는 LLM 모델을 사용한 수립, 정렬, 답변 에이전트입니다.' +
+        '      <br />• AI비서의 답변은 환각으로 인해 올바르지 않은 정보가 제공될 수 있습니다.' +
+        '      <br />• AI비서의 답변 정보는 고객사의 수집된 정보를 기반으로 합니다.' +
+        '      <br />• AI비서의 답변 결과에 대해서 개발사는 책임을 지지 않습니다.',
+      welcome: '안녕하세요! {title}입니다.\n궁금한 점을 물어보세요.',
+      send: '보내기',
+    },
+    en: {
+      launcherAria: 'Open AI Assistant',
+      title: '✨ AI Assistant',
+      statusChecking: 'Checking connection...',
+      statusOk: 'Connected',
+      statusFail: 'Not connected',
+      statusNoProxy: 'Proxy not loaded',
+      inputPlaceholder: 'Type a message...',
+      inputBusy: 'Generating answer...',
+      micLabel: 'Voice<br/>input',
+      loader: '✨ Generating answer...',
+      howItWorks: '⚙️ How it works',
+      howBody:
+        '      • This assistant is an LLM-based agent for planning, sorting and answering.' +
+        '      <br />• Answers may be inaccurate due to model hallucinations.' +
+        '      <br />• Answers are based on information collected from the customer website.' +
+        '      <br />• The developer is not responsible for generated answers.',
+      welcome: 'Hello! This is the {title}.\nAsk me anything.',
+      send: 'Send',
+    },
+  };
+
+  function t(key) {
+    var lang = (window.WebMCPConfig && window.WebMCPConfig.lang) || 'ko';
+    var dict = I18N[lang] || I18N.ko;
+    return dict[key] !== undefined ? dict[key] : (I18N.ko[key] !== undefined ? I18N.ko[key] : key);
+  }
 
   function mount() {
     if (document.getElementById(ROOT_ID)) return;
@@ -39,37 +89,34 @@
 
   function widgetTemplate() {
     return (
-      '<button id="webmcpLauncher" class="wmcp-launcher" type="button" aria-label="AI 비서 열기">' +
+      '<button id="webmcpLauncher" class="wmcp-launcher" type="button" aria-label="' + t('launcherAria') + '">' +
       '  <span class="wmcp-launcher-ai">AI</span>' +
       '  <span class="wmcp-launcher-spark">✦</span>' +
       '</button>' +
       '<div id="webmcpPanel" class="wmcp-panel" hidden>' +
       '  <header class="wmcp-header">' +
       '    <span class="wmcp-header-logo">AI</span>' +
-      '    <h1 id="wmcpTitle">✨ AI 비서</h1>' +
-      '    <span class="wmcp-status" id="wmcpStatus">연결 확인 중...</span>' +
-      '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="크게 보기">⤢</button>' +
-      '    <button id="wmcpClose" class="wmcp-close" type="button" title="닫기">✕</button>' +
+      '    <h1 id="wmcpTitle">' + t('title') + '</h1>' +
+      '    <span class="wmcp-status" id="wmcpStatus">' + t('statusChecking') + '</span>' +
+      '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="' + (t('title').indexOf('Assistant') >= 0 ? 'Expand' : '크게 보기') + '">⤢</button>' +
+      '    <button id="wmcpClose" class="wmcp-close" type="button" title="' + (t('title').indexOf('Assistant') >= 0 ? 'Close' : '닫기') + '">✕</button>' +
       '  </header>' +
       '  <div id="wmcpChat" class="wmcp-chat" aria-live="polite"></div>' +
       '  <div class="wmcp-inputbar">' +
       '    <div id="wmcpPills" class="wmcp-pills"></div>' +
       '    <div class="wmcp-inputrow">' +
-      '      <textarea id="wmcpInput" placeholder="메시지를 입력하세요..." rows="1"></textarea>' +
-      '      <button id="wmcpMic" class="wmcp-mic" type="button" title="음성 입력">' +
-      '        <span class="wmcp-mic-text">음성<br/>입력</span>' +
+      '      <textarea id="wmcpInput" placeholder="' + t('inputPlaceholder') + '" rows="1"></textarea>' +
+      '      <button id="wmcpMic" class="wmcp-mic" type="button" title="' + (t('launcherAria')) + '">' +
+      '        <span class="wmcp-mic-text">' + t('micLabel') + '</span>' +
       '      </button>' +
-      '      <button id="wmcpAsk" class="wmcp-ask" type="button" title="보내기">➤</button>' +
+      '      <button id="wmcpAsk" class="wmcp-ask" type="button" title="' + t('send') + '">➤</button>' +
       '    </div>' +
-      '    <div class="wmcp-loader" id="wmcpLoader">✨ 답변 생성 중...</div>' +
+      '    <div class="wmcp-loader" id="wmcpLoader">' + t('loader') + '</div>' +
       '  </div>' +
       '  <details class="wmcp-accordion">' +
-      '    <summary>⚙️ 동작 방식</summary>' +
+      '    <summary>' + t('howItWorks') + '</summary>' +
       '    <div class="wmcp-acc-body">' +
-      '      • AI비서는 LLM 모델을 사용한 수립, 정렬, 답변 에이전트입니다.' +
-      '      <br />• AI비서의 답변은 환각으로 인해 올바르지 않은 정보가 제공될 수 있습니다.' +
-      '      <br />• AI비서의 답변 정보는 고객사의 수집된 정보를 기반으로 합니다.' +
-      '      <br />• AI비서의 답변 결과에 대해서 개발사는 책임을 지지 않습니다.' +
+      t('howBody') +
       '    </div>' +
       '  </details>' +
       '</div>'
@@ -298,7 +345,7 @@
     // 답변 생성 중에는 입력을 받지 않도록 비활성화
     if (input) {
       input.disabled = on;
-      input.placeholder = on ? '답변 생성 중...' : '메시지를 입력하세요...';
+      input.placeholder = on ? t('inputBusy') : t('inputPlaceholder');
     }
     if (mic) mic.disabled = on;
     // 퀵 메뉴(빠른메뉴 pill)도 비활성화
@@ -311,7 +358,7 @@
     if (!chat) return;
     chat.innerHTML = '';
     var cfg = siteConfig();
-    addMsg('안녕하세요! ' + cfg.title + '입니다.\n궁금한 점을 물어보세요.', 'bot');
+    addMsg(t('welcome').replace('{title}', cfg.title), 'bot');
   }
 
   // ════════════════════════════════════════════════════════════════════════
@@ -458,12 +505,12 @@
   async function refresh() {
     var status = $('#wmcpStatus');
     if (!status) return;
-    status.textContent = '연결 확인 중...';
+    status.textContent = t('statusChecking');
     status.style.background = 'rgba(255,255,255,0.2)';
 
     // 1) 프록시 라이브러리 로드 여부
     if (typeof window.WebMCP === 'undefined' || typeof window.WebMCP.callGeminiViaProxy !== 'function') {
-      setStatus('⚠️ 프록시 미로드', false);
+      setStatus('⚠️ ' + t('statusNoProxy'), false);
       return;
     }
 
@@ -478,12 +525,12 @@
         res = await fetch(healthUrl, { method: 'GET' });
       }
       if (res.ok) {
-        setStatus('✅ 연결됨', true);
+        setStatus('✅ ' + t('statusOk'), true);
       } else {
-        setStatus('⚠️ 연결 안 됨', false);
+        setStatus('⚠️ ' + t('statusFail'), false);
       }
     } catch (e) {
-      setStatus('⚠️ 연결 안 됨', false);
+      setStatus('⚠️ ' + t('statusFail'), false);
     }
   }
 

@@ -3,35 +3,49 @@ from django.db import models
 
 from apps.catalogs.models import DomainType, QuickMenu
 
-# 필수 메뉴 "AI비서란?" 의 공통 답변 — 모든 프로젝트에서 동일하게 사용 (DB에서 관리)
-REQUIRED_MENU_LABEL = 'AI비서란?'
-REQUIRED_MENU_QUESTION = 'AI비서가 무엇이고, 어떻게 사용하나요?'
-REQUIRED_MENU_HINT = 'AI비서의 소개·사용 방법·문의 안내 중심'
-REQUIRED_MENU_ANSWER = (
-    '**AI비서란?**\n\n'
-    'AI비서는 홈페이지에 설치된 인공지능 상담 챗봇입니다. '
-    '홈페이지의 정보를 학습하여 방문자에게 빠르고 정확한 답변을 제공합니다.\n\n'
-    '**사용 방법**\n'
-    '- 우하단 **AI** 버튼을 클릭하면 채팅창이 열립니다.\n'
-    '- 빠른 메뉴(퀵 질문) 버튼을 누르면 자동으로 질문이 입력됩니다.\n'
-    '- 직접 질문을 입력하거나 **🎤 음성 입력**으로 질문할 수 있습니다.\n'
-    '- 답변은 수집된 홈페이지 정보를 기반으로 생성됩니다.\n\n'
-    '**문의 안내**\n'
-    '- 궁금한 점이 있으면 홈페이지의 **고객센터 Q&A**에 질문을 남겨주세요.\n'
-    '- 또는 [AI 아카이브](https://ai-archive.co.kr/ko)에서 더 자세한 정보를 확인하실 수 있습니다.'
-)
+# ── 언어별 필수 메뉴("AI비서란?" / "About AI Assistant?") 정의 ──
+# 각 언어 사일로가 자체 언어로 필수 메뉴를 가진다 (DB 공통 답변).
+REQUIRED_MENUS = {
+    'ko': {
+        'label': 'AI비서란?',
+        'question': 'AI비서가 무엇이고, 어떻게 사용하나요?',
+        'hint': 'AI비서의 소개·사용 방법·문의 안내 중심',
+        'answer': (
+            '**AI비서란?**\n\n'
+            'AI비서는 홈페이지에 설치된 인공지능 상담 챗봇입니다. '
+            '홈페이지의 정보를 학습하여 방문자에게 빠르고 정확한 답변을 제공합니다.\n\n'
+            '**사용 방법**\n'
+            '- 우하단 **AI** 버튼을 클릭하면 채팅창이 열립니다.\n'
+            '- 빠른 메뉴(퀵 질문) 버튼을 누르면 자동으로 질문이 입력됩니다.\n'
+            '- 직접 질문을 입력하거나 **음성 입력**으로 질문할 수 있습니다.\n'
+            '- 답변은 수집된 홈페이지 정보를 기반으로 생성됩니다.\n\n'
+            '**문의 안내**\n'
+            '- 궁금한 점이 있으면 홈페이지의 **고객센터 Q&A**에 질문을 남겨주세요.\n'
+            '- 또는 [AI 아카이브](https://ai-archive.co.kr/ko)에서 더 자세한 정보를 확인하실 수 있습니다.'
+        ),
+    },
+    'en': {
+        'label': 'About AI Assistant',
+        'question': 'What is the AI assistant and how do I use it?',
+        'hint': 'Intro to the AI assistant, usage guidance and support contacts',
+        'answer': (
+            '**What is the AI Assistant?**\n\n'
+            'The AI Assistant is an AI-powered chat bot installed on your website. '
+            'It learns from the information on your website and provides visitors with fast, accurate answers.\n\n'
+            '**How to use**\n'
+            '- Click the **AI** button at the bottom-right corner to open the chat window.\n'
+            '- Quick menu buttons automatically insert pre-made questions.\n'
+            '- You can type a question directly or use **voice input**.\n'
+            '- Answers are generated from the information collected from your website.\n\n'
+            '**Support**\n'
+            '- If you have questions, please post them on the **Customer Center Q&A**.\n'
+            '- Or visit [AI Archive](https://ai-archive.co.kr) for more information.'
+        ),
+    },
+}
 
-# 도메인 유형 세분화 템플릿.
-# 포맷: (code, name, description, icon, [(label, question, hint), ...])
-#
-# code 규칙:
-#  - hospital*  : 병원/의료 계열 (병원, 치과, 미용, 한의원) — 예약 안내를 위해 startswith('hospital')
-#  - law*       : 법률/전문자격 계열 (변호사, 노무, 회계, 부동산)
-#  - edu_*      : 교육/상담 계열 (상담, 요양, 대학)
-#  - company*   : 일반회사/산업 계열 (일반, 건설, 화학, 생명, 보건, 제약)
-
-SEED = [
-    # ── 병원·의료 계열 ────────────────────────────────────────
+# ── 한국어 카탈로그 (lang='ko') — 도메인 유형 세분화 템플릿 ────
+SEED_KO = [
     ('hospital', '병원', '종합·전문 병원 사이트 (진료과·의사·치료 중심)', '🏥', [
         ('병원정보', '병원 소개와 특징을 알려줘', '병원의 연혁·규모·특징·철학 중심'),
         ('의료진', '의료진 정보를 알려줘', '의료진 이름·전문분야·경력 중심'),
@@ -192,9 +206,116 @@ SEED = [
     ]),
 ]
 
+# ── 영어 카탈로그 (en 사일로) ──────────────────────────────────
+# 한국어 SEED와 동일한 code 체계를 공유하되, 이름/설명/빠른메뉴가 영어다.
+# code가 같아도 lang이 다르므로 별도 레코드로 저장되어 사일로가 격리된다.
+SEED_EN = [
+    # ── Healthcare ─────────────────────────────────────────
+    ('hospital', 'Hospital', 'General & specialty hospital sites (departments, doctors, treatments)', '🏥', [
+        ('About', 'Tell me about the hospital and its key features', 'History, scale, philosophy of the hospital'),
+        ('Doctors', 'Introduce the medical staff and their specialties', 'Doctors, specialties, and experience'),
+        ('Treatments', 'What treatments and services do you provide?', 'Departments, procedures, surgeries, specialized centers'),
+        ('Contact', 'How can I contact the hospital and get directions?', 'Phone, address, directions, parking, appointments'),
+    ]),
+    ('hospital_dental', 'Dental', 'Dental clinics & hospitals (orthodontics, implants)', '🦷', [
+        ('About', 'Introduce the dental clinic and its features', 'Clinic history, scale, philosophy'),
+        ('Doctors', 'Introduce the dentists and their specialties', 'Dentist names, specialties, expertise'),
+        ('Treatments', 'What dental treatments and services do you offer?', 'Orthodontics, implants, prosthetics, whitening'),
+        ('Contact', 'Contact information and appointment booking', 'Phone, address, booking, parking'),
+    ]),
+    ('hospital_beauty', 'Aesthetic', 'Dermatology & plastic surgery clinics', '✨', [
+        ('About', 'Introduce the clinic and its features', 'Clinic history, philosophy, safety'),
+        ('Doctors', 'Introduce the medical team', 'Doctor names, specialties, experience'),
+        ('Procedures', 'What treatments and programs are available?', 'Procedure types, effects, pricing, cautions'),
+        ('Contact', 'Contact details and booking information', 'Phone, address, booking method'),
+    ]),
+    ('hospital_oriental', 'Oriental', 'Oriental medicine clinics & hospitals', '🌿', [
+        ('About', 'Introduce the clinic and its philosophy', 'Clinic history, scale, philosophy'),
+        ('Doctors', 'Introduce the practitioners', 'Practitioner names, specialties, experience'),
+        ('Treatments', 'What oriental treatments are offered?', 'Acupuncture, herbal medicine, chuna, moxibustion'),
+        ('Contact', 'Contact details and booking/directions', 'Phone, address, booking method'),
+    ]),
+
+    # ── 법률/전문자격 (영어) ─────────────────────────────────
+    ('law', 'Law Firm', 'Law firm & legal services sites (attorneys, litigation)', '⚖️', [
+        ('About', 'Introduce the law firm', 'Firm history, members, philosophy'),
+        ('Attorneys', 'Introduce the attorneys and their specialties', 'Attorney names, practice areas, experience'),
+        ('Practice', 'What are the main practice areas', 'Case types, notable outcomes'),
+        ('Contact', 'Contact information and consultation booking', 'Phone, email, booking, address'),
+    ]),
+    ('law_labor', 'Labor', 'Labor law & HR consulting firms', '👥', [
+        ('About', 'Introduce the labor law firm', 'Firm history, structure, philosophy'),
+        ('Experts', 'Introduce the labor attorneys', 'Names, specialties, experience'),
+        ('Services', 'What services do you provide?', 'Payroll, contracts, industrial accidents, insurance'),
+        ('Contact', 'Contact details and consultation booking', 'Phone, email, booking, address'),
+    ]),
+    ('law_accounting', 'Accounting', 'Accounting & tax firm sites', '🧾', [
+        ('About', 'Introduce the accounting firm', 'History, structure, philosophy'),
+        ('Experts', 'Introduce accountants and tax experts', 'Expert names, specialties, experience'),
+        ('Services', 'What are your main services?', 'Bookkeeping, tax filing, audits, advisory'),
+        ('Contact', 'Contact details and consultation booking', 'Phone, email, booking, address'),
+    ]),
+    ('law_realestate', 'Real Estate', 'Real estate brokerage & consulting', '🏠', [
+        ('About', 'Introduce the real estate agency', 'History, team, philosophy'),
+        ('Agents', 'Introduce the agents and consultants', 'Names, specialties, experience'),
+        ('Services', 'What services and listings do you offer?', 'Properties, brokerage, consulting'),
+        ('Contact', 'Contact details and office location', 'Phone, address, consultation booking'),
+    ]),
+
+    # ── 교육·상담 (영어) ──────────────────────────────────────
+    ('edu_counseling', 'Counseling', 'Counseling & mental health centers', '💬', [
+        ('About', 'Introduce the counseling center', 'History, team, philosophy'),
+        ('Counselors', 'Introduce the counselors', 'Names, specialties, credentials'),
+        ('Programs', 'What programs and sessions are offered?', 'Program types, sessions, methods'),
+        ('Contact', 'Contact and reservation information', 'Phone, email, booking, address'),
+    ]),
+
+    # ── 일반회사/산업 (영어) ──────────────────────────────────
+    ('company', 'Company', 'General company & corporate sites', '🏢', [
+        ('About', 'Introduce the company', 'History, mission, scale, philosophy'),
+        ('Team', 'Introduce the executives and team', 'Executives, key staff, careers'),
+        ('Services', 'What are the main products and services', 'Services, products, business areas'),
+        ('Contact', 'Contact information and office locations', 'Phone, email, address, directions'),
+    ]),
+    ('company_construction', 'Construction', 'Construction & engineering companies', '🏗', [
+        ('About', 'Introduce the construction company', 'History, major projects, capability'),
+        ('Projects', 'Show key projects and track record', 'Completed projects, references'),
+        ('Services', 'What services and fields do you cover?', 'Business areas, capabilities, certifications'),
+        ('Contact', 'Contact information and inquiry process', 'Phone, email, request form'),
+    ]),
+    ('company_retail', 'Retail', 'Retail & e-commerce sites', '🛍', [
+        ('About', 'Introduce the company and store', 'Brand story, store info, philosophy'),
+        ('Products', 'What are the main products and categories?', 'Product lines, categories, bestsellers'),
+        ('Store', 'Store locations and operating hours', 'Locations, hours, online store'),
+        ('Contact', 'Customer service and support contacts', 'Customer service, support channels'),
+    ]),
+    ('company_tech', 'Tech', 'IT, software & tech companies', '💻', [
+        ('About', 'Introduce the company and its mission', 'Company overview, vision, history'),
+        ('Solutions', 'What solutions and services do you offer?', 'Products, solutions, tech stack'),
+        ('Case Studies', 'Show customer success stories', 'References, case studies, results'),
+        ('Contact', 'Contact information and demo requests', 'Contact options, demo requests'),
+    ]),
+
+    # ── 교육·상담 (영어) ─────────────────────────────────────
+    ('edu_college', 'University', 'Universities & higher education', '🎓', [
+        ('About', 'Introduce the university and its mission', 'History, campus, philosophy'),
+        ('Faculties', 'List schools and departments', 'Colleges, departments, facilities'),
+        ('Admissions', 'What are the admission requirements?', 'Admission criteria, process, scholarships'),
+        ('Contact', 'Contact information and campus directions', 'Phone, email, campus locations'),
+    ]),
+
+    # ── 기타 (영어) ──────────────────────────────────────────
+    ('blog', 'Blog', 'Personal & corporate blog sites', '📝', [
+        ('About', 'Introduce the blog and its focus', 'Topics, author, writing philosophy'),
+        ('Categories', 'What are the main blog categories', 'Topics, series, themes'),
+        ('Posts', 'Show recent and popular posts', 'Latest articles, popular posts'),
+        ('Contact', 'How can readers reach the author', 'Email, social media, comments'),
+    ]),
+]
+
 
 class Command(BaseCommand):
-    help = '도메인 유형 25종(세분화) + 빠른메뉴를 시드합니다.'
+    help = '도메인 유형(언어별) + 빠른메뉴를 시드합니다. --langs ko,en 처럼 언어를 지정할 수 있다.'
 
     # code 접두사 → 상위 카테고리 매핑
     CATEGORY_BY_PREFIX = [
@@ -210,35 +331,60 @@ class Command(BaseCommand):
                 return cat
         return 'etc'
 
-    def handle(self, *args, **options):
-        for order, (code, name, desc, icon, menus) in enumerate(SEED, start=1):
-            category = self._category_for(code)
-            dt, _ = DomainType.objects.get_or_create(
-                code=code,
-                defaults={'name': name, 'description': desc, 'icon': icon, 'category': category, 'sort_order': order},
-            )
-            # 재실행 시에도 정렬 순서/이름/카테고리를 최신값으로 갱신
-            DomainType.objects.filter(pk=dt.pk).update(
-                name=name, description=desc, icon=icon, category=category, sort_order=order,
-            )
-            for i, (label, question, hint) in enumerate(menus, start=1):
-                qm, _ = QuickMenu.objects.get_or_create(
-                    domain_type=dt, label=label,
-                    defaults={'question': question, 'prompt_hint': hint, 'sort_order': i},
-                )
-                QuickMenu.objects.filter(pk=qm.pk).update(
-                    question=question, prompt_hint=hint, sort_order=i,
-                )
-            # 필수 메뉴 "AI비서란?" — 모든 도메인 유형에 마지막에 자동 추가 (편집/삭제 불가)
-            self._ensure_required_menu(dt)
-        self.stdout.write(self.style.SUCCESS('카탈로그 시드 완료 (25개 도메인)'))
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--langs',
+            default='',
+            help='시드할 언어(콤마 구분). 비우면 환경 변수 WEBMCP_LANGS(기본 ko) 사용. 예: --langs ko,en',
+        )
 
-    def _ensure_required_menu(self, dt):
-        """모든 도메인 유형에 'AI비서란?' 필수 메뉴를 마지막에 추가한다."""
-        label = REQUIRED_MENU_LABEL
-        question = REQUIRED_MENU_QUESTION
-        hint = REQUIRED_MENU_HINT
-        answer = REQUIRED_MENU_ANSWER
+    def handle(self, *args, **options):
+        from core.langsilo import current_lang, configured_langs
+
+        langs_arg = (options.get('langs') or '').strip()
+        want = [x.strip().lower() for x in langs_arg.split(',') if x.strip()] if langs_arg else []
+        if not want:
+            want = configured_langs()
+        if not want:
+            want = [current_lang()]
+
+        total = 0
+        # ── 언어별 카탈로그 시드 (사일로 격리: DomainType.lang 으로 구분) ──
+        seeds = {'ko': SEED_KO, 'en': SEED_EN}
+        for lang in want:
+            seed = seeds.get(lang) or SEED_KO
+            for order, (code, name, desc, icon, menus) in enumerate(seed, start=1):
+                category = self._category_for(code)
+                # code + lang 조합으로 격리 — 같은 code라도 언어별 별도 레코드
+                dt, _ = DomainType.objects.get_or_create(
+                    code=code, lang=lang,
+                    defaults={'name': name, 'description': desc, 'icon': icon, 'category': category,
+                              'sort_order': order, 'lang': lang},
+                )
+                # 재실행 시에도 정렬 순서/이름/카테고리/언어를 최신값으로 갱신
+                DomainType.objects.filter(pk=dt.pk).update(
+                    name=name, description=desc, icon=icon, category=category, sort_order=order, lang=lang,
+                )
+                for i, (label, question, hint) in enumerate(menus, start=1):
+                    qm, _ = QuickMenu.objects.get_or_create(
+                        domain_type=dt, label=label,
+                        defaults={'question': question, 'prompt_hint': hint, 'sort_order': i},
+                    )
+                    QuickMenu.objects.filter(pk=qm.pk).update(
+                        question=question, prompt_hint=hint, sort_order=i,
+                    )
+                # 필수 메뉴 — 언어별 공통 답변으로 마지막에 자동 추가 (편집/삭제 불가)
+                self._ensure_required_menu(dt, lang)
+            self.stdout.write(self.style.SUCCESS(f'[{lang}] 카탈로그 시드 완료 ({len(seed)}개 도메인)'))
+        self.stdout.write(self.style.SUCCESS(f'카탈로그 시드 완료 — 사일로 언어: {",".join(want)}'))
+
+    def _ensure_required_menu(self, dt, lang: str = 'ko'):
+        """해당 언어 사일로의 필수 메뉴(한국어='AI비서란?', 영어='About AI Assistant')를 마지막에 추가한다."""
+        req = REQUIRED_MENUS.get(lang) or REQUIRED_MENUS['ko']
+        label = req['label']
+        question = req['question']
+        hint = req['hint']
+        answer = req['answer']
         # 기존 메뉴 중 마지막 sort_order 다음에 배치
         last_order = QuickMenu.objects.filter(domain_type=dt).aggregate(m=models.Max('sort_order'))['m'] or 0
         qm, created = QuickMenu.objects.get_or_create(

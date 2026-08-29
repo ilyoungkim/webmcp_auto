@@ -438,3 +438,85 @@ docker/backups/logs/logs_YYYYMMDD_HHMMSS/
 - [ ] `/health/`, `/ready/`, 로그인, 프로젝트 생성, worker, 채팅 동작 검증
 - [ ] DB 백업 및 로그 백업 cron 등록
 - [ ] 백업 파일을 운영 서버 외부에도 보관
+
+---
+
+## 12. 다국어 사일로 (ko / en 분리 배포)
+
+언어별로 **DB·컨테이너·LLM 엔진이 완전히 분리된 사일로**를 운영할 수 있다.
+ko(한국어)와 en(영어)은 서로 다른 PostgreSQL 인스턴스·DB·컨테이너 세트에서 실행되며,
+카탈로그·프로젝트·위젯 설정이 언어별로 독립된다.
+
+### 12.1 아키텍처
+
+| 항목 | ko 사일로 | en 사일로 |
+|---|---|---|
+| 접속 | `127.0.0.1:8080` | `127.0.0.1:8081` |
+| 컨테이너 | webmcp-{backend,worker,frontend,nginx,postgres} | webmcp-en-{backend,worker,frontend,nginx} + webmcp-postgres-en |
+| PostgreSQL DB | `webmcp_ko` | `webmcp_en` |
+| 카탈로그 도메인 | 25종(병원·법률·교육·회사 등, 한국어) | 15종(hospital, law 등, 영어) |
+| LLM env 접미사 | 없음 (전역 값 사용) | `_EN` 접미사 env (예: `GEMINI_API_KEY_EN`) |
+| nginx conf | `nginx.conf` | `nginx-en.conf` |
+
+### 12.2 파일 구성
+
+```text
+docker/
+├── docker-compose.yml          # 기본(ko) 사일로: 127.0.0.1:8080
+├── docker-compose.silo.yml     # en 사일로(추가): 127.0.0.1:8081
+├── nginx.conf                  # ko 전용 (proxy_pass http://backend/frontend)
+├── nginx-en.conf               # en 전용 (proxy_pass http://backend-en/frontend-en)
+```
+
+- `docker-compose.silo.yml`은 **`docker-compose.yml`과 동시 로드**할 수 없다(이름 충돌 방지 위해 별도 파일). en 사일로를 띄우려면:
+
+```bash
+cd docker
+docker compose -f docker-compose.silo.yml up -d
+```
+
+- ko는 기존대로 `docker compose up -d`(기본 compose)로 띄운다.
+
+### 12.3 필수 환경변수 (`.env`)
+
+| env | 설명 | 예시 |
+|---|---|---|
+| `WEBMCP_LANG` | 사일로의 컨테이너 언어 | `ko` / `en` |
+| `WEBMCP_LANGS` | 지원 언어 목록(콤마 구분) | `ko,en` |
+| `GEMINI_API_KEY_EN` | en 사일로용 Gemini 키(없으면 전역 `GEMINI_API_KEY` 폴백) | AIza... |
+| `GEMINI_MODEL_EN` | en 사일로용 모델(기본 `gemini-3.5-flash-lite`) | gemini-2.0-flash |
+| `OPENROUTER_API_KEY_EN` | en 사일로용 OpenRouter 키 | sk-or-... |
+| `OPENROUTER_MODEL_EN` | en 사일로 모델 | openai/gpt-oss-120b |
+| `SAAS_PUBLIC_URL_EN` | en 사일로 공개 URL(위젯 config 박제용) | https://en.example.com |
+
+> 언어 접미사 env가 없으면 전역 값으로 폴백한다. en 사일로 컨테이너는 `WEBMCP_LANG=en`을 가지며,
+> 프로젝트 생성·Q&A 파이프라인·위젯 config 생성이 모두 en 사일로 설정을 따른다. ko DB에는 영향 없음.
+
+> **주의**: en 사일로에 외부 도메인을 붙일 때 `SAAS_PUBLIC_URL`은 반드시 en 도메인
+> (예: `https://en.example.com`)으로 설정해야 한다. 이 값은 위젯 config의
+> `assetBase`/`proxyEndpoint`에 박제되므로 ko 도메인을 쓰면 위젯이 ko API를 호출하게 된다(§4.1).
+
+### 12.4 시드 명령 (en 사일로)
+
+en 사일로는 별도 DB이므로 최초 기동 시 migrate와 시드가 자동 실행된다(`docker-entrypoint.sh`). 수동 실행이 필요한 경우:
+
+```bash
+docker compose -f docker-compose.silo.yml exec backend-en python manage.py migrate
+docker compose -f docker-compose.silo.yml exec backend-en python manage.py seed_catalogs --langs en
+```
+
+### 12.5 위젯 i18n
+
+위젯 UI 문구는 `saas/widget-dist/webmcp-widget.js`의 `I18N` 사전(ko/en) + `t(key)` 로 결정된다.
+en 위젯은 제목 기본값 "AI Assistant", 상태 "Connected", "Voice input" 등 영어 UI가 나온다.
+en 위젯을 얻으려면 **en 사일로에서 프로젝트를 생성**해야 하며,
+이때 프로젝트의 `lang=en`이 위젯 config에 박제되어 I18N 선택에 사용된다.
+
+### 12.6 요약
+
+> ko: `docker compose up -d` → `127.0.0.1:8080` (25개 한국어 도메인)
+> en: `docker compose -f docker-compose.silo.yml up -d` → `127.0.0.1:8081` (15개 영어 도메인)
+>
+> en 사일로는 별도 PostgreSQL 인스턴스(`webmcp-postgres-en`), 별도 DB(`webmcp_en`),
+> 별도 nginx conf(`nginx-en.conf`), 별도 env 접미사(`_EN`)로 **완전 격리**된다.
+> 언어 사일로 모듈: `saas/backend/core/langsilo.py` (`SUPPORTED_LANGS=('ko','en')`)

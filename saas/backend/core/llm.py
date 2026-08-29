@@ -143,23 +143,26 @@ def ask(prompt: str, *, temperature: float = 0.2, retries: int = 1, timeout: flo
 
 def ask_openrouter(prompt: str, *, temperature: float = 0.2, retries: int = 1,
                    timeout: float = 90.0, max_tokens: int = 16384,
-                   model: str | None = None) -> str:
+                   model: str | None = None, lang: str | None = None) -> str:
     """단일 프롬프트 → 텍스트 응답 (OpenRouter, OpenAI 호환 API).
 
     위젯 생성(Q&A) 및 빠른메뉴 질문 편집에 사용된다.
     Gemini 대비 더 긴 답변을 위해 max_tokens 기본값을 16384로 설정.
 
-    모델 폴백: 주 모델(OPENROUTER_MODEL)이 실패하면
-    폴백 모델(OPENROUTER_FALLBACK_MODEL)로 자동 전환해 재시도한다.
+    모델 폴백: 주 모델이 실패하면 폴백 모델로 자동 전환해 재시도한다.
 
-    OpenRouter 설정은 전역 settings(.env) 값만 사용한다.
+    lang: 언어 사일로. 지정 시 언어 전용 엔진(env 접미사 _EN 등)을 우선 사용하고,
+    없으면 전역 settings 값에 폴백한다. ko 사일로는 전역 설정을 그대로 사용.
     """
-    api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
+    from .langsilo import openrouter_config as lang_openrouter
+    orc = lang_openrouter(lang or 'ko')
+    api_key = orc['api_key']
+    primary_model = model or orc['model']
+    fallback_model = orc['fallback']
+    base = orc.get('base') or getattr(settings, 'OPENROUTER_BASE', 'https://openrouter.ai/api/v1')
+
     if not api_key:
         raise GeminiError('OPENROUTER_API_KEY가 설정되지 않았습니다.')
-    primary_model = model or getattr(settings, 'OPENROUTER_MODEL', 'mistralai/mistral-nemo')
-    fallback_model = getattr(settings, 'OPENROUTER_FALLBACK_MODEL', '~deepseek/deepseek-v4-flash-latest')
-    base = getattr(settings, 'OPENROUTER_BASE', 'https://openrouter.ai/api/v1')
 
     # 주 모델 → 실패 시 폴백 모델 순서로 시도
     models_to_try = [primary_model]
@@ -180,8 +183,12 @@ def ask_openrouter(prompt: str, *, temperature: float = 0.2, retries: int = 1,
     raise GeminiError(str(last_err))
 
 
-def _gemini_config(project=None) -> tuple[str, str]:
-    """Gemini API 키/모델 결정. 테넌트(project) 지정값 우선, 없으면 전역 settings."""
+def _gemini_config(project=None, lang=None) -> tuple[str, str]:
+    """Gemini API 키/모델 결정. 우선순위: 테넌트(project) 지정값 > 언어 사일로 env > 전역 settings."""
+    from .langsilo import gemini_config as lang_gemini
+    if lang:
+        key, model, _base = lang_gemini(lang)
+        return key, model
     api_key = settings.GEMINI_API_KEY
     model = settings.GEMINI_MODEL
     if project is not None:
@@ -243,10 +250,10 @@ def _openrouter_config() -> tuple[str, str, str, str]:
     return api_key, primary, fallback, base
 
 
-def resolve_openrouter_model() -> str:
-    """전역 OpenRouter 주 모델명 반환 (GeneratedQnA.model 기록용)."""
-    _, primary, _, _ = _openrouter_config()
-    return primary
+def resolve_openrouter_model(lang: str | None = None) -> str:
+    """전역 또는 언어 사일로별 OpenRouter 주 모델명 반환 (GeneratedQnA.model 기록용)."""
+    from .langsilo import openrouter_config
+    return openrouter_config(lang or 'ko')['model']
 
 
 def _openrouter_call(api_key: str, base: str, model: str, prompt: str, *,

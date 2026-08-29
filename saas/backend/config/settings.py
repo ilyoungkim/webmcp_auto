@@ -142,6 +142,11 @@ SAAS_PUBLIC_URL = env('SAAS_PUBLIC_URL', 'http://127.0.0.1:53300')
 ADMIN_SEED_EMAIL = env('ADMIN_SEED_EMAIL', 'admin@local')
 ADMIN_SEED_PASSWORD = env('ADMIN_SEED_PASSWORD', '')
 JOB_LOCK_MINUTES = int(env('JOB_LOCK_MINUTES', '15'))
+# ── 다국어 사일로 ────────────────────────────────────────────
+# 이 컨테이너가 담당하는 언어 및 지원 언어 목록 (ko | en, 콤마 구분).
+# ko 컨테이너는 lang='ko' 카탈로그만, en 컨테이너는 lang='en' 카탈로그만 노출한다.
+WEBMCP_LANG = env('WEBMCP_LANG', 'ko')
+WEBMCP_LANGS = env('WEBMCP_LANGS', 'ko')
 
 # ── 위젯 번들 난독화 ─────────────────────────────────────────
 # bundle.zip 의 JS 파일을 terser 로 난독화+최적화한다.

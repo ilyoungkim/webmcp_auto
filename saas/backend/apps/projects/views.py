@@ -39,7 +39,10 @@ def projects(request):
     code = (request.data.get('domainTypeCode') or '').strip()
     if not name or not url or not code:
         raise ValidationError('name/url/domainTypeCode 필요')
-    dt = DomainType.objects.filter(code=code, enabled=True).first()
+    # 언어 사일로 — 컨테이너의 언어에 맞는 카탈로그만 노출되므로 code 탐색도 현재 언어로 제한
+    from core.langsilo import current_lang
+    cur_lang = current_lang()
+    dt = DomainType.objects.filter(code=code, enabled=True, lang__in=[cur_lang, '']).first()
     if dt is None:
         raise ValidationError('알 수 없는 도메인 유형')
 
@@ -47,6 +50,7 @@ def projects(request):
         user=request.user, name=name, url=url,
         origin=normalize_origin(url), domain_type=dt,
         theme=(request.data.get('theme') or 'blue_sky'),
+        lang=dt.lang or cur_lang,  # 프로젝트 언어 = 카탈로그(도메인 유형)의 언어
     )
     TenantOrigin.objects.get_or_create(origin=project.origin, defaults={'project': project})
     from apps.pipeline.models import PipelineJob

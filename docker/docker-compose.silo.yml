@@ -1,0 +1,181 @@
+# ─────────────────────────────────────────────────────────────
+# WebMCP Auto — 언어 사일로 분리 배포 (완전 독립 스택)
+# ─────────────────────────────────────────────────────────────
+# 언어마다 DB·백엔드·프론트·포트가 완전히 분리되어 별도 사이트처럼 동작한다.
+#   한국어 사일로: http://localhost:8080  (WEBMCP_LANG=ko,  DB: webmcp_ko)
+#   영어   사일로: http://localhost:8081  (WEBMCP_LANG=en,  DB webmcp_en)
+#
+# 실행:
+#   cd docker
+#   docker compose -f docker-compose.lang.yml up -d --build
+#
+# 언어별 엔진 분리는 saas/backend/.env 에서:
+#   GEMINI_API_KEY_EN=...        (en 사일로 전용 키, 없으면 전역 키 폴백)
+#   GEMINI_MODEL_EN=gemini-2.0-flash
+#   OPENROUTER_MODEL_EN=openai/gpt-4o-mini
+#   WEBMCP_LANGS=ko,en           (이 배포가 지원하는 언어)
+# ─────────────────────────────────────────────────────────────
+
+x-backend-env: &backend-env
+  DJANGO_DEBUG: "false"
+  ALLOWED_HOSTS: "127.0.0.1,localhost,backend"
+  TERSER_CMD: "terser"
+  GUNICORN_WORKERS: "2"
+  GUNICORN_THREADS: "2"
+
+services:
+  # ── 한국어 사일로 (기본) ─────────────────────────────────────
+  postgres-ko:
+    image: postgres:18-alpine
+    container_name: webmcp-postgres-ko
+    environment:
+      - POSTGRES_USER=webmcp
+      - POSTGRES_PASSWORD=webmcp_dev_pass
+      - POSTGRES_DB=webmcp_ko
+    volumes:
+      - postgres_data_ko:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webmcp -d webmcp_ko"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose: ["5432"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  backend-ko:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: webmcp-ko-backend
+    env_file: [../saas/backend/.env]
+    environment:
+      <<: *backend-env
+      WEBMCP_LANG: ko
+      WEBMCP_LANGS: ko
+      DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-ko:5432/webmcp_ko
+      SAAS_PUBLIC_URL: http://localhost:8080
+      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    depends_on:
+      postgres-ko: { condition: service_healthy }
+    expose: ["8000"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  worker-ko:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: webmcp-ko-worker
+    command: ["python", "manage.py", "run_pipeline_worker", "--interval", "2.0"]
+    env_file: [../saas/backend/.env]
+    environment:
+      <<: *backend-env
+      WEBMCP_LANG: ko
+      WEBMCP_LANGS: ko
+      DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-ko:5432/webmcp_ko
+      SAAS_PUBLIC_URL: http://localhost:8080
+      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    depends_on:
+      postgres-ko: { condition: service_healthy }
+    expose: ["8000"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  frontend-ko:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.frontend
+      args: { API_HOST: "http://backend-ko:8000" }
+    container_name: webmcp-ko-frontend
+    depends_on: [backend-ko]
+    expose: ["3000"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  nginx-ko:
+    image: nginx:stable-alpine
+    container_name: webmcp-ko-nginx
+    depends_on: [backend-ko, frontend-ko]
+    ports: ["8080:80"]
+    volumes: ["./nginx.conf:/etc/nginx/nginx.conf:ro"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  # ── 영어 사일로 — 완전히 독립된 DB·백엔드·프론트엔드·포트 ─────
+  postgres-en:
+    image: postgres:18-alpine
+    container_name: webmcp-postgres-en
+    environment:
+      - POSTGRES_USER=webmcp
+      - POSTGRES_PASSWORD=webmcp_dev_pass
+      - POSTGRES_DB=webmcp_en
+    volumes:
+      - postgres_data_en:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webmcp -d webmcp_en"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose: ["5432"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  backend-en:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: webmcp-en-backend
+    env_file: [../saas/backend/.env]
+    environment:
+      <<: *backend-env
+      WEBMCP_LANG: en
+      WEBMCP_LANGS: en
+      DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-en:5432/webmcp_en
+      SAAS_PUBLIC_URL: http://localhost:8081
+      CSRF_TRUSTED_ORIGINS: http://localhost:8081,http://127.0.0.1:8081
+      # ── 영어 사일로 전용 엔진 (env 접미사 _EN — 없으면 전역 키 폴백) ──
+      # GEMINI_MODEL_EN=gemini-2.0-flash
+      # GEMINI_API_KEY_EN=...
+      # OPENROUTER_MODEL_EN=openai/gpt-4o-mini
+      # OPENROUTER_FALLBACK_MODEL_EN=~deepseek/deepseek-chat
+    depends_on:
+      postgres-en: { condition: service_healthy }
+    expose: ["8000"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  worker-en:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    container_name: webmcp-en-worker
+    command: ["python", "manage.py", "run_pipeline_worker", "--interval", "2.0"]
+    env_file: [../saas/backend/.env]
+    environment:
+      <<: *backend-env
+      WEBMCP_LANG: en
+      WEBMCP_LANGS: en
+      DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-en:5432/webmcp_en
+      SAAS_PUBLIC_URL: http://localhost:8081
+      CSRF_TRUSTED_ORIGINS: http://localhost:8081,http://127.0.0.1:8081
+    depends_on:
+      postgres-en: { condition: service_healthy }
+    expose: ["8000"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  frontend-en:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.frontend
+      args: { API_HOST: "http://backend-en:8000" }
+    container_name: webmcp-en-frontend
+    depends_on: [backend-en]
+    expose: ["3000"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+  nginx-en:
+    image: nginx:stable-alpine
+    container_name: webmcp-en-nginx
+    depends_on: [backend-en, frontend-en]
+    ports: ["8081:80"]
+    volumes:
+      - ./nginx-en.conf:/etc/nginx/nginx.conf:ro
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
+
+volumes:
+  postgres_data_ko:
+  postgres_data_en:

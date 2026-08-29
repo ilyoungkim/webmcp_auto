@@ -471,10 +471,13 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
     """
     qna_rows: list[GeneratedQnA] = []
     parsed: dict[str, dict] = {}
+    # 언어 사일로 — 프로젝트의 언어로 엔진/프롬프트 언어가 결정된다
+    lang = getattr(project, 'lang', '') or 'ko'
     try:
         batch_text = ask_openrouter(
             _batch_qna_prompt(markdown, project, menus, questions_map),
             temperature=0.3,
+            lang=lang,
         )
         parsed = _parse_batch_qna(batch_text, menus)
     except GeminiError:
@@ -487,7 +490,7 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
                 project=project, menu_label=menu.label,
                 question=menu.question,
                 answer_md=menu.answer_md or _required_menu_answer(project),
-                model=resolve_openrouter_model(),
+                model=resolve_openrouter_model(lang),
             ))
             continue
 
@@ -501,21 +504,21 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
         # 배치에서 질문/답변이 빠졌으면 개별 생성으로 보완
         if not question:
             try:
-                question = ask_openrouter(_question_prompt(markdown, project, menu), temperature=0.3).strip().splitlines()[0]
+                question = ask_openrouter(_question_prompt(markdown, project, menu), temperature=0.3, lang=lang).strip().splitlines()[0]
             except GeminiError:
                 question = existing.question if existing and existing.question else menu.question
         if not answer:
             if not question:
                 question = existing.question if existing and existing.question else menu.question
             try:
-                answer = ask_openrouter(_answer_prompt(markdown, project, menu, question))
+                answer = ask_openrouter(_answer_prompt(markdown, project, menu, question), lang=lang)
             except GeminiError:
                 answer = existing.answer_md if existing and existing.answer_md else ''
 
         answer = _finalize_answer(answer)
         qna_rows.append(GeneratedQnA(
             project=project, menu_label=menu.label,
-            question=question, answer_md=answer, model=resolve_openrouter_model(),
+            question=question, answer_md=answer, model=resolve_openrouter_model(lang),
         ))
     return qna_rows
 

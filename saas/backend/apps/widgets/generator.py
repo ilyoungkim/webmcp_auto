@@ -75,9 +75,10 @@ def build_widget(project, menus, markdown: str, qna_rows=None) -> Widget:
     config = {
         'publicId': project.public_id,
         'siteNs': project.public_id,
-        'lang': 'ko',
+        'lang': getattr(project, 'lang', '') or 'ko',  # 언어 사일로 → 위젯 UI 언어
         'debug': False,
-        'title': f'{project.name} AI 비서',
+        'title': f'{project.name} AI Assistant' if (getattr(project, 'lang', '') or 'ko') == 'en'
+                 else f'{project.name} AI 비서',
         'widgetVersion': (Widget.current(project).version + 1) if Widget.current(project) else 1,
         'assetBase': f'{settings.SAAS_PUBLIC_URL.rstrip("/")}/widget-dist/',
         'proxyEndpoint': f'{settings.SAAS_PUBLIC_URL.rstrip("/")}/api/chat/',
