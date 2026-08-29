@@ -383,10 +383,10 @@ docker/backups/logs/logs_YYYYMMDD_HHMMSS/
 5. Docker 스택을 시작한다.
    ```bash
    cd /path/to/webMCP_Auto/docker
-   docker compose build
-   docker compose up -d
+   ./build.sh --run            # 빌드 + 기동 + health 체크 (한 번에)
    docker compose ps
    ```
+   - `./build.sh --help` 로 빌드/기동 옵션 확인 (기본 ko+en 모두, `--ko`/`--en` 개별 지정, `--dry-run` 명령 미리보기)
 6. 상태를 확인한다.
    ```bash
    curl https://saas.example.com/health/

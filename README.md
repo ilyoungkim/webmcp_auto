@@ -24,6 +24,7 @@
 | 고객센터 | Q&A 게시판(질문 2000자, 10개/페이지) |
 | 이용약관 | 프로젝트 페이지 하단 "읽어볼 내용" 아코디언(이용약관/AI 이용고지/개인정보처리방침/프로그램 사용동의) |
 | SEO | **전 페이지 noindex·nofollow**, `robots.txt` 전체 접근 금지, `llms.txt` 제공 |
+| 다국어 사일로 | **ko/en 완전 분리** — 언어별 DB·컨테이너·LLM 엔진·카탈로그·위젯UI·콘솔UI 독립 실행 |
 
 ## LLM 구성
 
@@ -38,16 +39,49 @@
 > 실제 호출 검증에 성공한 키만 저장되며, 비워두면 전역 `.env` 값을 사용합니다.
 > OpenRouter는 전역 `.env`로만 관리됩니다.
 
-## 빠른 시작 (Docker)
+## 빠른 시작 (Docker) — build.sh
+
+`docker/build.sh` 가 이미지 컴파일(빌드) + 기동 + health 체크를 한 번에 처리합니다.
+**기본값은 ko + en 모두 빌드**이며, `--ko`/`--en` 으로 특정 언어만 지정할 수 있습니다.
 
 ```bash
 cd docker
 # saas/backend/.env 에 GEMINI_API_KEY, OPENROUTER_API_KEY 채우기
-docker compose up -d --build
-# 접속: http://localhost:8080  (admin@local / .env의 ADMIN_SEED_PASSWORD)
+
+./build.sh                  # ko(8080) + en(8081) 사일로 모두 빌드
+./build.sh --ko             # ko 사일로만 빌드
+./build.sh --en             # en 사일로만 빌드
+./build.sh --no-cache       # 캐시 무시 완전 재빌드
+
+./build.sh --run            # 빌드 후 ko + en 모두 기동 + health 체크
+./build.sh --run ko         # 빌드 후 ko(8080)만 기동
+./build.sh --run en         # 빌드 후 en(8081)만 기동
+
+./build.sh --dry-run        # 실행할 명령만 출력 (빌드 테스트, 실제 빌드 안 함)
+./build.sh --list           # 등록된 언어 사일로 목록
+./build.sh --help           # 전체 사용법
 ```
 
-자세한 설치·운영 방법은 [`docker/HOWTO.md`](docker/HOWTO.md) 참고.
+### 접속 주소
+
+| 사일로 | 주소 | 언어 |
+|--------|------|------|
+| ko | http://localhost:8080 | 한국어 콘솔·위젯 (도메인 25종) |
+| en | http://localhost:8081 | English console·widget (도메인 15종) |
+
+- en 사일로는 별도 DB(`webmcp_en`)·컨테이너로 완전 분리되어 있습니다.
+- **새 언어 추가** (일본어·중국어·프랑스어·스페인어·포르투갈어 등)는
+  [`docker/HOWTO.md`](docker/HOWTO.md) §4.0의 4단계 절차를 따릅니다.
+
+수동 실행(스크립트 없이)은 아래와 같습니다:
+
+```bash
+cd docker
+docker compose up -d --build                # ko 사일로
+docker compose -f docker-compose.silo.yml up -d --build   # en 사일로
+```
+
+> 관리자 계정: `admin@local` / `.env`의 `ADMIN_SEED_PASSWORD`
 
 ## 로컬 개발 (SQLite)
 
