@@ -160,6 +160,18 @@ def fetch_sitemap_items(url: str, limit: int = 30) -> list[dict[str, str]]:
         # UA 폴백 관리 — robots/sitemap 요청마다 차단 상태를 확인해 헤더 교체
         headers = dict(_UA)
         with httpx.Client(timeout=20, follow_redirects=True) as client:
+            # 세션 워밍업 — Akamai 등 WAF는 홈페이지(Under Attack 우회)에서 _abck 쿠키를
+            # 발급한 뒤에만 robots/sitemap을 정상 응답한다. 직행 요청은 차단페이지(3.7KB,
+            # HTTP 200 위장)를 반환한다. 커스텀 UA 홈 요청이 차단되면 브라우저 UA로
+            # 홈을 다시 방문해 유효 세션 쿠키를 확보한 뒤 진행한다.
+            try:
+                warm = client.get(url, headers=headers)
+                if _looks_blocked(warm.text):
+                    headers = _headers_with_fallback(headers, warm.text)
+                    time.sleep(0.5)
+                    client.get(url, headers=headers)
+            except httpx.HTTPError:
+                pass
             try:
                 robots = client.get(f'{origin}/robots.txt', headers=headers)
                 if _looks_blocked(robots.text):
