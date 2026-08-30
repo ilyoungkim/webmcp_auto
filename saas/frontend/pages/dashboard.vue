@@ -155,6 +155,8 @@ onMounted(async () => {
             👤 {{ userEmail || t('dash.myAccount') }} ▾
           </button>
           <div v-if="userMenuOpen" class="user-dropdown">
+            <NuxtLink to="/profile" class="menu-item">👤 {{ t('prof.title') }}</NuxtLink>
+            <NuxtLink v-if="isAdmin" to="/admin/profile" class="menu-item">⚙️ {{ t('prof.adminTitle') }}</NuxtLink>
             <button class="menu-item" @click="openPwModal">🔑 {{ t('dash.changePw') }}</button>
             <button class="menu-item danger" @click="logout">🚪 {{ t('common.logout') }}</button>
           </div>

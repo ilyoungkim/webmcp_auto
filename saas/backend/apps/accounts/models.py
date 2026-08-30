@@ -44,6 +44,24 @@ class User(AbstractUser):
     plan = models.CharField(max_length=16, default='free')  # free | pro | admin
     must_change_password = models.BooleanField(default=False)
 
+    # 프로필 — 연락처 (전화번호 2개)
+    phone1 = models.CharField('대표 전화번호', max_length=32, blank=True, default='')
+    phone2 = models.CharField('보조 전화번호', max_length=32, blank=True, default='')
+
+    # 결제 정보 (테스트용 — PayPal/Stripe 연동 전 입력 보관소)
+    billing_company = models.CharField('회사명', max_length=128, blank=True, default='')
+    billing_contact = models.CharField('결제 담당자', max_length=64, blank=True, default='')
+    billing_email = models.EmailField('결제 이메일', blank=True, default='')
+    billing_address = models.TextField('결제 주소', blank=True, default='')
+    billing_note = models.TextField('결제 비고', blank=True, default='')
+    # 월 결제 금액 — 비어 있으면 사일로 기본가(ko: 50,000원, en: $49) 적용.
+    # admin 이 엔터프라이즈 금액을 지정할 때 사용.
+    monthly_price = models.DecimalField(
+        '월 결제 금액', max_digits=12, decimal_places=2, null=True, blank=True,
+        default=None,
+    )
+    monthly_currency = models.CharField('통화', max_length=3, blank=True, default='')  # KRW|USD|...
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 

@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import User
-from .serializers import MeSerializer, PasswordChangeSerializer, SignupSerializer
+from .serializers import MeSerializer, PasswordChangeSerializer, ProfileSerializer, SignupSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -171,3 +171,50 @@ def change_password(request):
 
     update_session_auth_hash(request, user)
     return Response({'ok': True})
+
+
+# ── 프로필 페이지 ────────────────────────────────────────────
+DEFAULT_MONTHLY_PRICE = {'ko': ('KRW', 50000), 'en': ('USD', 49)}
+
+
+def _default_price_for_silo() -> tuple[str, int]:
+    """현재 사일로의 기본 월 결제 금액. ko=50,000원, en=$49."""
+    from django.conf import settings as dj_settings
+    lang = getattr(dj_settings, 'WEBMCP_LANG', 'ko')
+    return DEFAULT_MONTHLY_PRICE.get(lang, DEFAULT_MONTHLY_PRICE['ko'])
+
+
+def _profile_payload(user: User) -> dict:
+    """프로필 응답 — 본인 정보 + 결제 안내(기본가/엔터프라이즈 여부)."""
+    data = ProfileSerializer(user).data
+    currency, price = _default_price_for_silo()
+    # admin이 금액을 지정했으면 엔터프라이즈로 표시
+    overridden = user.monthly_price is not None
+    data['billing'] = {
+        'defaultCurrency': currency,
+        'defaultPrice': float(price),
+        'amount': float(user.monthly_price) if overridden else float(price),
+        'currency': user.monthly_currency or currency,
+        'isEnterprise': overridden,
+        # 결제 수단 연동 전 테스트용 플레이스홀더
+        'paymentReady': False,
+    }
+    # 사이트 대표 연락처 (오류 안내 문구에 노출되는 번호 — admin만 수정)
+    from apps.proxy.models import SiteSetting
+    from django.conf import settings as dj_settings
+    data['supportPhone'] = SiteSetting.get('support_phone', dj_settings.SUPPORT_PHONE)
+    return data
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def profile(request):
+    """내 프로필 조회/수정 (일반/관리자 공용)."""
+    user = request.user
+    if request.method == 'GET':
+        return Response(_profile_payload(user))
+
+    s = ProfileSerializer(user, data=request.data, partial=True)
+    s.is_valid(raise_exception=True)
+    s.save()
+    return Response(_profile_payload(user))

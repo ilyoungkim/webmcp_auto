@@ -8,5 +8,6 @@ urlpatterns = [
     path('logout/', views.logout_view),
     path('password/', views.change_password),
     path('me/', views.me),
+    path('profile/', views.profile),
     path('csrf/', views.csrf_token),
 ]

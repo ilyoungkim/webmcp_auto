@@ -5,6 +5,7 @@ export type SiloLang = 'ko' | 'en'
 interface SiloState {
   lang: Ref<SiloLang>
   ready: Ref<boolean>
+  supportPhone: Ref<string>
   t: (key: string, params?: Record<string, string | number>) => string
   load: () => Promise<void>
 }
@@ -50,6 +51,40 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'dash.pw.changing': '변경 중...',
     'dash.pw.nameLabel': '이름',
     'dash.empty': '등록된 프로젝트가 없습니다.',
+    // 프로필 (/profile, /admin/profile)
+    'prof.title': '내 프로필',
+    'prof.adminTitle': '관리자 프로필',
+    'prof.section.account': '계정 정보',
+    'prof.section.contact': '연락처',
+    'prof.section.billing': '결제 정보',
+    'prof.section.support': '문의 연락처 (사이트 대표)',
+    'prof.email': '아이디(이메일)',
+    'prof.emailNote': '아이디(이메일)는 변경할 수 없습니다.',
+    'prof.name': '이름',
+    'prof.role': '권한',
+    'prof.plan': '플랜',
+    'prof.phone1': '대표 전화번호',
+    'prof.phone2': '보조 전화번호 (선택)',
+    'prof.phoneHint': '오류 안내·고객 문의 시 사용됩니다.',
+    'prof.billing.company': '회사명',
+    'prof.billing.contact': '결제 담당자',
+    'prof.billing.email': '결제 이메일',
+    'prof.billing.address': '결제 주소',
+    'prof.billing.note': '결제 비고',
+    'prof.billing.amount': '월 결제 금액',
+    'prof.billing.default': '기본 요금: {price} {currency} / 월',
+    'prof.billing.enterprise': '엔터프라이즈 요금이 적용되었습니다.',
+    'prof.billing.enterpriseNote': '엔터프라이즈 요금은 관리자가 설정합니다.',
+    'prof.billing.gateway': '결제 수단',
+    'prof.billing.gatewayPrep': '| PayPal / Stripe 연동 준비 중입니다. 카드 정보는 아직 입력하지 마세요.',
+    'prof.supportPhone': '대표 연락처',
+    'prof.supportPhoneNote': '위젯 오류 안내 문구에 노출되는 번호입니다. (기본: {default})',
+    'prof.save': '저장',
+    'prof.saving': '저장 중...',
+    'prof.saved': '프로필이 저장되었습니다.',
+    'prof.loadFailed': '프로필을 불러오지 못했습니다.',
+    'prof.backToDash': '← 대시보드',
+    'prof.backToAdmin': '← 관리 화면',
     // projects/new.vue
     'new.title': '새 프로젝트',
     'new.namePlaceholder': '프로젝트명 (예: OO병원)',
@@ -89,7 +124,7 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'proj.btn.regenerate': '재생성',
     'proj.btn.edit': '수정',
     'proj.btn.delete': '삭제',
-    'proj.edit.failMsg': '재생성하거나 문의 02-888-9999로 연락 주세요.',
+    'proj.edit.failMsg': '재생성하거나 문의 {phone}로 연락 주세요.',
     'proj.edit.note1': '이름과 URL은 변경할 수 없습니다. 도메인 유형과 위젯 테마만 변경할 수 있습니다.',
     'proj.edit.domainType': '도메인 유형',
     'proj.edit.theme': '위젯 테마',
@@ -166,6 +201,40 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'dash.pw.changing': 'Changing...',
     'dash.pw.nameLabel': 'Name',
     'dash.empty': 'No projects yet.',
+    // Profile (/profile, /admin/profile)
+    'prof.title': 'My Profile',
+    'prof.adminTitle': 'Admin Profile',
+    'prof.section.account': 'Account',
+    'prof.section.contact': 'Contact',
+    'prof.section.billing': 'Billing',
+    'prof.section.support': 'Support Phone (site-wide)',
+    'prof.email': 'ID (email)',
+    'prof.emailNote': 'Your ID (email) cannot be changed.',
+    'prof.name': 'Name',
+    'prof.role': 'Role',
+    'prof.plan': 'Plan',
+    'prof.phone1': 'Primary phone',
+    'prof.phone2': 'Secondary phone (optional)',
+    'prof.phoneHint': 'Used in error notices and support inquiries.',
+    'prof.billing.company': 'Company',
+    'prof.billing.contact': 'Billing contact',
+    'prof.billing.email': 'Billing email',
+    'prof.billing.address': 'Billing address',
+    'prof.billing.note': 'Billing notes',
+    'prof.billing.amount': 'Monthly price',
+    'prof.billing.default': 'Default price: {price} {currency} / month',
+    'prof.billing.enterprise': 'Enterprise pricing is applied.',
+    'prof.billing.enterpriseNote': 'Enterprise pricing is configured by the administrator.',
+    'prof.billing.gateway': 'Payment method',
+    'prof.billing.gatewayPrep': 'PayPal / Stripe integration coming soon. Do not enter card details yet.',
+    'prof.supportPhone': 'Support phone',
+    'prof.supportPhoneNote': 'Shown in widget error notices. (default: {default})',
+    'prof.save': 'Save',
+    'prof.saving': 'Saving...',
+    'prof.saved': 'Profile saved.',
+    'prof.loadFailed': 'Failed to load profile.',
+    'prof.backToDash': '← Dashboard',
+    'prof.backToAdmin': '← Admin',
     // projects/new.vue
     'new.title': 'New Project',
     'new.namePlaceholder': 'Project name (e.g., City Hospital)',
@@ -205,7 +274,7 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'proj.btn.regenerate': 'Regenerate',
     'proj.btn.edit': 'Edit',
     'proj.btn.delete': 'Delete',
-    'proj.edit.failMsg': 'Regenerate, or contact us at 02-888-9999.',
+    'proj.edit.failMsg': 'Regenerate, or contact us at {phone}.',
     'proj.edit.note1': 'Name and URL cannot be changed. Only domain type and widget theme can be changed.',
     'proj.edit.domainType': 'Domain type',
     'proj.edit.theme': 'Widget theme',
@@ -256,6 +325,8 @@ export function useSilo(): SiloState {
     return (envLang === 'en' || envLang === 'ko') ? envLang : 'ko'
   })
   const ready = useState<boolean>('silo-ready', () => false)
+  // 사이트 대표 연락처 — 오류 안내 문구(proj.edit.failMsg 등)에서 {phone} 치환용
+  const supportPhone = useState<string>('silo-support-phone', () => '')
 
   const load = async () => {
     // env로 이미 확정된 경우(운영 도커) API 호출 불필요
@@ -274,19 +345,34 @@ export function useSilo(): SiloState {
     } catch {
       // 실패 시 기본값(ko) 유지
     }
+    // 대표 연락처는 인증 여부와 무관하게 노출되어야 하므로 별도 실험
+    try {
+      const config = useRuntimeConfig()
+      const res2: any = await $fetch('/api/site-info/', { baseURL: config.public.apiBase, credentials: 'include' })
+      if (res2?.supportPhone) supportPhone.value = res2.supportPhone
+    } catch {
+      // 실패 시 빈 값 유지 → t()에서 기본 번호 사용
+    }
     ready.value = true
   }
 
   const t = (key: string, params?: Record<string, string | number>): string => {
     const table = MESSAGES[lang.value] || MESSAGES.ko
     let out = table[key] || MESSAGES.ko[key] || key
-    if (params) {
-      for (const [k, v] of Object.entries(params)) {
+    // {phone} 플레이스홀더 — supportPhone 조회 전이면 백엔드 기본값 사용
+    const merged = { ...params }
+    if ('phone' in merged) {
+      merged.phone = supportPhone.value || String(merged.phone)
+    } else if (out.includes('{phone}')) {
+      merged.phone = supportPhone.value || '02-888-9999'
+    }
+    if (Object.keys(merged).length) {
+      for (const [k, v] of Object.entries(merged)) {
         out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
       }
     }
     return out
   }
 
-  return { lang, ready, t, load }
+  return { lang, ready, supportPhone, t, load }
 }

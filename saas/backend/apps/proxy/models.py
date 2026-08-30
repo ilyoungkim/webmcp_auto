@@ -44,3 +44,26 @@ class ChatErrorReport(models.Model):
 
     def __str__(self):
         return f'[{self.status}] {self.public_id} {self.error_message[:50]}'
+
+
+class SiteSetting(models.Model):
+    """전역 사이트 설정 (관리자 프로필에서 수정). key-value 단순 구조."""
+
+    key = models.CharField(max_length=64, unique=True)
+    value = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.key}={self.value[:30]}'
+
+    @classmethod
+    def get(cls, key: str, default: str = '') -> str:
+        row = cls.objects.filter(key=key).first()
+        if row is None or (row.value or '').strip() == '':
+            return default
+        return row.value
+
+    @classmethod
+    def set(cls, key: str, value: str) -> 'SiteSetting':
+        row, _ = cls.objects.update_or_create(key=key, defaults={'value': value or ''})
+        return row

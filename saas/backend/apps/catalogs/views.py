@@ -35,3 +35,18 @@ def silo_info(request):
     summary = silo_summary()
     meta = lang_meta(summary['lang'])
     return Response({'lang': summary['lang'], 'label': meta.get('label', summary['lang'])})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def site_info(request):
+    """사이트 공개 정보 — 대표 연락처 등.
+
+    로그인 없이 위젯 오류 안내 문구에 필요한 최소 정보만 반환한다.
+    supportPhone: 관리자 프로필에서 수정 가능. 비어 있으면 settings 기본값.
+    """
+    from apps.proxy.models import SiteSetting
+    from django.conf import settings as dj_settings
+    return Response({
+        'supportPhone': SiteSetting.get('support_phone', dj_settings.SUPPORT_PHONE),
+    })

@@ -142,6 +142,9 @@ SAAS_PUBLIC_URL = env('SAAS_PUBLIC_URL', 'http://127.0.0.1:53300')
 ADMIN_SEED_EMAIL = env('ADMIN_SEED_EMAIL', 'admin@local')
 ADMIN_SEED_PASSWORD = env('ADMIN_SEED_PASSWORD', '')
 JOB_LOCK_MINUTES = int(env('JOB_LOCK_MINUTES', '15'))
+# 문의/오류 안내에 노출되는 대표 연락처 (관리자 프로필 페이지에서 수정 가능,
+# 값이 비으면 이 기본값 사용. .env 의 SUPPORT_PHONE 으로 초기 기본값 지정 가능)
+SUPPORT_PHONE = env('SUPPORT_PHONE', '02-888-9999')
 # ── 다국어 사일로 ────────────────────────────────────────────
 # 이 컨테이너가 담당하는 언어 및 지원 언어 목록 (ko | en, 콤마 구분).
 # ko 컨테이너는 lang='ko' 카탈로그만, en 컨테이너는 lang='en' 카탈로그만 노출한다.

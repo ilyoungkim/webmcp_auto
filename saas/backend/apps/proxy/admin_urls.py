@@ -15,13 +15,33 @@ def _require_admin(request):
         raise PermissionDenied()
 
 
+# ── 사일로별 기본 결제 금액 ─────────────────────────────────
+DEFAULT_MONTHLY_PRICE = {'ko': ('KRW', 50000), 'en': ('USD', 49)}
+
+
+def _default_price():
+    from django.conf import settings as dj_settings
+    lang = getattr(dj_settings, 'WEBMCP_LANG', 'ko')
+    return DEFAULT_MONTHLY_PRICE.get(lang, DEFAULT_MONTHLY_PRICE['ko'])
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def users(request):
     _require_admin(request)
+    currency, price = _default_price()
     return Response([
-        {'id': u.id, 'email': u.email, 'name': u.name, 'role': u.role,
-         'plan': u.plan, 'active': u.is_active, 'allowedIps': u.allowed_ips}
+        {
+            'id': u.id, 'email': u.email, 'name': u.name, 'role': u.role,
+            'plan': u.plan, 'active': u.is_active, 'allowedIps': u.allowed_ips,
+            'phone1': u.phone1, 'phone2': u.phone2,
+            'monthlyPrice': float(u.monthly_price) if u.monthly_price is not None else None,
+            'monthlyCurrency': u.monthly_currency or '',
+            'billingCompany': u.billing_company,
+            # 사일로 기본가 참고용
+            'defaultCurrency': currency,
+            'defaultPrice': float(price),
+        }
         for u in User.objects.order_by('id')
     ])
 
@@ -40,8 +60,55 @@ def user_patch(request, pk):
         u.is_active = bool(request.data['active'])
     if 'allowedIps' in request.data:
         u.allowed_ips = (request.data['allowedIps'] or '').strip()
+    # 프로필 연락처 (admin이 대신 수정 가능)
+    for field in ('phone1', 'phone2'):
+        if field in request.data:
+            setattr(u, field, (request.data[field] or '').strip())
+    # ── 결제 금액 ──────────────────────────────────────────
+    # monthlyPrice: null → 기본값(ko 50,000원 / en $49)으로 되돌림
+    #             숫자 → 엔터프라이즈 금액 지정
+    if 'monthlyPrice' in request.data:
+        raw = request.data['monthlyPrice']
+        if raw in (None, '', 'null'):
+            u.monthly_price = None
+            u.monthly_currency = ''
+        else:
+            try:
+                u.monthly_price = round(float(raw), 2)
+            except (TypeError, ValueError):
+                raise ValidationError('결제 금액은 숫자여야 합니다.')
+            cur = (request.data.get('monthlyCurrency') or '').strip().upper()
+            u.monthly_currency = cur or _default_price()[0]
+        if request.data.get('monthlyCurrency') is not None and raw in (None, '', 'null'):
+            u.monthly_currency = (request.data['monthlyCurrency'] or '').strip().upper()
     u.save()
-    return Response({'ok': True})
+    return Response({
+        'ok': True,
+        'monthlyPrice': float(u.monthly_price) if u.monthly_price is not None else None,
+        'monthlyCurrency': u.monthly_currency,
+    })
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def site_settings(request):
+    """전역 사이트 설정 조회/수정 (관리자 전용).
+
+    현재 지원: supportPhone(문의 안내 연락처 — 오류 메시지 등에 노출).
+    값이 비어 있으면 settings.SUPPORT_PHONE 기본값 사용.
+    """
+    _require_admin(request)
+    from django.conf import settings as dj_settings
+
+    from .models import SiteSetting
+
+    if request.method == 'PATCH':
+        if 'supportPhone' in request.data:
+            SiteSetting.set('support_phone', (request.data['supportPhone'] or '').strip())
+    return Response({
+        'supportPhone': SiteSetting.get('support_phone', dj_settings.SUPPORT_PHONE),
+        'defaultSupportPhone': dj_settings.SUPPORT_PHONE,
+    })
 
 
 @api_view(['GET'])
@@ -360,6 +427,7 @@ urlpatterns = [
     path('users/', users),
     path('users/<int:pk>/plan/', user_patch),
     path('users/<int:pk>/', user_patch),
+    path('settings/', site_settings),
     path('usage/', usage),
     path('chat-errors/', chat_errors),
     path('chat-errors/<int:pk>/', chat_error_patch),
