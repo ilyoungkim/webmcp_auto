@@ -171,8 +171,12 @@ SEED_KO = [
         ('매장', '매장·지점 정보를 알려줘', '매장 위치·영업시간·지점 안내 중심'),
         ('제품', '판매 제품·상품을 알려줘', '상품군·브랜드·카테고리 중심'),
         ('연락처', '연락처와 고객센터를 알려줘', '전화·이메일·고객센터·매장 문의 중심'),
-    ]),
-    ('company_research', '연구회사', '연구소·연구개발 전문 회사 (연구·기술 중심)', '🔬', [
+    ]),    ('company_sales', '영업', '영업·판매·고객사 대상 서비스 팀 사이트 (영업·제안 중심)', '📈', [
+        ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·영업 조직 중심'),
+        ('제품·서비스', '판매 제품·서비스를 알려줘', '제품·서비스 구성·가격·구매 절차 중심'),
+        ('제안·견적', '제안·견적 받는 방법을 알려줘', '견적 요청·제안서·도입 문의 중심'),
+        ('연락처', '영업 담당자와 연락처를 알려줘', '영업팀·지역 담당·전화·이메일 중심'),
+    ]),    ('company_research', '연구회사', '연구소·연구개발 전문 회사 (연구·기술 중심)', '🔬', [
         ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·연구 분야 중심'),
         ('연구분야', '주요 연구 분야를 알려줘', '연구 주제·기술·특허·성과 중심'),
         ('성과', '연구 성과·논문·특허를 알려줘', '대표 성과·논문·특허·수상 중심'),
@@ -294,6 +298,12 @@ SEED_EN = [
         ('Solutions', 'What solutions and services do you offer?', 'Products, solutions, tech stack'),
         ('Case Studies', 'Show customer success stories', 'References, case studies, results'),
         ('Contact', 'Contact information and demo requests', 'Contact options, demo requests'),
+    ]),
+    ('company_sales', 'Sales', 'Sales & customer-facing team sites (quotes, proposals)', '📈', [
+        ('About', 'Introduce the company and its sales team', 'Company history, sales organization'),
+        ('Products', 'What products and services do you sell?', 'Product lines, pricing, purchase process'),
+        ('Quotes', 'How can I request a quote or proposal?', 'Quote requests, proposals, demo requests'),
+        ('Contact', 'Introduce the sales contacts', 'Sales team, regional reps, phone, email'),
     ]),
 
     # ── 교육·상담 (영어) ─────────────────────────────────────
