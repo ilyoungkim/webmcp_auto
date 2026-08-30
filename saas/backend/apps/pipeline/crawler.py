@@ -467,24 +467,42 @@ def crawl(url: str) -> dict:
 
 
 def _crawl_httpx(url: str) -> dict:
-    with httpx.Client(timeout=30, follow_redirects=True) as client:
-        resp = client.get(url, headers={'User-Agent': 'Mozilla/5.0 (WebMCPAutoBot/1.0)'})
-        resp.raise_for_status()
-        html = resp.text
+    """단일 페이지 크롤(httpx). 커스텀 UA가 403/차단페이지면 브라우저 헤더로 폴백."""
+    html: str | None = None
+    last_err: Exception | None = None
+    for headers in (_UA, _UA_BROWSER):
+        try:
+            with httpx.Client(timeout=30, follow_redirects=True) as client:
+                resp = client.get(url, headers=headers)
+                # 403/401 또는 위장 차단페이지면 다음 UA로 재시도
+                if resp.status_code in (403, 401):
+                    last_err = RuntimeError(f'HTTP {resp.status_code} (UA: {headers.get("User-Agent", "")[:20]})')
+                    continue
+                resp.raise_for_status()
+                if _looks_blocked(resp.text):
+                    last_err = RuntimeError('WAF 차단 페이지 감지')
+                    continue
+                html = resp.text
 
-        # JS 리다이렉트(document.location.href=...) 추종 — 후보 전부 시도, 가장 큰 본문 채택
-        if len(html) < 3000:
-            cands = re.findall(r'location\.href\s*=\s*["\']([^"\']+)["\']', html)
-            for target in dict.fromkeys(cands):
-                if not target.startswith('http'):
-                    continue
-                try:
-                    resp2 = client.get(target, headers={'User-Agent': 'Mozilla/5.0 (WebMCPAutoBot/1.0)'})
-                except httpx.HTTPError:
-                    continue
-                if resp2.status_code == 200 and len(resp2.text) > len(html):
-                    html = resp2.text
-                    break
+                # JS 리다이렉트(document.location.href=...) 추종 — 후보 전부 시도, 가장 큰 본문 채택
+                if len(html) < 3000:
+                    cands = re.findall(r'location\.href\s*=\s*["\']([^"\']+)["\']', html)
+                    for target in dict.fromkeys(cands):
+                        if not target.startswith('http'):
+                            continue
+                        try:
+                            resp2 = client.get(target, headers=headers)
+                        except httpx.HTTPError:
+                            continue
+                        if resp2.status_code == 200 and len(resp2.text) > len(html):
+                            html = resp2.text
+                            break
+                break   # 이 UA로 정상 획득
+        except httpx.HTTPError as e:
+            last_err = e
+            continue
+    if html is None:
+        raise RuntimeError(f'페이지 획득 실패: {last_err}')
 
     title_m = re.search(r'<title[^>]*>(.*?)</title>', html, re.S | re.I)
     title = title_m.group(1).strip() if title_m else url
