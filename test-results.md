@@ -246,6 +246,27 @@
 
 ---
 
+### T-027. 스마트폰 LAN 로그인 실패 원인 분석/수정 (커밋 07e19df)
+- **증상**: 같은 Wi-Fi의 스마트폰에서 `http://192.168.31.248:8080/login` 화면은 뜨지만 로그인이 안 됨
+- **진단 과정**:
+  1. LAN 경유 `/api/health/` 200, `/login` 페이지 200 — nginx/라우팅 정상
+  2. curl로 스마트폰 동일 조건(Origin/Referer = LAN URL) 로그인 POST → **200** (API 자체는 정상)
+  3. **Set-Cookie 응답 분석 → 원인 확정**: `csrftoken`/`sessionid` 모두 **`Secure` 속성이 붙어 있었음**
+- **근본 원인**: `settings.py`의 `if not DEBUG: SESSION/CSRF_COOKIE_SECURE = True` — compose가 `DJANGO_DEBUG=false`이므로 **http 접속에서 브라우저가 Secure 쿠키를 폐기** → 로그인 API는 성공해도 브라우저가 세션 쿠키를 저장하지 못함 (curl -c는 Secure 쿠키도 저장해 헤더 재현 시 성공처럼 보이는 함정)
+- **수정**:
+  - `settings.py`: `SECURE_COOKIES` env 스위치 신설(기본 `true` — https 배포 안전 유지)
+  - `docker-compose.silo.yml`: LAN 배포용으로 `SECURE_COOKIES: "false"` 주입 (인터넷 공개 시 true로 되돌릴 것을 주석 명시)
+- **검증**:
+  | 항목 | 결과 |
+  |---|---|
+  | Set-Cookie에 Secure 속성 | ✅ 제거 확인 (`SameSite=Lax`만) |
+  | LAN 로그인(tensun) | ✅ 200 |
+  | LAN 로그인 후 `/api/auth/me/` 세션 유지 | ✅ 200 |
+  | localhost 접속 | ✅ 200 유지 |
+- **운영 주의**: 인터넷 공개(https) 시 compose에서 `SECURE_COOKIES: "true"`로 되돌려야 쿠키 보안 유지
+
+---
+
 ## 부록 A. 커밋 이력 (시간 순)
 
 | 커밋 | 내용 |
@@ -261,6 +282,8 @@
 | `597b095` | LAN(192.168.x.x) 원격 접속 허용 — 8080/8081, DB 로컬 전용 유지 |
 | `0eccdd0` | test-results.md T-026 LAN 접속 테스트 추가 |
 | `2eb18e9` | DEPLOY_PORUDCTION.md §5.1 LAN 접속 절차 문서화 |
+| `07e19df` | SECURE_COOKIES 스위치 — LAN http 로그인 쿠키 폐기 문제 수정 |
+| `ce780c2` | test-results.md 커밋 이력 갱신 |
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
 
