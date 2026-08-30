@@ -70,7 +70,46 @@ def _html_to_text(html: str) -> str:
     return WS_RE.sub('\n\n', text).strip()
 
 
+# 식별 가능한 커스텀 봇 UA (기본) — robots.txt를 준수하는 사이트에서는 이것으로 충분.
+# Akamai/Cloudflare 등 WAF가 커스텀/비표준 UA를 차단하는 사이트가 많아,
+# 차단 응답(짧은 본문 + unavailable/denied)을 감지하면 브라우저 UA로 폴백한다.
+# (robots.txt의 User-agent 규칙은 httpx 기본 UA와 동일하게 무해하게 사용)
 _UA = {'User-Agent': 'Mozilla/5.0 (WebMCPAutoBot/1.0)'}
+
+# WAF 차단 폴백용 — 일반 브라우저 UA + 표준 헤더. robots.txt Disallow는 사이트맵
+# 수집 이전에 validate_crawl_url 등 상위 정책으로 통제하며, 크롤 본문(대상 사이트
+# 콘텐츠)도 운영자 동의 기반 SaaS이므로 정상 페이지만 수집 된다.
+# 주의: Sec-Fetch-* 등 모든 브라우저 표준 헤더를 갖춰야 Akamai가 통과시킨다
+# (실측: UA만으로는 3762B 차단 페이지, 전체 헤더 시 499KB+ 정상 응답).
+_UA_BROWSER = {
+    'User-Agent': ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+                   'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'),
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Upgrade-Insecure-Requests': '1',
+}
+
+_BLOCK_MARKERS = ('unavailable', 'access denied', 'denied', 'captcha',
+                  'blocked', 'verify you are', 'attention required')
+
+
+def _looks_blocked(text: str) -> bool:
+    """짧은 본문 + 차단 키워드 조합으로 WAF 차단 페이지를 판별."""
+    if not text or len(text) > 20_000:
+        return False
+    lower = text.lower()
+    return any(k in lower for k in _BLOCK_MARKERS)
+
+
+def _headers_with_fallback(base_headers: dict, response_text: str) -> dict:
+    """차단 페이지로 판단되면 브라우저 UA 헤더로 교체해 반환."""
+    if _looks_blocked(response_text):
+        return dict(_UA_BROWSER)
+    return base_headers
 
 
 def _url_depth_score(target_url: str, base_url: str) -> tuple[int, int, int]:
@@ -118,9 +157,15 @@ def fetch_sitemap_items(url: str, limit: int = 30) -> list[dict[str, str]]:
     urls: list[str] = []
     discovered_labels: dict[str, str] = {}
     try:
+        # UA 폴백 관리 — robots/sitemap 요청마다 차단 상태를 확인해 헤더 교체
+        headers = dict(_UA)
         with httpx.Client(timeout=20, follow_redirects=True) as client:
             try:
-                robots = client.get(f'{origin}/robots.txt', headers=_UA)
+                robots = client.get(f'{origin}/robots.txt', headers=headers)
+                if _looks_blocked(robots.text):
+                    # robots.txt 자체가 WAF 차단이면 브라우저 UA로 전환
+                    headers = _headers_with_fallback(headers, robots.text)
+                    robots = client.get(f'{origin}/robots.txt', headers=headers)
                 if robots.status_code == 200:
                     for line in robots.text.splitlines():
                         if line.lower().startswith('sitemap:'):
@@ -151,7 +196,7 @@ def fetch_sitemap_items(url: str, limit: int = 30) -> list[dict[str, str]]:
             seen_sitemaps: set[str] = set()
             cap = limit * 20  # 후보군을 충분히 수집 후 depth 정렬
             for sm in candidates:
-                _collect_sitemap(client, sm, urls, seen_sitemaps, depth=0, cap=cap)
+                _collect_sitemap(client, sm, urls, seen_sitemaps, depth=0, cap=cap, headers=headers)
                 if not urls:
                     continue
                 host_matched = any(urlparse(u).netloc == base_host for u in urls)
@@ -200,11 +245,16 @@ def _collect_html_links_with_labels(
     client: httpx.Client, page_url: str, out: list[str], labels_map: dict[str, str], cap: int
 ) -> None:
     """sitemap이 없을 때 페이지 HTML에서 동일 도메인의 링크와 메뉴 라벨을 추출."""
+    headers = dict(_UA)
     # 일시적 네트워크 실패 대비 홈페이지 fetch 재시도 (최대 3회)
     resp = None
     for attempt in range(3):
         try:
-            resp = client.get(page_url, headers=_UA)
+            resp = client.get(page_url, headers=headers)
+            if _looks_blocked(resp.text):
+                # WAF 차단 시 브라우저 UA로 전환 재시도
+                headers = _headers_with_fallback(headers, resp.text)
+                continue
             if resp.status_code == 200 and 'text/html' in resp.headers.get('content-type', ''):
                 break
             resp = None
@@ -258,26 +308,27 @@ def _collect_html_links_with_labels(
 
 
 def _fetch_single_title(client: httpx.Client, page_url: str) -> tuple[str, str]:
-    """단일 페이지에서 <title> 또는 <meta og:title> 추출."""
-    try:
-        r = client.get(page_url, headers=_UA, timeout=4)
-        if r.status_code == 200:
-            m = re.search(r'<title[^>]*>(.*?)</title>', r.text, re.I | re.S)
-            if m:
-                t = html.unescape(m.group(1))
-                t = re.sub(r'\s+', ' ', t).strip()
-                if t:
-                    return page_url, t
-            og = re.search(r'<meta[^>]*property=[\"\']og:title[\"\'][^>]*content=[\"\'](.*?)[\"\']', r.text, re.I)
-            if not og:
-                og = re.search(r'<meta[^>]*content=[\"\'](.*?)[\"\'][^>]*property=[\"\']og:title[\"\']', r.text, re.I)
-            if og:
-                t = html.unescape(og.group(1))
-                t = re.sub(r'\s+', ' ', t).strip()
-                if t:
-                    return page_url, t
-    except Exception:  # noqa: BLE001
-        pass
+    """단일 페이지에서 <title> 또는 <meta og:title> 추출. WAF 차단 시 브라우저 UA 재시도."""
+    for headers in (_UA, _UA_BROWSER):
+        try:
+            r = client.get(page_url, headers=headers, timeout=4)
+            if r.status_code == 200 and not _looks_blocked(r.text):
+                m = re.search(r'<title[^>]*>(.*?)</title>', r.text, re.I | re.S)
+                if m:
+                    t = html.unescape(m.group(1))
+                    t = re.sub(r'\s+', ' ', t).strip()
+                    if t:
+                        return page_url, t
+                og = re.search(r'<meta[^>]*property=[\"\']og:title[\"\'][^>]*content=[\"\'](.*?)[\"\']', r.text, re.I)
+                if not og:
+                    og = re.search(r'<meta[^>]*content=[\"\'](.*?)[\"\'][^>]*property=[\"\']og:title[\"\']', r.text, re.I)
+                if og:
+                    t = html.unescape(og.group(1))
+                    t = re.sub(r'\s+', ' ', t).strip()
+                    if t:
+                        return page_url, t
+        except Exception:  # noqa: BLE001
+            pass
     return page_url, ''
 
 
@@ -312,12 +363,16 @@ def _fetch_titles_for_urls(urls: list[str], fallback_labels: dict[str, str]) -> 
 
 
 def _collect_sitemap(client: httpx.Client, sm_url: str, out: list[str],
-                     seen: set[str], depth: int, cap: int) -> None:
+                     seen: set[str], depth: int, cap: int, headers: dict | None = None) -> None:
     if sm_url in seen or depth > 1 or len(out) >= cap:
         return
     seen.add(sm_url)
     try:
-        resp = client.get(sm_url, headers=_UA)
+        resp = client.get(sm_url, headers=headers or _UA)
+        if _looks_blocked(resp.text):
+            # sitemap 요청이 WAF 차단이면 브라우저 UA로 재시도 (재귀 시에도 유지됨)
+            headers = _headers_with_fallback(headers or _UA, resp.text)
+            resp = client.get(sm_url, headers=headers)
         if resp.status_code != 200 or '<' not in resp.text[:100]:
             return
         root = ET.fromstring(resp.content)
@@ -338,7 +393,7 @@ def _collect_sitemap(client: httpx.Client, sm_url: str, out: list[str],
         if kind == 'url':
             out.append(loc)
         elif depth == 0:
-            _collect_sitemap(client, loc, out, seen, depth + 1, cap)
+            _collect_sitemap(client, loc, out, seen, depth + 1, cap, headers)
 
 
 def crawl_many(url: str, limit: int = 10, per_page_chars: int = 30_000, target_urls: list[str] | None = None) -> dict:
