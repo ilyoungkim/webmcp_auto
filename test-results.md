@@ -284,6 +284,27 @@
 
 ---
 
+### T-029. 갤럭시 크롬 음성입력 무반응 — 원인 분석/개선 (커밋 0d50d3c)
+- **증상**: MacBook(https 아님에도 정상 작동)에서는 되는데 갤럭시 크롬에서 음성 입력이 안 됨
+- **구조**: 위젯 음성입력 = Web Speech API (`window.SpeechRecognition || webkitSpeechRecognition`)
+- **원인 (웹 표준 규격)**: 마이크 접근(`getUserMedia`)은 **보안 콘텍스트(Secure Context) 필수**.
+  Mac이 아닌 폰에서 `http://192.168.x.x:8080` 접속 시 **비보안 콘텍스트**라
+  크롬(안드로이드)이 마이크 권한 요청 자체를 차단 → `onerror(not-allowed)` →
+  기존 코드는 이렇게 실패해도 아무 안내 없이 조용히 끝났음 → "버튼을 눌러도 아무 일도 없음"
+  - 데스크톱 MacBook이 `localhost`(http)에서 동작한 까닭: **localhost는 예외적으로 보안 콘텍스트 취급**
+- **개선**:
+  1. `recognition.onerror`에 오류코드별 사용자 안내 표시 (not-allowed / audio-capture / network / no-speech…, ko/en)
+  2. 미보안 콘텍스트 감지(`isSecureContext === false`) 시 클릭 즉시 "HTTPS 필요" 안내 표시
+  3. 무음 실패 대비 8초 타임아웃 처리
+- **해결책 (갤럭시에서 음성입력을 쓰려면)**:
+  | 방법 | 설명 |
+  |---|---|
+  | **HTTPS 접속** | 유일한 근본 해결 — 브라우저 규격상 http에서는 마이크 차단 불가피 |
+  | 직접 입력 | 텍스트 입력은 영향 없음 |
+- **검증**: 문법 `node --check` OK, 서빙 JS에 `MIC_ERRORS/isSecureContext` 반영 확인(3곳)
+
+---
+
 ## 부록 A. 커밋 이력 (시간 순)
 
 | 커밋 | 내용 |
@@ -302,6 +323,7 @@
 | `07e19df` | SECURE_COOKIES 스위치 — LAN http 로그인 쿠키 폐기 문제 수정 |
 | `8ab4abf` | test-results.md T-027 추가 |
 | `6eb0ee0` | 위젯 에셋 no-cache — 모바일 캐시 방지 (갤럭시 런처 미표출 해결) |
+| `0d50d3c` | 음성입력 갤럭시 대응 — 오류피드백 + HTTPS 필요 안내 + 8초 타임아웃 |
 | `ce780c2` | test-results.md 커밋 이력 갱신 |
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
