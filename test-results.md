@@ -259,6 +259,8 @@
 | `179dd07` | plan.md §0.10 최신 현황 추가 |
 | `4536bb2` | test-results.md 최초 생성 (T-001~T-025) |
 | `597b095` | LAN(192.168.x.x) 원격 접속 허용 — 8080/8081, DB 로컬 전용 유지 |
+| `0eccdd0` | test-results.md T-026 LAN 접속 테스트 추가 |
+| `2eb18e9` | DEPLOY_PORUDCTION.md §5.1 LAN 접속 절차 문서화 |
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
 
