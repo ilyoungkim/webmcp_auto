@@ -246,6 +246,68 @@ ports:
 
 ---
 
+## 5.1 LAN(사내망 192.168.x.x) 접속 허용 — 현재 적용 중 (2026-08-30)
+
+### 요구사항과 구성
+
+- 사무실 내 다른 PC/모바일에서 **8080(ko) / 8081(en)** 로 콘솔 접속
+- **DB(5432)는 로컬 전용** — 호스트를 포함한 어디서도 외부 직접 접속 불가
+
+`docker/docker-compose.silo.yml` 현재 설정 (커밋 `597b095`):
+
+```yaml
+x-backend-env: &backend-env
+  ALLOWED_HOSTS: "127.0.0.1,localhost,backend,192.168.31.248,192.168.64.1"
+
+# 각 backend/worker (ko·en 모두):
+  SAAS_PUBLIC_URL: http://192.168.31.248:8080   # ko (en은 :8081)
+  CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://192.168.31.248:8080
+```
+
+### 접속 주소 (같은 네트워크의 기기에서)
+
+| 사일로 | 주소 |
+|---|---|
+| 한국어(ko) | http://192.168.31.248:8080 |
+| 영어(en) | http://192.168.31.248:8081 |
+
+### 왜 SAAS_PUBLIC_URL도 바꿔야 하나
+
+이 값은 **위젯 config의 `assetBase`(JS/CSS 경로)와 `proxyEndpoint`(채팅 API)에 박제**된다.
+LAN 사용자 브라우저는 이 주소로 위젯을 로드·채팅하므로 `localhost`로 두면 위젯이 동작하지 않는다.
+(검증: LAN 오리진 로그인 CSRF 라운드트립 200, `/api/health/` LAN 8080/8081 모두 200)
+
+### DB 로컬 전용 확인 방법
+
+```bash
+docker port webmcp-postgres-ko   # 출력 없음 = 호스트 바인딩 없음(정상)
+docker port webmcp-postgres-en   # 출력 없음 = 동일
+```
+
+postgres 서비스는 `ports`가 아닌 `expose: ["5432"]`만 사용하므로 **호스트든 LAN이든 5432로 접속 불가**.
+백엔드·워커만 컨테이너 네트워크 안에서 DB에 접속한다.
+
+### IP 변경 시 갱신 절차 (DHCP)
+
+공유기 재부팅 등으로 Mac의 IP가 바뀌면 아래 3곳의 IP를 갱신한 뒤 backend/worker를 재기동한다.
+
+```bash
+/sbin/ifconfig | grep "inet 192.168"     # 새 IP 확인
+# docker/docker-compose.silo.yml:
+#   1) ALLOWED_HOSTS (공통 &backend-env)
+#   2) SAAS_PUBLIC_URL (backend-ko/worker-ko/backend-en/worker-en 각 4곳)
+#   3) CSRF_TRUSTED_ORIGINS (위와 동일 4곳)
+docker compose -f docker-compose.silo.yml up -d backend-ko worker-ko backend-en worker-en
+docker compose -f docker-compose.silo.yml restart nginx-ko nginx-en
+```
+
+**주의**:
+- macOS 방화벽이 "모든 수신 연결 차단" 모드면 8080/8081 수신을 허용해야 한다.
+- 공유기에서 Mac에 **DHCP 고정 IP 예약**을 권장 (IP 변경 시 위 절차 반복 방지).
+- 권장 이상 접근이 필요해지면(인터넷 공개) §1~§4의 공인 도메인+HTTPS 구성으로 전환. LAN 허용은 어디까지나 사내망 전제이다.
+
+---
+
 ## 6. HTTPS 프록시 시 주의사항 및 해결
 
 외부 nginx에서 HTTPS를 종료한 후 Docker nginx로 HTTP를 전달하면, 내부 서비스는 요청을 HTTP로 오인할 수 있다.
