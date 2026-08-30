@@ -13,9 +13,56 @@ load_dotenv(BASE_DIR / '.env')
 def env(key, default=''):
     return os.environ.get(key, default)
 
+def _detect_host_ips() -> list:
+    """서버(컨테이너/호스트)의 자기 네트워크 IP를 자동 탐지해 반환.
+
+    운영 서버의 IP가 바뀌거나(도메인 없이 IP 직접 접속) 네트워크가 여러 개여도
+    ALLOWED_HOSTS를 수동 관리하지 않도록 한다.
+    - socket.gethostbyname 로 해석 실패 시 socket.gethostbyname_ex 로 전체 IP 수집
+    - 실패해도 배포가 죽지 않게 조용히 빈 목록 반환 (폴백)
+    """
+    ips = set()
+    try:
+        import socket
+        ips.update(socket.gethostbyname_ex(socket.gethostname())[2])
+    except Exception:  # noqa: BLE001 — 호스트명 해석 실패 시 무시
+        pass
+    try:
+        import fcntl  # Linux 컨테이너 안에서만 사용
+        import struct
+
+        import array
+
+        # SIOCGIFCONF 로 모든 인터페이스 IPv4 주소 나열
+        max_if = 128
+        bytes_ = max_if * 40
+        names = array.array('B', b'\0' * bytes_)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        result = struct.unpack(
+            'iL', fcntl.ioctl(s.fileno(), 0x8912, struct.pack('iL', bytes_, names.buffer_info()[0]))
+        )
+        length = result[1]
+        namestr = names.tobytes()
+        for i in range(0, length, 40):
+            ip = socket.inet_ntoa(namestr[i + 20:i + 24])
+            if not ip.startswith('127.'):
+                ips.add(ip)
+    except Exception:  # noqa: BLE001 — 컨테이너 환경별 구조 차이, 실패 무시
+        pass
+    return sorted(ips)
+
 SECRET_KEY = env('DJANGO_SECRET_KEY', 'dev-only-insecure-key-change-me')
 DEBUG = env('DJANGO_DEBUG', 'true').lower() == 'true'
 ALLOWED_HOSTS = [h for h in env('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',') if h]
+
+# 서버 자기 IP 자동 탐지 허용 — ALLOWED_HOSTS 를 도메인/IP 목록으로 유지·관리하는 대신,
+# 운영 서버에서 ifconfig 로 나오는 자기 주소를 전부 자동 허용한다 (컨테이너 배포 호환).
+if env('ALLOW_SELF_IP', 'true').lower() == 'true':
+    _self_ips = _detect_host_ips()
+    ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS + _self_ips))
+    if _self_ips:
+        import logging
+        logging.getLogger(__name__).info('ALLOWED_HOSTS += self IPs: %s', ','.join(_self_ips))
 
 # ── apps ─────────────────────────────────────────────────────
 INSTALLED_APPS = [
