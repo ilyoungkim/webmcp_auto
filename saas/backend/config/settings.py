@@ -126,7 +126,14 @@ REST_FRAMEWORK = {
 CSRF_COOKIE_HTTPONLY = False          # Nuxt가 읽어 X-CSRFToken 헤더로 전달
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
-if not DEBUG:
+CSRF_COOKIE_HTTPONLY = False          # Nuxt가 읽어 X-CSRFToken 헤더로 전달
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+# Secure 쿠키는 https 에서만 브라우저에 저장되므로, http(LAN 192.168.x.x) 접속 환경에서는
+# 세션/CSRF 쿠키가 저장되지 않아 로그인이 안 된다. DEBUG=false(운영)이면 기본 Secure=True,
+# LAN 배포 등 http 로 서빙할 때만 env 로 끌 수 있다 (docker compose: SECURE_COOKIES=false)
+SECURE_COOKIES = env('SECURE_COOKIES', not DEBUG and 'true' or 'false').lower() == 'true'
+if SECURE_COOKIES:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 

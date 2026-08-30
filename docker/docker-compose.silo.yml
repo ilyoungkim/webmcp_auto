@@ -18,6 +18,9 @@
 
 x-backend-env: &backend-env
   DJANGO_DEBUG: "false"
+  # http(LAN 192.168.x.x) 접속에서 브라우저가 세션/CSRF 쿠키를 저장하도록 Secure 속성을 끈다.
+  # 인터넷 공개(https) 시 true 로 되돌릴 것 (settings.SECURE_COOKIES, 기본값 true)
+  SECURE_COOKIES: "false"
   # LAN(192.168.x.x) 원격 접속 허용 — 네트워크가 바뀌면 이 목록과 아래 CSRF에도 IP 추가 필요
   # (보안 유의: 이 값은 로컬/사내망 공유용. 인터넷 공인 노출 시엔 공인 도메인으로 교체할 것)
   ALLOWED_HOSTS: "127.0.0.1,localhost,backend,192.168.31.248,192.168.64.1"
