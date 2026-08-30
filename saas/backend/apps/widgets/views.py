@@ -176,13 +176,20 @@ def embed_js(request, public_id):
 
 
 def widget_asset(request, path):
-    """widget-dist 정적 파일 서빙."""
+    """widget-dist 정적 파일 서빙.
+
+    no-cache 헤더를 명시한다 — 위젯 JS/CSS가 업데이트될 때(모바일 대응 등) 고객
+    사이트/미리보기 브라우저에 이전 실패 응답·구버전이 캐시되어 갱신이 안 되는
+    문제를 예방한다 (갤럭시 등 모바일 브라우저는 디스크 캐시가 공격적이다).
+    """
     dist_dir = Path(settings.BASE_DIR).parent / 'widget-dist'
     target = (dist_dir / path).resolve()
     if not str(target).startswith(str(dist_dir.resolve())) or not target.is_file():
         raise Http404('Asset not found')
     content_type, _ = mimetypes.guess_type(str(target))
-    return HttpResponse(target.read_bytes(), content_type=content_type or 'application/octet-stream')
+    resp = HttpResponse(target.read_bytes(), content_type=content_type or 'application/octet-stream')
+    resp['Cache-Control'] = 'no-cache, must-revalidate'
+    return resp
 
 
 @xframe_options_exempt
