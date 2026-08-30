@@ -581,8 +581,10 @@
   function initMic() {
     var mic = $('#wmcpMic');
     if (!mic) return;
-    // Web Speech API 지원 여부 확인
+    // Web Speech API 지원 여부 확인 — Chrome은 http(비보안 콘텍스트)에서 지원해도
+    // **마이크 권한 요청이 차단**된다 (getUserMedia = Secure Context 필수).
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var insecure = (typeof window.isSecureContext === 'boolean' && !window.isSecureContext);
     if (!SR) {
       mic.style.display = 'none'; // 미지원 브라우저에서는 숨김
       return;
@@ -604,9 +606,18 @@
       input.focus();
     };
     recognition.onerror = function (e) {
+      clearMicTimeout();
       setMicState(false);
+      // 실패 사유를 사용자에게 표시 — 갤럭시(안드로이드 크롬)의 http 접속은
+      // 마이크 권한이 자동 거부(not-allowed)되어 무음으로 끝난다.
+      var code = (e && e.error) || 'unknown';
+      var isEn = (window.WebMCPConfig && window.WebMCPConfig.lang) === 'en';
+      var msg = MIC_ERRORS[code] !== undefined ? MIC_ERRORS[code] : MIC_ERRORS['unknown'];
+      if (typeof msg === 'object') msg = isEn ? msg.en : msg.ko;
+      if (msg) addMsg(msg, 'bot', false);
     };
     recognition.onend = function () {
+      clearMicTimeout();
       setMicState(false);
       // 음성 인식이 끝나면 입력된 내용이 있으면 자동으로 질문 전송
       var input = $('#wmcpInput');
@@ -617,18 +628,51 @@
 
     mic.addEventListener('click', function () {
       if (listening) {
+        clearMicTimeout();
         recognition.stop();
         setMicState(false);
       } else {
+        // 보안 콘텍스트(http)가 아니면 마이크 권한 요청 자체가 차단되므로 사전 안내
+        if (insecure) {
+          var isEn2 = (window.WebMCPConfig && window.WebMCPConfig.lang) === 'en';
+          addMsg(isEn2
+            ? '⚠️ Voice input requires a secure connection (HTTPS). Please open this page over HTTPS or type your question.'
+            : '⚠️ 음성 입력은 보안 연결(HTTPS)에서만 사용할 수 있습니다. HTTPS 주소로 접속하거나 직접 입력해 주세요.',
+            'bot', false);
+          return;
+        }
         try {
           recognition.start();
           setMicState(true);
+          // some browsers fail silently → 8초 내 결과/에러/종료가 없으면 타임아웃 안내
+          clearMicTimeout();
+          micTimeoutId = setTimeout(function () {
+            if (listening) {
+              try { recognition.stop(); } catch (_) {}
+              setMicState(false);
+            }
+          }, 8000);
         } catch (err) {
           setMicState(false);
         }
       }
     });
   }
+
+  function clearMicTimeout() {
+    if (micTimeoutId) { clearTimeout(micTimeoutId); micTimeoutId = null; }
+  }
+
+  // 오류 코드별 사용자 안내 — ko/en 병기 (config.lang 으로 선택)
+  var MIC_ERRORS = {
+    'not-allowed': { ko: '⚠️ 마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용해 주세요.', en: '⚠️ Microphone permission was denied. Allow mic access in browser settings and retry.' },
+    'service-not-allowed': { ko: '⚠️ 마이크/서비스 권한이 차단되었습니다. 브라우저 설정 또는 HTTPS 접속을 확인해 주세요.', en: '⚠️ Mic/service permission blocked. Check browser settings or use HTTPS.' },
+    'audio-capture': { ko: '⚠️ 마이크를 찾을 수 없습니다. 마이크 연결을 확인해 주세요.', en: '⚠️ No microphone found. Check your device.' },
+    'network': { ko: '⚠️ 음성 인식 서비스에 연결할 수 없습니다. 네트워크를 확인해 주세요.', en: '⚠️ Speech service unreachable. Check your network.' },
+    'no-speech': { ko: '⚠️ 인식된 음성이 없습니다. 다시 한 번 말씀해 주세요.', en: '⚠️ No speech detected. Please try again.' },
+    'aborted': '' , // 사용자가 취소한 경우 — 안내 생략
+    'unknown': { ko: '⚠️ 음성 입력에 실패했습니다. 다시 시도해 주세요.', en: '⚠️ Voice input failed. Please try again.' }
+  };
 
   function setMicState(on) {
     listening = on;

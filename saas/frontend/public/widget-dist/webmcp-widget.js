@@ -25,8 +25,58 @@
 (function () {
   'use strict';
 
-  var WIDGET_VERSION = '1.1.0'; // 🧠 메모리 기능 추가
+  var WIDGET_VERSION = '1.2.0'; // 🌐 다국어(i18n) 지원
   var ROOT_ID = 'webmcp-widget';
+
+  // ── 다국어 사전 (config.lang 으로 선택) ──────────────────────
+  var I18N = {
+    ko: {
+      launcherAria: 'AI 비서 열기',
+      title: '✨ AI 비서',
+      statusChecking: '연결 확인 중...',
+      statusOk: '연결됨',
+      statusFail: '연결 안 됨',
+      statusNoProxy: '프록시 미로드',
+      inputPlaceholder: '메시지를 입력하세요...',
+      inputBusy: '답변 생성 중...',
+      micLabel: '음성<br/>입력',
+      loader: '✨ 답변 생성 중...',
+      howItWorks: '⚙️ 동작 방식',
+      howBody:
+        '      • AI비서는 LLM 모델을 사용한 수립, 정렬, 답변 에이전트입니다.' +
+        '      <br />• AI비서의 답변은 환각으로 인해 올바르지 않은 정보가 제공될 수 있습니다.' +
+        '      <br />• AI비서의 답변 정보는 고객사의 수집된 정보를 기반으로 합니다.' +
+        '      <br />• AI비서의 답변 결과에 대해서 개발사는 책임을 지지 않습니다.',
+      welcome: '안녕하세요! {title}입니다.\n궁금한 점을 물어보세요.',
+      send: '보내기',
+    },
+    en: {
+      launcherAria: 'Open AI Assistant',
+      title: '✨ AI Assistant',
+      statusChecking: 'Checking connection...',
+      statusOk: 'Connected',
+      statusFail: 'Not connected',
+      statusNoProxy: 'Proxy not loaded',
+      inputPlaceholder: 'Type a message...',
+      inputBusy: 'Generating answer...',
+      micLabel: 'Voice<br/>input',
+      loader: '✨ Generating answer...',
+      howItWorks: '⚙️ How it works',
+      howBody:
+        '      • This assistant is an LLM-based agent for planning, sorting and answering.' +
+        '      <br />• Answers may be inaccurate due to model hallucinations.' +
+        '      <br />• Answers are based on information collected from the customer website.' +
+        '      <br />• The developer is not responsible for generated answers.',
+      welcome: 'Hello! This is the {title}.\nAsk me anything.',
+      send: 'Send',
+    },
+  };
+
+  function t(key) {
+    var lang = (window.WebMCPConfig && window.WebMCPConfig.lang) || 'ko';
+    var dict = I18N[lang] || I18N.ko;
+    return dict[key] !== undefined ? dict[key] : (I18N.ko[key] !== undefined ? I18N.ko[key] : key);
+  }
 
   function mount() {
     if (document.getElementById(ROOT_ID)) return;
@@ -39,30 +89,34 @@
 
   function widgetTemplate() {
     return (
-      '<button id="webmcpLauncher" class="wmcp-launcher" type="button" aria-label="AI 비서 열기">💬</button>' +
+      '<button id="webmcpLauncher" class="wmcp-launcher" type="button" aria-label="' + t('launcherAria') + '">' +
+      '  <span class="wmcp-launcher-ai">AI</span>' +
+      '  <span class="wmcp-launcher-spark">✦</span>' +
+      '</button>' +
       '<div id="webmcpPanel" class="wmcp-panel" hidden>' +
       '  <header class="wmcp-header">' +
-      '    <h1 id="wmcpTitle">💘 AI 비서</h1>' +
-      '    <span class="wmcp-status" id="wmcpStatus">연결 확인 중...</span>' +
-      '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="크게 보기">⤢</button>' +
-      '    <button id="wmcpClose" class="wmcp-close" type="button" title="닫기">✕</button>' +
+      '    <span class="wmcp-header-logo">AI</span>' +
+      '    <h1 id="wmcpTitle">' + t('title') + '</h1>' +
+      '    <span class="wmcp-status" id="wmcpStatus">' + t('statusChecking') + '</span>' +
+      '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="' + (t('title').indexOf('Assistant') >= 0 ? 'Expand' : '크게 보기') + '">⤢</button>' +
+      '    <button id="wmcpClose" class="wmcp-close" type="button" title="' + (t('title').indexOf('Assistant') >= 0 ? 'Close' : '닫기') + '">✕</button>' +
       '  </header>' +
       '  <div id="wmcpChat" class="wmcp-chat" aria-live="polite"></div>' +
       '  <div class="wmcp-inputbar">' +
       '    <div id="wmcpPills" class="wmcp-pills"></div>' +
       '    <div class="wmcp-inputrow">' +
-      '      <textarea id="wmcpInput" placeholder="메시지를 입력하세요..." rows="1"></textarea>' +
-      '      <button id="wmcpAsk" class="wmcp-ask" type="button" title="보내기">➤</button>' +
+      '      <textarea id="wmcpInput" placeholder="' + t('inputPlaceholder') + '" rows="1"></textarea>' +
+      '      <button id="wmcpMic" class="wmcp-mic" type="button" title="' + (t('launcherAria')) + '">' +
+      '        <span class="wmcp-mic-text">' + t('micLabel') + '</span>' +
+      '      </button>' +
+      '      <button id="wmcpAsk" class="wmcp-ask" type="button" title="' + t('send') + '">➤</button>' +
       '    </div>' +
-      '    <div class="wmcp-loader" id="wmcpLoader">💬 답변 생성 중...</div>' +
+      '    <div class="wmcp-loader" id="wmcpLoader">' + t('loader') + '</div>' +
       '  </div>' +
       '  <details class="wmcp-accordion">' +
-      '    <summary>⚙️ 동작 방식</summary>' +
+      '    <summary>' + t('howItWorks') + '</summary>' +
       '    <div class="wmcp-acc-body">' +
-      '      • AI비서는 LLM 모델을 사용한 수립, 정렬, 답변 에이전트입니다.' +
-      '      <br />• AI비서의 답변은 환각으로 인해 올바르지 않은 정보가 제공될 수 있습니다.' +
-      '      <br />• AI비서의 답변 정보는 고객사의 수집된 정보를 기반으로 합니다.' +
-      '      <br />• AI비서의 답변 결과에 대해서 개발사는 책임을 지지 않습니다.' +
+      t('howBody') +
       '    </div>' +
       '  </details>' +
       '</div>'
@@ -80,12 +134,12 @@
     var names = cfg.names || {};
     // 사이트별 헤더 제목 — SaaS 생성 config.title 우선, 없으면 기존 하드코딩 폴백
     var titles = {
-      yonja: '💘 연애의 자격 AI 비서',
+      yonja: '✨ 연애의 자격 AI 비서',
       hospital: '🏥 생생병원 AI 비서',
       genisev: '🔋 제니스코리아 AI 비서',
     };
     return {
-      title: cfg.title || titles[ns] || '💘 AI 비서',
+      title: cfg.title || titles[ns] || '✨ AI 비서',
       ns: ns,
       names: names,
       theme: cfg.theme || {},
@@ -284,8 +338,19 @@
   function setLoading(on) {
     var loader = $('#wmcpLoader');
     var ask = $('#wmcpAsk');
+    var input = $('#wmcpInput');
+    var mic = $('#wmcpMic');
     if (loader) loader.classList.toggle('show', on);
     if (ask) ask.disabled = on;
+    // 답변 생성 중에는 입력을 받지 않도록 비활성화
+    if (input) {
+      input.disabled = on;
+      input.placeholder = on ? t('inputBusy') : t('inputPlaceholder');
+    }
+    if (mic) mic.disabled = on;
+    // 퀵 메뉴(빠른메뉴 pill)도 비활성화
+    var pills = document.querySelectorAll('#webmcp-widget .wmcp-pill');
+    for (var i = 0; i < pills.length; i++) pills[i].disabled = on;
   }
 
   function welcome() {
@@ -293,7 +358,7 @@
     if (!chat) return;
     chat.innerHTML = '';
     var cfg = siteConfig();
-    addMsg('안녕하세요! ' + cfg.title + '입니다.\n궁금한 점을 물어보세요.', 'bot');
+    addMsg(t('welcome').replace('{title}', cfg.title), 'bot');
   }
 
   // ════════════════════════════════════════════════════════════════════════
@@ -440,31 +505,32 @@
   async function refresh() {
     var status = $('#wmcpStatus');
     if (!status) return;
-    status.textContent = '연결 확인 중...';
+    status.textContent = t('statusChecking');
     status.style.background = 'rgba(255,255,255,0.2)';
 
     // 1) 프록시 라이브러리 로드 여부
     if (typeof window.WebMCP === 'undefined' || typeof window.WebMCP.callGeminiViaProxy !== 'function') {
-      setStatus('⚠️ 프록시 미로드', false);
+      setStatus('⚠️ ' + t('statusNoProxy'), false);
       return;
     }
 
     // 2) 백엔드 헬스체크 (프록시가 실제 응답하는지)
+    //    위젯은 같은 오리진에서 서빙되므로 상대경로로 호출한다.
+    //    (proxyEndpoint 가 절대 URL(localhost 등)이면 127.0.0.1 접속 시 CORS 로 차단됨)
     try {
-      var proxy = window.WebMCP.proxyEndpoint || '/api/chat/';
-      var healthUrl = proxy.replace(/\/api\/chat\/?$/, '/api/health/');
+      var healthUrl = '/api/health/';
       var res = await fetch(healthUrl, { method: 'GET' });
       if (!res.ok) {
-        healthUrl = proxy.replace(/\/api\/chat\/?$/, '/health/');
+        healthUrl = '/health/';
         res = await fetch(healthUrl, { method: 'GET' });
       }
       if (res.ok) {
-        setStatus('✅ 연결됨', true);
+        setStatus('✅ ' + t('statusOk'), true);
       } else {
-        setStatus('⚠️ 연결 안 됨', false);
+        setStatus('⚠️ ' + t('statusFail'), false);
       }
     } catch (e) {
-      setStatus('⚠️ 연결 안 됨', false);
+      setStatus('⚠️ ' + t('statusFail'), false);
     }
   }
 
@@ -499,12 +565,121 @@
     }
     var ask = $('#wmcpAsk');
     if (ask) ask.addEventListener('click', handleAsk);
+    initMic(); // 음성 입력
     // 사이트별 헤더 제목 설정
     var titleEl = $('#wmcpTitle');
     if (titleEl) titleEl.textContent = siteConfig().title;
     initPills();
     initChatLinks();
     refresh(); // 연결 상태 배지 갱신
+  }
+
+  // ── 음성 입력 (Web Speech API) ─────────────────────────────
+  var recognition = null;
+  var listening = false;
+
+  function initMic() {
+    var mic = $('#wmcpMic');
+    if (!mic) return;
+    // Web Speech API 지원 여부 확인 — Chrome은 http(비보안 콘텍스트)에서 지원해도
+    // **마이크 권한 요청이 차단**된다 (getUserMedia = Secure Context 필수).
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var insecure = (typeof window.isSecureContext === 'boolean' && !window.isSecureContext);
+    if (!SR) {
+      mic.style.display = 'none'; // 미지원 브라우저에서는 숨김
+      return;
+    }
+    recognition = new SR();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = true;   // 실시간 인식 결과 표시
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;      // 말이 끝나면 자동 종료
+
+    recognition.onresult = function (e) {
+      var input = $('#wmcpInput');
+      if (!input) return;
+      var transcript = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      input.value = transcript;
+      input.focus();
+    };
+    recognition.onerror = function (e) {
+      clearMicTimeout();
+      setMicState(false);
+      // 실패 사유를 사용자에게 표시 — 갤럭시(안드로이드 크롬)의 http 접속은
+      // 마이크 권한이 자동 거부(not-allowed)되어 무음으로 끝난다.
+      var code = (e && e.error) || 'unknown';
+      var isEn = (window.WebMCPConfig && window.WebMCPConfig.lang) === 'en';
+      var msg = MIC_ERRORS[code] !== undefined ? MIC_ERRORS[code] : MIC_ERRORS['unknown'];
+      if (typeof msg === 'object') msg = isEn ? msg.en : msg.ko;
+      if (msg) addMsg(msg, 'bot', false);
+    };
+    recognition.onend = function () {
+      clearMicTimeout();
+      setMicState(false);
+      // 음성 인식이 끝나면 입력된 내용이 있으면 자동으로 질문 전송
+      var input = $('#wmcpInput');
+      if (input && input.value.trim()) {
+        handleAsk();
+      }
+    };
+
+    mic.addEventListener('click', function () {
+      if (listening) {
+        clearMicTimeout();
+        recognition.stop();
+        setMicState(false);
+      } else {
+        // 보안 콘텍스트(http)가 아니면 마이크 권한 요청 자체가 차단되므로 사전 안내
+        if (insecure) {
+          var isEn2 = (window.WebMCPConfig && window.WebMCPConfig.lang) === 'en';
+          addMsg(isEn2
+            ? '⚠️ Voice input requires a secure connection (HTTPS). Please open this page over HTTPS or type your question.'
+            : '⚠️ 음성 입력은 보안 연결(HTTPS)에서만 사용할 수 있습니다. HTTPS 주소로 접속하거나 직접 입력해 주세요.',
+            'bot', false);
+          return;
+        }
+        try {
+          recognition.start();
+          setMicState(true);
+          // some browsers fail silently → 8초 내 결과/에러/종료가 없으면 타임아웃 안내
+          clearMicTimeout();
+          micTimeoutId = setTimeout(function () {
+            if (listening) {
+              try { recognition.stop(); } catch (_) {}
+              setMicState(false);
+            }
+          }, 8000);
+        } catch (err) {
+          setMicState(false);
+        }
+      }
+    });
+  }
+
+  function clearMicTimeout() {
+    if (micTimeoutId) { clearTimeout(micTimeoutId); micTimeoutId = null; }
+  }
+
+  // 오류 코드별 사용자 안내 — ko/en 병기 (config.lang 으로 선택)
+  var MIC_ERRORS = {
+    'not-allowed': { ko: '⚠️ 마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용해 주세요.', en: '⚠️ Microphone permission was denied. Allow mic access in browser settings and retry.' },
+    'service-not-allowed': { ko: '⚠️ 마이크/서비스 권한이 차단되었습니다. 브라우저 설정 또는 HTTPS 접속을 확인해 주세요.', en: '⚠️ Mic/service permission blocked. Check browser settings or use HTTPS.' },
+    'audio-capture': { ko: '⚠️ 마이크를 찾을 수 없습니다. 마이크 연결을 확인해 주세요.', en: '⚠️ No microphone found. Check your device.' },
+    'network': { ko: '⚠️ 음성 인식 서비스에 연결할 수 없습니다. 네트워크를 확인해 주세요.', en: '⚠️ Speech service unreachable. Check your network.' },
+    'no-speech': { ko: '⚠️ 인식된 음성이 없습니다. 다시 한 번 말씀해 주세요.', en: '⚠️ No speech detected. Please try again.' },
+    'aborted': '' , // 사용자가 취소한 경우 — 안내 생략
+    'unknown': { ko: '⚠️ 음성 입력에 실패했습니다. 다시 시도해 주세요.', en: '⚠️ Voice input failed. Please try again.' }
+  };
+
+  function setMicState(on) {
+    listening = on;
+    var mic = $('#wmcpMic');
+    if (!mic) return;
+    mic.classList.toggle('wmcp-mic--active', on);
+    mic.title = on ? '음성 입력 중지' : '음성 입력';
   }
 
   if (document.readyState === 'loading') {
