@@ -349,6 +349,29 @@
 
 ---
 
+## 2026-08-30 — 502 Bad Gateway 복구 + nginx DNS resolver 근본 방지
+
+### T-033. nginx 정적 upstream DNS 캐시 502 — resolver 동적 resolve 전환
+- **증상**: `http://127.0.0.1:8080/` → 502 Bad Gateway (nginx/1.30.4)
+- **원인 분석(실측)**:
+  1. `docker ps` — 컨테이너 10개 전부 Up (컨테이너 장애 아님)
+  2. `docker logs webmcp-ko-nginx` — `connect() failed (113: Host is unreachable) ... upstream: "http://172.21.0.12:3000"`
+  3. `docker inspect` — 프론트 실제 IP는 `172.21.0.3`, **nginx 시작 10:06 / 프론트 재시작 11:20**
+  4. 결론: nginx의 정적 `upstream` 블록은 **시작 시 1회만 DNS resolve** → 프론트 컨테이너 재시작으로 IP가 바뀌자 구 IP(없는 IP)로 접속 → 502
+- **근본 방지 (`docker/nginx-ko.conf`, `docker/nginx-en.conf` 동일 적용)**:
+  - 정적 `upstream backend/frontend` 블록 삭제
+  - `resolver 127.0.0.11 valid=10s ipv6=off;` (Docker 내장 DNS) 추가
+  - `set $backend_upstream http://backend-ko:8000;` + `proxy_pass $backend_upstream;` — **변수 기반 proxy_pass는 요청마다 resolve** (TTL 10s)
+- **검증**:
+  | 항목 | 결과 |
+  |---|---|
+  | compose 재기동 후 ko/en `/` | ✅ 200 / 200 |
+  | ko `/api/auth/me/` (미인증) | ✅ 403 (백엔드 정상 도달) |
+  | **프론트만 재시작 → IP 변경 → nginx 무재시작 접속** | ✅ **200** (구 IP 502 재현 안 됨) |
+- **부록 B 체크리스트 2항("worker/backend 재시작 후 nginx restart")에서 해소**: 이제 프론트/백엔드 어느 쪽이 재시작돼도 nginx 재시작 불필요
+
+---
+
 ## 부록 A. 커밋 이력 (시간 순)
 
 | 커밋 | 내용 |
@@ -371,12 +394,16 @@
 | `1410158` | test-results.md T-029 추가 |
 | `bfc49c9` | ALLOWED_HOSTS 자기 IP 자동 탐지 (`_detect_host_ips`) — 운영 배포 준비 |
 | `f31c23c`/`ce780c2` | test-results.md 커밋 이력 갱신 |
-| `ce780c2` | test-results.md 커밋 이력 갱신 |
+| `5a29848` | build.sh silo 기준 교체 + 언어별 서비스 필터 — 단일 진실 공급원 정리 |
+| `748bbc7` | test-results.md T-032 구 compose 정리 기록 |
+| `89049fc` | README.md compose 전문 백업(복구용) + silo.yml 실행안내 주석 최신화 |
+| `9a57701` | nginx Docker DNS resolver 전환 — 정적 upstream 캐시 502 근본 방지 |
+| `9a57702` | test-results.md T-033 502 복구·검증 기록 |
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
 
 1. 새 언어 사일로 첫 기동: `up -d` → `exec backend-<lang> migrate` → worker 재시작
-2. worker/backend 재시작 후 nginx-<lang>도 restart(DNS 캐시 502 방지)
+2. ~~worker/backend 재시작 후 nginx-<lang>도 restart(DNS 캐시 502 방지)~~ → **해소됨(T-033)**: nginx가 Docker DNS resolver(127.0.0.11, valid=10s)로 매 요청 resolve하므로 재시작 불필요
 3. 백엔드 재시작 후 브라우저 CSRF 무효 403 → 페이지 새로고침
 4. DB 복원(pg_dump 18.6 → psql): `\restrict` 2줄 제거 + `--data-only` + `--no-owner` + setval
 5. 구 docker-compose.yml(구 프로젝트)과 silo compose 동시 기동 금지(8080 충돌)

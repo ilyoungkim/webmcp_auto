@@ -316,6 +316,7 @@ volumes:
 | `ALLOWED_HOSTS`에 LAN IP | `192.168.31.248, 192.168.64.1` | `597b095` |
 | `SAAS_PUBLIC_URL` = LAN | 위젯 assetBase/proxyEndpoint 박제 (LAN 접속자 위젯 로드) | `597b095` |
 | `nginx-ko.conf` (backend-ko upstream) | 구 nginx.conf로는 silo 네트워크에 backend 없어 기동 실패 | `caf04fc` |
+| **nginx Docker DNS resolver** | 정적 upstream 시작 시 1회 resolve → 컨테이너 재시작 IP 변경 시 502 발생. `resolver 127.0.0.11 valid=10s` + 변수 proxy_pass로 근본 방지 (T-033) | `9a57701` |
 
 > **운영 전환 시 참고**: 위값들을 도메인/https로 변경하는 체크리스트는
 > [`plan.md`](plan.md) §0.11.7 및 [`DEPLOY_PORUDCTION.md`](DEPLOY_PORUDCTION.md) §5.1 참조.
