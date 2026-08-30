@@ -7,7 +7,8 @@
 #
 # 실행:
 #   cd docker
-#   docker compose -f docker-compose.lang.yml up -d --build
+#   ./build.sh --run            # ko + en 사일로 모두 빌드·기동 + health 체크 (권장)
+#   docker compose -f docker-compose.silo.yml up -d --build   # compose 직접 실행
 #
 # 언어별 엔진 분리는 saas/backend/.env 에서:
 #   GEMINI_API_KEY_EN=...        (en 사일로 전용 키, 없으면 전역 키 폴백)
