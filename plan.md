@@ -13,6 +13,7 @@
 > 검증 단계(SQLite, 단일 서버) 구현이 **전부 완료**되어 실제 E2E 동작이 확인됐다.
 > 파이프라인 워커로 5개 프로젝트가 `completed`까지 진행되었고, 위젯 임베드·채팅·미리보기·설치 번들까지 동작한다.
 > **2026-08-29~30: 보안 강화 → 다국어 사일로(ko/en) → 콘솔·Q&A 완전 영어화 · sitemap 수집 개선 · GitHub 퍼블리시 완료** (§0.9).
+> **2026-08-30 최신: 크롤러 WAF 폴백 → 프로필/결제(엔터프라이즈 요금) → 관리자 사일로 다국어 → ko DB 복구 · 도커 사일로 정합성 개선** (§0.10).
 
 ### 0.1 마일스톤 완료 현황
 
@@ -30,6 +31,10 @@
 | 추가(2026-08-29) | **"AI비서란?" 필수 메뉴**(DB 공통 답변, 편집 불가), 위젯 AI 로고 아이콘, 음성 입력, 답변 생성 중 입력 잠금, 로그아웃 세션 확실 삭제, 전 페이지 noindex·robots.txt·llms.txt | ✅ 완료 |
 | 추가(2026-08-29) | **보안 강화** — 브루트포스 방어(IP+이메일 5회 실패 15분 잠금), IP 화이트리스트(루프백·사설망 안전장치), 설치 가이드 Step3(설정 변경) 삭제 | ✅ 완료 |
 | 추가(2026-08-29~30) | **다국어 사일로(ko/en 완전 분리)** — 언어별 DB·컨테이너·LLM 엔진·카탈로그·위젯UI·콘솔UI 분리, en 사일로 Q&A 영어 강제, sitemap 수집 개선(robots.txt 동일 호스트 우선 + HTML 폴백), **GitHub 퍼블리시** | ✅ 완료 |
+| 추가(2026-08-30) | **크롤러 WAF 폴백** — 차단 감지 + Sec-Fetch 헤더 폴백 + 세션 워밍업(`_crawl_httpx` 포함). Edmunds류 강차단은 포기·대체 소스(Autolist) | ✅ 완료 |
+| 추가(2026-08-30) | **프로필 페이지(일반/관리자)** — 연락처 2개, 비밀번호 변경, 결제 정보(PayPal/Stripe 연동 전), 사이트 대표 연락처 관리(SiteSetting), **엔터프라이즈 결제금액**(0=기본요금) | ✅ 완료 |
+| 추가(2026-08-30) | **관리자 페이지 사일로 다국어** — /admin/projects·chat-errors에 useSilo 적용, "AI비서란?" 필수메뉴 en 분기 | ✅ 완료 |
+| 추가(2026-08-30) | **도커 사일로 정합성** — nginx-ko.conf 신설, ko DB 유실 복구(임시 컨테이너 pg_dump) | ✅ 완료 |
 
 ### 0.2 실데이터 증거 (`saas/backend/db.sqlite3`)
 
@@ -186,7 +191,7 @@ flowchart TB
 - **보안**: SSRF 가드(`core/origins.validate_crawl_url`), Origin 화이트리스트, `public_id`만 외부 노출, 시스템 프롬프트/Gemini 키 비노출, 쿼터 429, `/api/chat/`는 `csrf_exempt`+Origin 검사
 - **운영**: 2000줄 날짜·넘버링 로그 로테이션(`core/logging`), `/ready`로 Gemini 키 확인, 워커 잠금 만료 복구, 위젯 버전 관리
 - **잔여 정리 대상**: `widget.js`/`webmcp-widget.js`에 레거시 `*_SYSTEM_PROMPT` 참조 코드가 일부 남아 있으나 **전송되지 않음**(동작 영향 없음). `crawl4ai`는 무거워 주석 처리, **httpx 폴백 사용 중**. M7(PostgreSQL/Celery) 미착수.
-- **커밋 상태**: GitHub 퍼블리시 완료 — `https://github.com/ilyoungkim/webmcp_auto` (origin/main, 커밋 5ef119f). 기존 템플릿 파일은 강제 푸시로 제거됨.
+- **커밋 상태**: GitHub 퍼블리시 완료 — `https://github.com/ilyoungkim/webmcp_auto` (origin/main, 최신 커밋 ea0abb7, 2026-08-30). 기존 템플릿 파일은 강제 푸시로 제거됨.
 
 ### 0.9 다국어 사일로 + 보안 강화 (2026-08-29~30 최종)
 
@@ -199,7 +204,7 @@ flowchart TB
 | DB | `webmcp_ko` (postgres-ko) | `webmcp_en` (postgres-en, 별도 PostgreSQL 인스턴스) |
 | 컨테이너 | webmcp-{backend,worker,frontend,nginx,postgres} | webmcp-en-{...} + webmcp-postgres-en |
 | nginx | `nginx.conf` (backend/frontend) | `nginx-en.conf` (backend-en/frontend-en) — HTTP 격리 |
-| 카탈로그 | 도메인 25종(한국어) | 도메인 15종(영어) — `seed_catalogs --langs` |
+| 카탈로그 | 도메인 26종(한국어, company_sales 포함) | 도메인 16개(영어) — `seed_catalogs --langs` |
 | LLM env | 전역 (`GEMINI_API_KEY`) | `_EN` 접미사 (`GEMINI_API_KEY_EN` 등, 없으면 전역 폴백) |
 | 위젯 UI | 한국어 (안녕하세요…, 음성/입력) | 영어 (Hello…, Voice input) — `WebMCPConfig.lang` |
 | 콘솔 UI | 한국어 전면 | 영어 전면 — `NUXT_PUBLIC_SILO_LANG=en` env 주입 |
@@ -244,6 +249,78 @@ Hopkins Medicine처럼 robots.txt에 다른 호스트 sitemap(`profiles.xxx.org`
 - `https://github.com/ilyoungkim/webmcp_auto` — main 브랜치(커밋 5ef119f)
 - 기존 Vite 템플릿 파일(index.html, package.json, src/, public/ 등)은 강제 푸시로 제거되고 현재 프로젝트로 교체됨
 - 주요 커밋: `28724a3` 다국어 사일로 → `e470108` sitemap 개선 → `1ee18f7` Q&A 영어화 → `f9c06a5` 영어 강제 → `35f11d0` SSR 영어화 → `5ef119f` 스텝3 삭제
+
+---
+
+### 0.10 크롤 WAF 대응 + 프로필/결제 + 사일로 정합성 (2026-08-30 최신)
+
+#### 0.10.1 크롤러 WAF 차단 대응 (커밋 e6692b1 → 83ca7ed → 4e8e319)
+
+**원인 분석 (Autotrader 'page unavailable')**: HTTP 200 위장 차단페이지(3.7KB) 반환.
+**해결 (실측 매트릭스 확정)**:
+- `_looks_blocked()` — 짧은 본문(<20KB) + 차단 키워드(unavailable/denied/captcha 등)로 위장 페이지 감지
+- **결정적 헤더 = Sec-Fetch-Dest/Mode/Site + Upgrade-Insecure-Requests** — Chrome UA만으론 차단, 3종+UA 조합에서 498KB 정상 응답
+- **세션 워밍업** — 홈 먼저 방문(커스텀 UA 차단 시 브라우저 UA 재방문) → `_abck` 쿠키 획득 후 robots/sitemap 진행
+- `_crawl_httpx()`에도 동일 폴백 적용(4e8e319) — 403/차단 감지 시 `_UA_BROWSER` 헤더로 재시도, JS 리다이렉트 추종에도 동일 헤더
+
+**한계 (사이트별 정책)**:
+- **Edmunds**: 403 명시 차단 + Googlebot/Bingbot UA도 403(지역/IP 차단) — VPN으로도 실패, **최종 포기·Autolist 대체** (같은 자동차 카테고리). robots.txt는 GPTBot/ClaudeBot 등 AI 크롤러 Disallow: /
+- **Hopkins**: Cloudflare 403(시시각각 변함)
+- 교훈: 대형 상업 사이트는 UA/헤더 폴백으로 안 될 수 있고, **대체 소스 사용이 실용적 해법**
+
+#### 0.10.2 프로필 + 결제 기능 (커밋 903cdf3 → 605a733)
+
+| 항목 | 내용 |
+|------|------|
+| User 모델 확장 | `phone1/phone2`, `billing_company/contact/email/address/note`, `monthly_price/currency` (accounts 0004) |
+| `/profile` (일반) | 계정 정보(아이디 비활성), 비밀번호 변경, 연락처 2개, 결제 정보(PayPal/Stripe 연동 전 테스트용 입력란) |
+| `/admin/profile` | 일반 프로필 + **사이트 대표 연락처** 관리 카드 |
+| SiteSetting 모델 | `key/value` 단순 구조(proxy 0003) — `support_phone` 저장, `/api/admin/settings/` PATCH |
+| `/api/site-info/` (공개) | 위젯 오류 문구용 대표 연락처 반환 — 02-888-9999 하드코딩 제거, `useSilo`의 `{phone}` 플레이스홀더로 치환 |
+| 엔터프라이즈 요금 | admin users PATCH `monthlyPrice` — **숫자=엔터프라이즈, 빈 값 또는 0=기본 요금 복귀** (605a733) |
+| 기본 요금 | 사일로별 자동: ko 50,000원/월, en $49/월 (`settings.WEBMCP_LANG` 기반, `SUPPORT_PHONE`도 .env로 기본 지정 가능) |
+| 관리 UI | `/admin/projects` "💰 사용자별 결제 금액/연락처 설정" + 계정 선택 시 즉시 편집 패널 자동 표시 |
+
+#### 0.10.3 관리자 페이지 사일로 다국어 적용 (커밋 ea0abb7)
+
+- `/admin/projects`, `/admin/chat-errors`에 `useSilo()` 도입 — **en 사일로에서 한국어 노출 문제 해결**
+- `useSilo.ts`에 `admin.*` 키 60여개 추가(ko/en 완전 대칭) — 헤더·버튼·결제패널·LLM 설정·고객센터 Q&A·confirm/메시지 전체
+- `STATUS_LABELS`를 `computed`로 전환 — 프로젝트 상태(완료/진행중 등)도 언어별 표시
+- `runner.py `_required_menu_answer``에 **en 분기 추가** — "AI비서란?" 필수 메뉴가 영어 고정이던 문제 해결("What is the AI assistant?")
+- `prof.backToDash` 키는 이미 `← 대시보드` 화살표를 포함하므로 템플릿에 `&larr;` 중복 붙이지 않도록 수정
+
+#### 0.10.4 도커 사일로 정합성 개선 (커밋 caf04fc)
+
+- **`docker/nginx-ko.conf` 신설** — silo compose용 ko nginx(backend-ko/frontend-ko upstream). 기존 `nginx.conf`(backend:8000 참조)는 silo 네트워크에 없어 nginx-ko 기동 실패("host not found in upstream")였음
+- `docker-compose.silo.yml`의 nginx-ko 볼륨을 `nginx-ko.conf`로 교체
+- **사일로 배포 절차 확정**: `docker compose -f docker-compose.silo.yml down` → `docker/build.sh --run ko`(또는 en) → backend-ko migrate → worker-ko 재시작 → nginx-ko restart
+- **구 docker-compose.yml 관계**: `LANGS_KO`는 아직 구 compose를 가리킴 — **silo compose로 교체 예정(잔여)**. 두 compose를 동시에 띄우면 8080 중복 충돌
+
+#### 0.10.5 ko 사일로 DB 유실/복구 사건
+
+- **원인**: 구버전 ko 컨테이너(`docker-compose.yml` 기반) 정리 시 이전 ko DB(`docker_postgres_data` 볼륨의 `webmcp` DB)가 새 사일로 DB(`webmcp_ko`)로 마이그레이션되지 않아 **tensun@naver.com 로그인 불가**
+- **복구**: 임시 postgres:18-alpine 컨테이너(55432 포트)로 구 볼륨을 띄워 `pg_dump --data-only` 추출 → 신규 `webmcp_ko` DB에 복원
+- **주의(학습)**: pg_dump 18.6의 `\restrict/\unrestrict` 지시어는 psql 18에서 "backslash commands are restricted"로 거부 — **sed로 해당 2줄만 정확 제거** 권장(`grep -v ^\\restrict`은 데이터 행 손상 위험). auth_permission/content_type 중복은 무해. 복원 후 `setval`로 전 시퀀스 동기화 필수
+- **결과**: users 2(admin+tensun), projects 1(부천 연세본사랑병원), qna 5, widgets 6 복원 — **tensun/10dlfdud 로그인 200 확인**
+
+#### 0.10.6 전체 기능 검토 결과 (사일로 정합성)
+
+| 구분 | 상태 |
+|---|---|
+| 관리자 페이지 2곳 (projects, chat-errors) | ✅ useSilo 적용 완료 (구: 한국어 하드코딩) |
+| "AI비서란?" 필수 메뉴 답변 | ✅ en 분기 추가 (구: 한국어 고정) |
+| `langsilo.py` 중앙화 (엔진/카탈로그/DB 접두사) | ✅ 깔끔함 |
+| `docker-compose.silo.yml` ko/en 스택 구조 | ✅ 대칭 (DB·백엔드·워커·프론트·nginx 분리) |
+| `useSilo.ts` ko/en 사전 키 쌍 | ✅ 대칭 (admin.* 60여개 포함) |
+| `preview_html` (widget views) 언어 분기 | ✅ ko/en 정상 |
+| `projects/views.py` 프로젝트 생성 시 lang 상속 | ✅ `lang=dt.lang or cur_lang` 정상 |
+| catalogs `catalog_lang_tag()` 사일로 필터 | ✅ 정상 |
+| **프롬프트 상세도 비대칭 (ko > en)** | 🟡 의도된 로컬라이제이션 — en 프롬프트가 한국 연락수단(카톡/네이버 예약) 미대응. 한국 웹사이트 크롤 시 품질 저하 가능 |
+| 통화 선택 드롭다운 `KRW(원)` 표기 | 🟢 통화코드 라벨이라 의도적 유지 |
+
+#### 0.10.7 커밋 이력 (2026-08-30)
+
+`4e8e319` 크롤 WAF 폴백 → `903cdf3` 프로필/결제 기능 → `caf04fc` 계정선택 결제 패널 + nginx-ko.conf → `605a733` 0=기본요금 → `ea0abb7` 관리자 사일로 다국어
 
 ---
 
