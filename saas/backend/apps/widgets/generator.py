@@ -163,6 +163,6 @@ def _site_summary(project, markdown: str) -> str:
             f'{markdown[:20000]}'
         )
     try:
-        return ask(prompt, project=project)
+        return ask(prompt, project=project, lang=lang)
     except Exception:  # noqa: BLE001 — 요약 실패 시 markdown 앞부분 사용
         return markdown[:1500]

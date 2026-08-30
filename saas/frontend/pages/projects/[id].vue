@@ -9,7 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const id = route.params.id as string
 
-const { t, lang, load: loadSilo } = useSilo()
+const { t, lang, load: loadSilo, formatDate } = useSilo()
 // SSR에서도 silo 언어를 로드해 첫 렌더부터 영어 UI가 나오도록 한다
 await useAsyncData('silo-info', async () => { await loadSilo(); return true })
 // lang은 useState ref — .value 접근 필요
@@ -260,9 +260,7 @@ function supportPageBtn(p: number) {
 }
 
 function fmtSupportTime(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleString('ko-KR', { hour12: false })
+  return formatDate(iso)
 }
 
 onMounted(async () => {

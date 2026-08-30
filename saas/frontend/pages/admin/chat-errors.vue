@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin' })
 
-const { t, load: loadSilo } = useSilo()
+const { t, load: loadSilo, formatDate } = useSilo()
 
 interface ChatError {
   id: number
@@ -54,9 +54,7 @@ function toggle(id: number) {
 }
 
 function fmtTime(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleString('ko-KR', { hour12: false })
+  return formatDate(iso)
 }
 
 onMounted(async () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin' })
 
-const { t, load: loadSilo } = useSilo()
+const { t, load: loadSilo, formatDate, locale } = useSilo()
 
 interface User {
   id: number; email: string; name: string; role: string
@@ -71,9 +71,10 @@ const paySaving = ref(false)
 const payMessage = ref<Record<number, string>>({})
 
 function fmtPrice(amount: number, currency: string): string {
-  if (currency === 'KRW') return `${Math.round(amount).toLocaleString()}원`
-  if (currency === 'USD') return `$${amount}`
-  return `${amount} ${currency}`
+  // 통화 기호는 언어와 무관하지만, 숫자 구분 기호는 사일로 로케일을 따른다.
+  if (currency === 'KRW') return `${Math.round(amount).toLocaleString(locale.value)}원`
+  if (currency === 'USD') return `$${amount.toLocaleString(locale.value)}`
+  return `${amount.toLocaleString(locale.value)} ${currency}`
 }
 
 function userPriceLabel(u: User): string {
@@ -216,9 +217,7 @@ async function submitAnswer(t: any) {
 }
 
 function fmtSupportTime(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleString('ko-KR', { hour12: false })
+  return formatDate(iso)
 }
 
 const filtered = computed(() => {

@@ -4,7 +4,7 @@
 // 결제 수단(PayPal/Stripe) 연동 전 테스트용 입력란만 제공한다.
 definePageMeta({ middleware: 'auth' })
 
-const { t, load: loadSilo } = useSilo()
+const { t, load: loadSilo, locale } = useSilo()
 
 interface ProfileData {
   email: string
@@ -116,9 +116,10 @@ async function changePassword() {
 }
 
 function fmtPrice(amount: number, currency: string): string {
-  if (currency === 'KRW') return `${Math.round(amount).toLocaleString()}원`
-  if (currency === 'USD') return `$${amount}`
-  return `${amount} ${currency}`
+  // 숫자 구분 기호는 사일로 로케일을 따른다.
+  if (currency === 'KRW') return `${Math.round(amount).toLocaleString(locale.value)}원`
+  if (currency === 'USD') return `$${amount.toLocaleString(locale.value)}`
+  return `${amount.toLocaleString(locale.value)} ${currency}`
 }
 
 onMounted(async () => {

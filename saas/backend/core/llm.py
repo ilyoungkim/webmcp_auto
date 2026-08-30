@@ -97,7 +97,7 @@ def strip_instruction_echo(text: str) -> str:
 
 
 def ask(prompt: str, *, temperature: float = 0.2, retries: int = 1, timeout: float = 60.0,
-        max_tokens: int = 1024, project=None) -> str:
+        max_tokens: int = 1024, project=None, lang: str | None = None) -> str:
     """단일 프롬프트 → 텍스트 응답 (Gemini).
 
     max_tokens: 생성 토큰 상한. 응답이 길어질수록 지연이 커지므로
@@ -106,8 +106,14 @@ def ask(prompt: str, *, temperature: float = 0.2, retries: int = 1, timeout: flo
 
     project: 테넌트(Project) 객체. 프로젝트별로 gemini_api_key/gemini_model 을
     지정했다면 전역 settings 값 대신 해당 값을 사용한다.
+
+    lang: 언어 사일로('ko'/'en'). 지정 시 언어 전용 엔진(env 접미사 _EN 등)을
+    우선 사용한다. 미지정이고 project 가 있으면 project.lang 을 따라간다
+    (en 사일로에서 GEMINI_API_KEY_EN 이 적용되도록).
     """
-    api_key, model = _gemini_config(project)
+    if lang is None and project is not None:
+        lang = (getattr(project, 'lang', '') or '').lower() or None
+    api_key, model = _gemini_config(project, lang)
     url = f'{settings.GEMINI_BASE}/models/{model}:generateContent?key={api_key}'
     payload = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
@@ -184,19 +190,21 @@ def ask_openrouter(prompt: str, *, temperature: float = 0.2, retries: int = 1,
 
 
 def _gemini_config(project=None, lang=None) -> tuple[str, str]:
-    """Gemini API 키/모델 결정. 우선순위: 테넌트(project) 지정값 > 언어 사일로 env > 전역 settings."""
+    """Gemini API 키/모델 결정. 우선순위: 테넌트(project) 지정값 > 언어 사일로 env > 전역 settings.
+
+    lang 이 주어져도 테넌트(project)가 자체 키/모델을 지정했다면 그것이 최우선이다.
+    (lang 만으로 테넌트 설정을 덮어쓰면 프로젝트별 엔진 지정이 무시되므로)
+    """
     from .langsilo import gemini_config as lang_gemini
-    if lang:
-        key, model, _base = lang_gemini(lang)
-        return key, model
-    api_key = settings.GEMINI_API_KEY
-    model = settings.GEMINI_MODEL
+    # 1) 언어 사일로 env (GEMINI_API_KEY_EN 등) — 없으면 전역값으로 폴백됨
+    key, model, _base = lang_gemini(lang)
+    # 2) 테넌트 지정값이 있으면 최우선 적용
     if project is not None:
         if getattr(project, 'gemini_api_key', ''):
-            api_key = project.gemini_api_key
+            key = project.gemini_api_key
         if getattr(project, 'gemini_model', ''):
             model = project.gemini_model
-    return api_key, model
+    return key, model
 
 
 def test_gemini_key(api_key: str, model: str | None = None, *, timeout: float = 30.0) -> str:

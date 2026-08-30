@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from apps.pipeline.models import GeneratedQnA
 from apps.projects.models import Project
 from apps.widgets.models import Widget
+from core.langsilo import msg
 from core.llm import ask, strip_instruction_echo
 
 from .models import RequestLog
@@ -42,25 +43,25 @@ def chat(request):
         body = json.loads(request.body.decode('utf-8') or '{}')
     except json.JSONDecodeError:
         _log(request, 'blocked_401', 'bad_json')
-        return JsonResponse({'error': '잘못된 요청'}, status=401)
+        return JsonResponse({'error': msg('common.badRequest')}, status=401)
 
     question = (body.get('question') or '').strip()
     public_id = (body.get('publicId') or '').strip()
     memory = (body.get('memory') or '').strip()  # 이전 대화 기억 컨텍스트(선택)
     if not question or not public_id:
         _log(request, 'blocked_401', 'missing_fields', public_id)
-        return JsonResponse({'error': 'question/publicId 필요'}, status=401)
+        return JsonResponse({'error': msg('proxy.questionRequired')}, status=401)
 
     project = Project.objects.filter(public_id=public_id).first()
     widget = Widget.current(project) if project else None
     if project is None or widget is None:
         _log(request, 'blocked_403', 'unknown_public_id', public_id)
-        return JsonResponse({'error': '등록되지 않은 위젯'}, status=403)
+        return JsonResponse({'error': msg('proxy.widgetNotRegistered')}, status=403)
 
     # 사용중지된 프로젝트는 위젯 서빙 중지
     if not project.enabled:
         _log(request, 'blocked_403', 'project_disabled', public_id)
-        return JsonResponse({'error': '사용이 중지된 위젯입니다.'}, status=403)
+        return JsonResponse({'error': msg('proxy.widgetDisabled')}, status=403)
 
     # 인증: Origin 화이트리스트 또는 (세션 + 소유권/미리보기)
     allowed_origin = any(
@@ -72,12 +73,12 @@ def chat(request):
     )
     if not allowed_origin and not session_owner:
         _log(request, 'blocked_403', 'origin_not_allowed', public_id)
-        return JsonResponse({'error': '허용되지 않은 도메인'}, status=403)
+        return JsonResponse({'error': msg('proxy.domainNotAllowed')}, status=403)
 
     if not session_owner:
         if not per_minute_ok(None, project) or not monthly_ok(project.user):
             _log(request, 'blocked_429', 'quota', public_id)
-            return JsonResponse({'error': '호출 한도 초과'}, status=429)
+            return JsonResponse({'error': msg('proxy.rateLimited')}, status=429)
 
     # 저장된 Q&A 우선 매칭 (토큰 절약) — 빠른메뉴와 거의 동일한 질문만 DB 답변 반환
     cached = _match_cached_qna(project, question)
@@ -90,15 +91,17 @@ def chat(request):
         return _gemini_shape(cleaned)
 
     # 언어 사일로 — en 위젯은 영어 라벨 사용 (한국어 라벨이 언어 혼용 유도 방지)
-    user_turn = 'User question:' if (getattr(project, 'lang', '') or 'ko') == 'en' else '사용자 질문'
+    project_lang = (getattr(project, 'lang', '') or 'ko').lower()
+    user_turn = 'User question:' if project_lang == 'en' else '사용자 질문'
     prompt = f"{widget.system_prompt}\n\n{memory}\n{user_turn}: {question}"
     try:
         # 실시간 채팅: 응답 토큰 상한과 짧은 타임아웃으로 지연 최소화
-        # 테넌트(project)별 Gemini 키/모델 설정을 우선 적용한다.
-        answer = ask(prompt, max_tokens=1024, timeout=30.0, project=project)
+        # 테넌트(project)별 Gemini 키/모델 설정을 우선 적용하고,
+        # 언어 사일로 전용 엔진(GEMINI_API_KEY_EN 등)을 함께 반영한다.
+        answer = ask(prompt, max_tokens=1024, timeout=30.0, project=project, lang=project_lang)
     except Exception as e:  # noqa: BLE001
         _log(request, 'blocked_401', f'llm_error:{str(e)[:120]}', public_id)
-        return JsonResponse({'error': 'AI 호출 실패'}, status=502)
+        return JsonResponse({'error': msg('proxy.aiFailed')}, status=502)
     answer = strip_instruction_echo(answer) or answer
 
     record(project.user, project, 'chat')
@@ -116,7 +119,7 @@ def chat_error_report(request):
     try:
         body = json.loads(request.body.decode('utf-8') or '{}')
     except json.JSONDecodeError:
-        return JsonResponse({'error': '잘못된 요청'}, status=400)
+        return JsonResponse({'error': msg('common.badRequest')}, status=400)
 
     public_id = (body.get('publicId') or '').strip()
     question = (body.get('question') or '').strip()
@@ -124,7 +127,7 @@ def chat_error_report(request):
     error_detail = (body.get('errorDetail') or '').strip()
 
     if not error_message:
-        return JsonResponse({'error': 'errorMessage 필요'}, status=400)
+        return JsonResponse({'error': msg('proxy.errorMessageRequired')}, status=400)
 
     project = Project.objects.filter(public_id=public_id).first() if public_id else None
     ChatErrorReport.objects.create(

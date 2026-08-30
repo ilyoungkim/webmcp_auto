@@ -6,6 +6,7 @@ from rest_framework.response import Response
 
 from apps.catalogs.models import DomainType
 from apps.pipeline.crawler import fetch_sitemap_items, fetch_sitemap_urls
+from core.langsilo import msg
 from core.origins import normalize_origin
 
 from .models import Project, TenantOrigin
@@ -15,7 +16,7 @@ from .serializers import OriginSerializer, ProjectDetailSerializer, ProjectListS
 def _get_owned(request, pk) -> Project:
     project = Project.objects.filter(pk=pk).first()
     if project is None:
-        raise ValidationError('프로젝트를 찾을 수 없습니다.')
+        raise ValidationError(msg('project.notFound'))
     if project.user_id != request.user.id and request.user.role != 'admin':
         raise PermissionDenied()
     return project
@@ -32,19 +33,19 @@ def projects(request):
     plan = settings.PLANS.get(request.user.plan, settings.PLANS['free'])
     max_projects = plan.get('max_projects', 5)
     if max_projects is not None and Project.objects.filter(user=request.user).count() >= max_projects:
-        return Response({'detail': f'프로젝트는 최대 {max_projects}개까지 생성할 수 있습니다.'}, status=400)
+        return Response({'detail': msg('project.limitReached', max=max_projects)}, status=400)
 
     name = (request.data.get('name') or '').strip()
     url = (request.data.get('url') or '').strip()
     code = (request.data.get('domainTypeCode') or '').strip()
     if not name or not url or not code:
-        raise ValidationError('name/url/domainTypeCode 필요')
+        raise ValidationError(msg('project.fieldsRequired'))
     # 언어 사일로 — 컨테이너의 언어에 맞는 카탈로그만 노출되므로 code 탐색도 현재 언어로 제한
     from core.langsilo import current_lang
     cur_lang = current_lang()
     dt = DomainType.objects.filter(code=code, enabled=True, lang__in=[cur_lang, '']).first()
     if dt is None:
-        raise ValidationError('알 수 없는 도메인 유형')
+        raise ValidationError(msg('project.unknownDomainType'))
 
     project = Project.objects.create(
         user=request.user, name=name, url=url,
@@ -77,13 +78,13 @@ def project_detail(request, pk):
         if code:
             dt = DomainType.objects.filter(code=code, enabled=True).first()
             if dt is None:
-                raise ValidationError('알 수 없는 도메인 유형')
+                raise ValidationError(msg('project.unknownDomainType'))
             p.domain_type = dt
         theme = (data.get('theme') or '').strip()
         if theme:
             from core.themes import THEME_CODES
             if theme not in THEME_CODES:
-                raise ValidationError('알 수 없는 테마')
+                raise ValidationError(msg('project.unknownTheme'))
             p.theme = theme
         p.save()
         # 테마/정보 변경 시 위젯 재빌드 (기존 소스 기반)
@@ -126,7 +127,7 @@ def sitemap_urls(request):
     """새 프로젝트 생성 전, 입력 URL 기준으로 상위 30개 URL 목록을 조회."""
     target_url = (request.query_params.get('url') or '').strip()
     if not target_url:
-        raise ValidationError('url 필요')
+        raise ValidationError(msg('project.urlRequired'))
     items = fetch_sitemap_items(target_url, limit=30)
     urls = [item['url'] for item in items]
     return Response({'urls': urls, 'items': items})
@@ -191,15 +192,15 @@ def project_menus_regenerate(request, pk):
 
     # 빠른메뉴 질문 편집은 1회만 허용
     if p.menus_edited:
-        raise ValidationError('빠른메뉴 질문 편집은 1회만 가능합니다.')
+        raise ValidationError(msg('project.menuEditOnce'))
 
     content = SiteContent.objects.filter(project=p).first()
     if content is None or not content.markdown:
-        raise ValidationError('수집된 소스가 없습니다. 먼저 크롤링/재생성을 실행하세요.')
+        raise ValidationError(msg('project.noSources'))
 
     menus = list(QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True, is_required=False))
     if not menus:
-        raise ValidationError('빠른메뉴가 설정되지 않았습니다.')
+        raise ValidationError(msg('project.noMenus'))
 
     # 사용자가 편집한 질문 매핑 (menu_label → question) — 필수 메뉴는 제외
     questions_map: dict[str, str] = {}
@@ -228,13 +229,13 @@ def project_origins(request, pk, origin_id=None):
         origin = normalize_origin((request.data.get('origin') or '').strip())
         obj, created = TenantOrigin.objects.get_or_create(origin=origin, defaults={'project': p})
         if not created and obj.project_id != p.id:
-            raise ValidationError('이미 다른 프로젝트에 등록된 Origin')
+            raise ValidationError(msg('project.originTaken'))
         return Response(OriginSerializer(obj).data, status=201)
     obj = TenantOrigin.objects.filter(pk=origin_id, project=p).first()
     if obj is None:
-        raise ValidationError('Origin 없음')
+        raise ValidationError(msg('project.originNotFound'))
     if TenantOrigin.objects.filter(project=p).count() <= 1:
-        raise ValidationError('최소 1개 Origin은 유지해야 합니다.')
+        raise ValidationError(msg('project.originMinimum'))
     obj.delete()
     return Response({'ok': True})
 
@@ -253,9 +254,9 @@ def project_support(request, pk):
     if request.method == 'POST':
         question = (request.data.get('question') or '').strip()
         if not question:
-            raise ValidationError('질문 내용을 입력해주세요.')
+            raise ValidationError(msg('project.questionRequired'))
         if len(question) > 2000:
-            raise ValidationError('질문은 2000자 이내로 입력해주세요.')
+            raise ValidationError(msg('project.questionTooLong'))
         ticket = SupportTicket.objects.create(
             project=p, user=request.user, question=question,
         )

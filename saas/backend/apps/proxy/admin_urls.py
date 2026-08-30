@@ -7,6 +7,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.langsilo import msg
+
 User = get_user_model()
 
 
@@ -52,7 +54,7 @@ def user_patch(request, pk):
     _require_admin(request)
     u = User.objects.filter(pk=pk).first()
     if u is None:
-        raise ValidationError('사용자 없음')
+        raise ValidationError(msg('admin.userNotFound'))
     for field in ('role', 'plan'):
         if field in request.data:
             setattr(u, field, request.data[field])
@@ -76,7 +78,7 @@ def user_patch(request, pk):
             try:
                 u.monthly_price = round(float(raw), 2)
             except (TypeError, ValueError):
-                raise ValidationError('결제 금액은 숫자여야 합니다.')
+                raise ValidationError(msg('admin.priceMustBeNumber'))
             cur = (request.data.get('monthlyCurrency') or '').strip().upper()
             u.monthly_currency = cur or _default_price()[0]
         if request.data.get('monthlyCurrency') is not None and raw in (None, '', 'null'):
@@ -160,7 +162,7 @@ def chat_error_patch(request, pk):
 
     r = ChatErrorReport.objects.filter(pk=pk).first()
     if r is None:
-        raise ValidationError('신고 없음')
+        raise ValidationError(msg('admin.reportNotFound'))
     status = (request.data.get('status') or '').strip()
     if status and status in dict(ChatErrorReport.STATUS):
         r.status = status
@@ -216,15 +218,15 @@ def admin_project_regenerate(request, pk):
 
     p = Project.objects.filter(pk=pk).first()
     if p is None:
-        raise ValidationError('프로젝트 없음')
+        raise ValidationError(msg('project.notFoundShort'))
 
     content = SiteContent.objects.filter(project=p).first()
     if content is None or not content.markdown:
-        raise ValidationError('수집된 소스가 없습니다. 먼저 크롤링을 실행하세요.')
+        raise ValidationError(msg('project.noSources'))
 
     menus = list(QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True))
     if not menus:
-        raise ValidationError('빠른메뉴가 설정되지 않았습니다.')
+        raise ValidationError(msg('project.noMenus'))
 
     qna_rows = regenerate_qna(p, content.markdown, menus)
     GeneratedQnA.objects.filter(project=p).delete()
@@ -245,7 +247,7 @@ def admin_project_toggle(request, pk):
 
     p = Project.objects.filter(pk=pk).first()
     if p is None:
-        raise ValidationError('프로젝트 없음')
+        raise ValidationError(msg('project.notFoundShort'))
     p.enabled = not p.enabled
     p.save(update_fields=['enabled', 'updated_at'])
     return Response({'ok': True, 'enabled': p.enabled})
@@ -266,7 +268,7 @@ def admin_project_llm(request, pk):
 
     p = Project.objects.filter(pk=pk).first()
     if p is None:
-        raise ValidationError('프로젝트 없음')
+        raise ValidationError(msg('project.notFoundShort'))
 
     if request.method == 'GET':
         return Response({
@@ -314,7 +316,7 @@ def admin_project_llm_test(request, pk):
 
     p = Project.objects.filter(pk=pk).first()
     if p is None:
-        raise ValidationError('프로젝트 없음')
+        raise ValidationError(msg('project.notFoundShort'))
 
     # 테스트할 키/모델 결정: 요청값 > 프로젝트 저장값 > 전역
     api_key = (request.data.get('geminiApiKey') or '').strip()
@@ -351,7 +353,7 @@ def admin_project_delete(request, pk):
 
     p = Project.objects.filter(pk=pk).first()
     if p is None:
-        raise ValidationError('프로젝트 없음')
+        raise ValidationError(msg('project.notFoundShort'))
     name = p.name
     p.delete()
     return Response({'ok': True, 'name': name})
@@ -412,10 +414,10 @@ def admin_support_answer(request, pk):
 
     t = SupportTicket.objects.filter(pk=pk).first()
     if t is None:
-        raise ValidationError('Q&A 없음')
+        raise ValidationError(msg('admin.qnaNotFound'))
     answer = (request.data.get('answer') or '').strip()
     if not answer:
-        raise ValidationError('답변 내용을 입력해주세요.')
+        raise ValidationError(msg('admin.answerRequired'))
     t.answer = answer
     t.status = 'answered'
     t.answered_at = timezone.now()

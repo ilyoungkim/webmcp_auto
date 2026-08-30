@@ -49,6 +49,25 @@
         '      <br />• AI비서의 답변 결과에 대해서 개발사는 책임을 지지 않습니다.',
       welcome: '안녕하세요! {title}입니다.\n궁금한 점을 물어보세요.',
       send: '보내기',
+      // ── 아래 키는 v1.3.0 에서 하드코딩을 사전으로 이관한 것 ──
+      defaultTitle: '✨ AI 비서',
+      expandTitle: '크게 보기',
+      shrinkTitle: '작게 보기',
+      closeTitle: '닫기',
+      askForInfo: '{group} 정보를 알려줘',
+      reportReceived: '✅ 오류가 접수되었습니다. 빠르게 확인하겠습니다.',
+      reportFailed: '⚠️ 오류 접수에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      errorOccurred: '⚠️ 오류가 발생했습니다 (클릭하여 상세보기)',
+      reportButton: '📮 오류 신고하기',
+      errorPrefix: '오류: ',
+      proxyNotLoaded: 'webmcp.js(프록시)가 로드되지 않았습니다.',
+      micStart: '음성 입력',
+      micStop: '음성 입력 중지',
+      micInsecure: '⚠️ 음성 입력은 보안 연결(HTTPS)에서만 사용할 수 있습니다. HTTPS 주소로 접속하거나 직접 입력해 주세요.',
+      memoryHeader: '[이전 대화 기억]',
+      memoryIntro: '사용자가 이전에 비슷한 질문을 한 적이 있습니다. 아래 내용을 참고해 일관되게 답하세요.',
+      memoryPrevQ: '이전 질문: ',
+      memoryPrevA: '이전 답변: ',
     },
     en: {
       launcherAria: 'Open AI Assistant',
@@ -69,13 +88,39 @@
         '      <br />• The developer is not responsible for generated answers.',
       welcome: 'Hello! This is the {title}.\nAsk me anything.',
       send: 'Send',
+      // ── 아래 키는 v1.3.0 에서 하드코딩을 사전으로 이관한 것 ──
+      defaultTitle: '✨ AI Assistant',
+      expandTitle: 'Expand',
+      shrinkTitle: 'Shrink',
+      closeTitle: 'Close',
+      askForInfo: 'Tell me about {group}',
+      reportReceived: '✅ Your report has been received. We will look into it shortly.',
+      reportFailed: '⚠️ Failed to submit the report. Please try again later.',
+      errorOccurred: '⚠️ An error occurred (click for details)',
+      reportButton: '📮 Report this error',
+      errorPrefix: 'Error: ',
+      proxyNotLoaded: 'webmcp.js (proxy) is not loaded.',
+      micStart: 'Voice input',
+      micStop: 'Stop voice input',
+      micInsecure: '⚠️ Voice input requires a secure connection (HTTPS). Please open this page over HTTPS or type your question.',
+      memoryHeader: '[Previous conversation memory]',
+      memoryIntro: 'The user has asked a similar question before. Use the context below to answer consistently.',
+      memoryPrevQ: 'Previous question: ',
+      memoryPrevA: 'Previous answer: ',
     },
   };
 
-  function t(key) {
+  function t(key, params) {
     var lang = (window.WebMCPConfig && window.WebMCPConfig.lang) || 'ko';
     var dict = I18N[lang] || I18N.ko;
-    return dict[key] !== undefined ? dict[key] : (I18N.ko[key] !== undefined ? I18N.ko[key] : key);
+    var out = dict[key] !== undefined ? dict[key] : (I18N.ko[key] !== undefined ? I18N.ko[key] : key);
+    // {group} / {title} 등 플레이스홀더 치환
+    if (params) {
+      Object.keys(params).forEach(function (k) {
+        out = out.split('{' + k + '}').join(String(params[k]));
+      });
+    }
+    return out;
   }
 
   function mount() {
@@ -98,8 +143,8 @@
       '    <span class="wmcp-header-logo">AI</span>' +
       '    <h1 id="wmcpTitle">' + t('title') + '</h1>' +
       '    <span class="wmcp-status" id="wmcpStatus">' + t('statusChecking') + '</span>' +
-      '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="' + (t('title').indexOf('Assistant') >= 0 ? 'Expand' : '크게 보기') + '">⤢</button>' +
-      '    <button id="wmcpClose" class="wmcp-close" type="button" title="' + (t('title').indexOf('Assistant') >= 0 ? 'Close' : '닫기') + '">✕</button>' +
+      '    <button id="wmcpExpand" class="wmcp-expand" type="button" title="' + t('expandTitle') + '">⤢</button>' +
+      '    <button id="wmcpClose" class="wmcp-close" type="button" title="' + t('closeTitle') + '">✕</button>' +
       '  </header>' +
       '  <div id="wmcpChat" class="wmcp-chat" aria-live="polite"></div>' +
       '  <div class="wmcp-inputbar">' +
@@ -133,13 +178,23 @@
     var ns = cfg.siteNs || 'home';
     var names = cfg.names || {};
     // 사이트별 헤더 제목 — SaaS 생성 config.title 우선, 없으면 기존 하드코딩 폴백
+    // 데모용 하드코딩 타이틀 — ko 사일로 전용. en은 사전 기본값 사용.
     var titles = {
-      yonja: '✨ 연애의 자격 AI 비서',
-      hospital: '🏥 생생병원 AI 비서',
-      genisev: '🔋 제니스코리아 AI 비서',
+      ko: {
+        yonja: '✨ 연애의 자격 AI 비서',
+        hospital: '🏥 생생병원 AI 비서',
+        genisev: '🔋 제니스코리아 AI 비서',
+      },
+      en: {
+        yonja: '✨ Dating Qualification AI Assistant',
+        hospital: '🏥 Saengsaeng Hospital AI Assistant',
+        genisev: '🔋 Genis Korea AI Assistant',
+      },
     };
+    var lang = cfg.lang || 'ko';
+    var byLang = titles[lang] || titles.ko;
     return {
-      title: cfg.title || titles[ns] || '✨ AI 비서',
+      title: cfg.title || byLang[ns] || t('defaultTitle'),
       ns: ns,
       names: names,
       theme: cfg.theme || {},
@@ -191,7 +246,7 @@
     Object.keys(names).forEach(function (group) {
       var meta = names[group];
       var label = meta.label || group;
-      var question = meta.question || (group + ' 정보를 알려줘');
+      var question = meta.question || t('askForInfo', { group: group });
       var b = document.createElement('button');
       b.className = 'wmcp-pill';
       b.type = 'button';
@@ -237,12 +292,12 @@
       body: JSON.stringify(payload),
     }).then(function (res) {
       if (res.ok) {
-        addMsg('✅ 오류가 접수되었습니다. 빠르게 확인하겠습니다.', 'bot');
+        addMsg(t('reportReceived'), 'bot');
       } else {
-        addMsg('⚠️ 오류 접수에 실패했습니다. 잠시 후 다시 시도해주세요.', 'bot', true);
+        addMsg(t('reportFailed'), 'bot', true);
       }
     }).catch(function () {
-      addMsg('⚠️ 오류 접수에 실패했습니다. 잠시 후 다시 시도해주세요.', 'bot', true);
+      addMsg(t('reportFailed'), 'bot', true);
     });
   }
 
@@ -319,17 +374,18 @@
       // 오류는 아코디언(<details>)으로 감춰서 상세 내용을 접어둡니다.
       bubble.innerHTML =
         '<details class="wmcp-error-details">' +
-        '<summary>⚠️ 오류가 발생했습니다 (클릭하여 상세보기)</summary>' +
+        '<summary>' + escapeHtml(t('errorOccurred')) + '</summary>' +
         '<div class="wmcp-error-body">' + escapeHtml(content) + '</div>' +
         '</details>' +
-        '<button type="button" class="wmcp-error-report" data-error="' + escapeAttr(content) + '">📮 오류 신고하기</button>';
+        '<button type="button" class="wmcp-error-report" data-error="' + escapeAttr(content) + '">' + escapeHtml(t('reportButton')) + '</button>';
     } else {
       bubble.innerHTML = markdownToHtml(content);
     }
     wrap.appendChild(bubble);
     var time = document.createElement('div');
     time.className = 'wmcp-time';
-    time.textContent = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    var timeLocale = ((window.WebMCPConfig && window.WebMCPConfig.lang) === 'en') ? 'en-US' : 'ko-KR';
+    time.textContent = new Date().toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' });
     wrap.appendChild(time);
     chat.appendChild(wrap);
     chat.scrollTop = chat.scrollHeight;
@@ -429,10 +485,10 @@
     var similar = findSimilar(q);
     if (!similar) return '';
     return (
-      '[이전 대화 기억]\n' +
-      '사용자가 이전에 비슷한 질문을 한 적이 있습니다. 아래 내용을 참고해 일관되게 답하세요.\n' +
-      '이전 질문: ' + similar.q + '\n' +
-      '이전 답변: ' + similar.a + '\n\n'
+      t('memoryHeader') + '\n' +
+      t('memoryIntro') + '\n' +
+      t('memoryPrevQ') + similar.q + '\n' +
+      t('memoryPrevA') + similar.a + '\n\n'
     );
   }
 
@@ -445,7 +501,7 @@
     setLoading(true);
     try {
       if (typeof window.WebMCP === 'undefined' || typeof window.WebMCP.callGeminiViaProxy !== 'function') {
-        throw new Error('webmcp.js(프록시)가 로드되지 않았습니다.');
+        throw new Error(t('proxyNotLoaded'));
       }
       // 사이트별 시스템 프롬프트 자동 선택
       // 1순위: SaaS가 생성한 window.P{siteNs}_SYSTEM_PROMPT (예: P12_SYSTEM_PROMPT)
@@ -468,7 +524,7 @@
       // 🧠 이번 질문-답변을 메모리에 저장 (로컬 + 서버)
       memoryAdd(q, answer);
     } catch (e) {
-      addMsg('오류: ' + (e.message || e), 'bot', true);
+      addMsg(t('errorPrefix') + (e.message || e), 'bot', true);
     } finally {
       setLoading(false);
     }
@@ -553,7 +609,7 @@
       expand.addEventListener('click', function () {
         var expanded = panel.classList.toggle('wmcp-panel--expanded');
         expand.textContent = expanded ? '⤣' : '⤢';
-        expand.title = expanded ? '작게 보기' : '크게 보기';
+        expand.title = expanded ? t('shrinkTitle') : t('expandTitle');
       });
     }
     var input = $('#wmcpInput');
@@ -590,7 +646,8 @@
       return;
     }
     recognition = new SR();
-    recognition.lang = 'ko-KR';
+    // 음성 인식 언어도 사일로 언어에 맞춘다 (en 위젯에서 한국어 인식 방지)
+    recognition.lang = ((window.WebMCPConfig && window.WebMCPConfig.lang) === 'en') ? 'en-US' : 'ko-KR';
     recognition.interimResults = true;   // 실시간 인식 결과 표시
     recognition.maxAlternatives = 1;
     recognition.continuous = false;      // 말이 끝나면 자동 종료
@@ -634,11 +691,7 @@
       } else {
         // 보안 콘텍스트(http)가 아니면 마이크 권한 요청 자체가 차단되므로 사전 안내
         if (insecure) {
-          var isEn2 = (window.WebMCPConfig && window.WebMCPConfig.lang) === 'en';
-          addMsg(isEn2
-            ? '⚠️ Voice input requires a secure connection (HTTPS). Please open this page over HTTPS or type your question.'
-            : '⚠️ 음성 입력은 보안 연결(HTTPS)에서만 사용할 수 있습니다. HTTPS 주소로 접속하거나 직접 입력해 주세요.',
-            'bot', false);
+          addMsg(t('micInsecure'), 'bot', false);
           return;
         }
         try {
@@ -679,7 +732,7 @@
     var mic = $('#wmcpMic');
     if (!mic) return;
     mic.classList.toggle('wmcp-mic--active', on);
-    mic.title = on ? '음성 입력 중지' : '음성 입력';
+    mic.title = on ? t('micStop') : t('micStart');
   }
 
   if (document.readyState === 'loading') {

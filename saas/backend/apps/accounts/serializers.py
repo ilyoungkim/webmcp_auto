@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from core.langsilo import msg
+
 from .models import User
 
 
@@ -17,7 +19,7 @@ class PasswordChangeSerializer(serializers.Serializer):
     def validate_current(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
-            raise serializers.ValidationError('현재 비밀번호가 다릅니다.')
+            raise serializers.ValidationError(msg('auth.passwordMismatch'))
         return value
 
 

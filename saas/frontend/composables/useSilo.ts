@@ -239,6 +239,17 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'admin.errors.project': '프로젝트',
     'admin.errors.question': '질문',
     'admin.errors.detail': '오류 상세',
+    // 적용 매뉴얼 (/manual)
+    'manual.title': '적용 매뉴얼',
+    'manual.recommended': '1. 권장 설치 (호스팅 1줄)',
+    'manual.bundle': '2. 자체 호스팅 번들',
+    'manual.bundleDesc': 'bundle.zip을 홈페이지 루트에 풀고:',
+    'manual.origin': '3. Origin 등록',
+    'manual.originDesc': '프로젝트 URL의 Origin은 자동 등록됩니다. www/스테이징 도메인은 콘솔에서 추가하세요.',
+    'manual.troubleshoot': '4. 문제 해결',
+    'manual.ts403': '위젯을 붙인 도메인이 Origin 화이트리스트에 없음',
+    'manual.ts429': '플랜 호출 한도 초과',
+    'manual.tsCsp': '고객 사이트 CSP에 SaaS 호스트를 script-src에 추가',
   },
   en: {
     // 공통 / 레이아웃
@@ -466,6 +477,17 @@ const MESSAGES: Record<SiloLang, Record<string, string>> = {
     'admin.errors.project': 'Project',
     'admin.errors.question': 'Question',
     'admin.errors.detail': 'Error detail',
+    // 적용 매뉴얼 (/manual)
+    'manual.title': 'Integration Manual',
+    'manual.recommended': '1. Recommended installation (one line on hosting)',
+    'manual.bundle': '2. Self-hosted bundle',
+    'manual.bundleDesc': 'Unzip bundle.zip into your website root:',
+    'manual.origin': '3. Register Origin',
+    'manual.originDesc': 'The Origin of your project URL is registered automatically. Add www/staging domains in the console.',
+    'manual.troubleshoot': '4. Troubleshooting',
+    'manual.ts403': 'The domain hosting the widget is not in the Origin allowlist',
+    'manual.ts429': 'Plan call limit exceeded',
+    'manual.tsCsp': 'Add the SaaS host to script-src in your site CSP',
   },
 }
 
@@ -528,5 +550,21 @@ export function useSilo(): SiloState {
     return out
   }
 
-  return { lang, ready, supportPhone, t, load }
+  // ── 로케일 헬퍼 ──────────────────────────────────────────
+  // 날짜/숫자 포맷을 사일로 언어에 맞춘다. (en 사일로에서 ko-KR 로케일이
+  // 그대로 쓰이던 문제 대응)
+  const locale = computed(() => (lang.value === 'en' ? 'en-US' : 'ko-KR'))
+
+  /** 사일로 로케일로 날짜·시간을 포맷한다. */
+  const formatDate = (
+    value: string | number | Date | null | undefined,
+    options: Intl.DateTimeFormatOptions = { hour12: false },
+  ): string => {
+    if (value === null || value === undefined || value === '') return ''
+    const d = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleString(locale.value, options)
+  }
+
+  return { lang, ready, supportPhone, t, load, locale, formatDate }
 }

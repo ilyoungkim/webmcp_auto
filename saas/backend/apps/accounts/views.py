@@ -9,6 +9,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from core.langsilo import msg
+
 from .models import User
 from .serializers import MeSerializer, PasswordChangeSerializer, ProfileSerializer, SignupSerializer
 
@@ -95,7 +97,7 @@ def login_view(request):
     if locked:
         logger.warning('LOGIN BLOCKED email=%s ip=%s remaining=%ss', email, ip, remaining)
         return Response(
-            {'detail': f'로그인 시도 횟수를 초과했습니다. {remaining}초 후 다시 시도하세요.'},
+            {'detail': msg('auth.tooManyAttempts', seconds=remaining)},
             status=429,
         )
 
@@ -105,11 +107,11 @@ def login_view(request):
         entry = _FAILED_ATTEMPTS.get(key)
         count = entry[0] if entry else 1
         logger.warning('LOGIN FAIL email=%s ip=%s reason=invalid_credentials count=%s', email, ip, count)
-        return Response({'detail': '자격 증명이 올바르지 않습니다.'}, status=401)
+        return Response({'detail': msg('auth.invalidCredentials')}, status=401)
     if not user.is_active:
         _record_failure(key)
         logger.warning('LOGIN FAIL email=%s ip=%s reason=inactive', email, ip)
-        return Response({'detail': '자격 증명이 올바르지 않습니다.'}, status=401)
+        return Response({'detail': msg('auth.invalidCredentials')}, status=401)
 
     # IP 화이트리스트 확인 — 등록된 IP만 로그인 허용 (비어 있으면 제한 없음)
     # direct(프록시 없는 직접 연결)이고 사설망/루프백이면 항상 허용(락아웃 방지)
@@ -117,7 +119,7 @@ def login_view(request):
     if not ip_allowed(getattr(user, 'allowed_ips', ''), ip, direct=direct):
         _record_failure(key)
         logger.warning('LOGIN DENIED email=%s ip=%s reason=ip_not_allowed', email, ip)
-        return Response({'detail': '허용되지 않은 IP에서의 접속입니다.'}, status=403)
+        return Response({'detail': msg('auth.ipNotAllowed')}, status=403)
 
     login(request, user)          # 세션 로테이션 포함
     _clear_failures(key)          # 성공 시 실패 카운터 초기화
@@ -133,7 +135,7 @@ def logout_view(request):
     if request.method == 'POST':
         logout(request)
         return JsonResponse({'ok': True})
-    return JsonResponse({'detail': 'POST 만 허용됩니다.'}, status=405)
+    return JsonResponse({'detail': msg('auth.postOnly')}, status=405)
 
 
 @api_view(['GET'])
@@ -145,7 +147,7 @@ def me(request):
     if not ip_allowed(getattr(request.user, 'allowed_ips', ''), ip, direct=direct):
         logout(request)
         logger.warning('ME DENIED email=%s ip=%s reason=ip_not_allowed (session terminated)', request.user.email, ip)
-        return Response({'detail': '허용되지 않은 IP에서의 접속입니다.'}, status=403)
+        return Response({'detail': msg('auth.ipNotAllowed')}, status=403)
     return Response(MeSerializer(request.user).data)
 
 
