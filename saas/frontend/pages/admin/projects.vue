@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin' })
 
+const { t, load: loadSilo } = useSilo()
+
 interface User {
   id: number; email: string; name: string; role: string
   phone1: string; phone2: string
@@ -50,13 +52,13 @@ const answerDrafts = ref<Record<number, string>>({})
 const answering = ref<Record<number, boolean>>({})
 const expandedSupport = ref<Set<number>>(new Set())
 
-const STATUS_LABELS: Record<string, string> = {
-  queued: '예약',
-  crawling: '진행중',
-  generating: '진행중',
-  completed: '완료',
-  failed: '실패',
-}
+const STATUS_LABELS = computed<Record<string, string>>(() => ({
+  queued: t('proj.status.queued'),
+  crawling: t('proj.status.crawling'),
+  generating: t('proj.status.generating'),
+  completed: t('proj.status.completed'),
+  failed: t('proj.status.failed'),
+}))
 
 async function loadUsers() {
   users.value = await useApi('/api/admin/users/')
@@ -76,9 +78,9 @@ function fmtPrice(amount: number, currency: string): string {
 
 function userPriceLabel(u: User): string {
   if (u.monthlyPrice !== null && u.monthlyPrice !== undefined) {
-    return `${fmtPrice(u.monthlyPrice, u.monthlyCurrency)} (엔터프라이즈)`
+    return `${fmtPrice(u.monthlyPrice, u.monthlyCurrency)} (${t('admin.projects.enterprise')})`
   }
-  return `${fmtPrice(u.defaultPrice, u.defaultCurrency)} (기본)`
+  return `${fmtPrice(u.defaultPrice, u.defaultCurrency)} (${t('admin.projects.default')})`
 }
 
 function syncPayForm() {
@@ -124,12 +126,12 @@ async function savePaying(u: User) {
         monthlyCurrency: payForm.value.monthlyCurrency,
       },
     })
-    payMessage.value = { ...payMessage.value, [u.id]: '저장 완료' }
+    payMessage.value = { ...payMessage.value, [u.id]: t('admin.projects.saved') }
     await loadUsers()
   } catch (e: any) {
     payMessage.value = {
       ...payMessage.value,
-      [u.id]: e?.data?.detail || e?.data?.monthlyPrice?.[0] || '저장에 실패했습니다.',
+      [u.id]: e?.data?.detail || e?.data?.monthlyPrice?.[0] || t('admin.projects.saveFailed'),
     }
   } finally {
     paySaving.value = false
@@ -192,7 +194,7 @@ function toggleSupport(id: number) {
 async function submitAnswer(t: any) {
   const answer = (answerDrafts.value[t.id] || '').trim()
   if (!answer) {
-    message.value = '답변 내용을 입력해주세요.'
+    message.value = t('admin.projects.answerRequired')
     return
   }
   answering.value[t.id] = true
@@ -205,9 +207,9 @@ async function submitAnswer(t: any) {
     t.answer = res.answer
     t.status = res.status
     answerDrafts.value[t.id] = ''
-    message.value = '답변이 등록되었습니다.'
+    message.value = t('admin.projects.answerDone')
   } catch (e: any) {
-    message.value = e?.data?.detail || '답변 등록에 실패했습니다.'
+    message.value = e?.data?.detail || t('admin.projects.answerFailed')
   } finally {
     answering.value[t.id] = false
   }
@@ -231,44 +233,45 @@ const filtered = computed(() => {
 })
 
 async function regenerate(p: Project) {
-  if (!confirm(`'${p.name}' 프로젝트의 Q&A를 재생성하시겠습니까?`)) return
+  if (!confirm(t('admin.projects.regenerateConfirm', { name: p.name }))) return
   message.value = ''
   regenerating.value[p.id] = true
   try {
     const res = await useApi(`/api/admin/projects/${p.id}/regenerate/`, { method: 'POST' })
-    message.value = `'${p.name}' Q&A 재생성 완료 (${res.count ?? ''}건)`
+    message.value = t('admin.projects.regenerateDone', { name: p.name, n: res.count ?? '' })
   } catch (e: any) {
-    message.value = e?.data?.detail || '재생성에 실패했습니다.'
+    message.value = e?.data?.detail || t('admin.projects.regenerateFailed')
   } finally {
     regenerating.value[p.id] = false
   }
 }
 
 async function toggleEnabled(p: Project) {
-  const action = p.enabled ? '사용중지' : '사용재개'
-  if (!confirm(`'${p.name}' 프로젝트를 ${action}하시겠습니까?`)) return
+  const action = p.enabled ? t('admin.projects.disable') : t('admin.projects.enable')
+  if (!confirm(t('admin.projects.toggleConfirm', { name: p.name, action }))) return
   message.value = ''
   toggling.value[p.id] = true
   try {
     const res = await useApi(`/api/admin/projects/${p.id}/toggle/`, { method: 'POST' })
     p.enabled = res.enabled
-    message.value = `'${p.name}' ${res.enabled ? '사용재개' : '사용중지'} 완료`
+    const doneAction = res.enabled ? t('admin.projects.enable') : t('admin.projects.disable')
+    message.value = t('admin.projects.toggleDone', { name: p.name, action: doneAction })
   } catch (e: any) {
-    message.value = e?.data?.detail || '상태 변경에 실패했습니다.'
+    message.value = e?.data?.detail || t('admin.projects.toggleFailed')
   } finally {
     toggling.value[p.id] = false
   }
 }
 
 async function removeProject(p: Project) {
-  if (!confirm(`'${p.name}' 프로젝트를 삭제하시겠습니까?\n삭제된 프로젝트는 복구할 수 없습니다.`)) return
+  if (!confirm(t('admin.projects.deleteConfirm', { name: p.name }))) return
   message.value = ''
   try {
     await useApi(`/api/admin/projects/${p.id}/`, { method: 'DELETE' })
-    message.value = `'${p.name}' 삭제 완료`
+    message.value = t('admin.projects.deleteDone', { name: p.name })
     await load()
   } catch (e: any) {
-    message.value = e?.data?.detail || '삭제에 실패했습니다.'
+    message.value = e?.data?.detail || t('admin.projects.deleteFailed')
   }
 }
 
@@ -294,14 +297,14 @@ async function loadLlm(p: Project) {
       geminiModel: res.geminiModel || '',
     }
   } catch (e: any) {
-    message.value = e?.data?.detail || 'LLM 설정을 불러오지 못했습니다.'
+    message.value = e?.data?.detail || t('admin.projects.llmLoadFailed')
   } finally {
     llmLoading.value[p.id] = false
   }
 }
 
 async function resetLlm(p: Project) {
-  if (!confirm(`'${p.name}' 프로젝트의 LLM 설정을 초기화해 전역(.env) 값을 사용하도록 되돌리시겠습니까?`)) return
+  if (!confirm(t('admin.projects.llmResetConfirm', { name: p.name }))) return
   llmSaving.value[p.id] = true
   message.value = ''
   try {
@@ -312,10 +315,10 @@ async function resetLlm(p: Project) {
         geminiModel: '',
       },
     })
-    message.value = `'${p.name}' LLM 설정이 전역 기본값으로 초기화되었습니다.`
+    message.value = t('admin.projects.llmResetDone', { name: p.name })
     await loadLlm(p)
   } catch (e: any) {
-    message.value = e?.data?.detail || 'LLM 설정 초기화에 실패했습니다.'
+    message.value = e?.data?.detail || t('admin.projects.llmResetFailed')
   } finally {
     llmSaving.value[p.id] = false
   }
@@ -323,7 +326,7 @@ async function resetLlm(p: Project) {
 
 async function testLlm(p: Project) {
   llmTesting.value[p.id] = true
-  llmTestResult.value[p.id] = { ok: false, message: '테스트 중...' }
+  llmTestResult.value[p.id] = { ok: false, message: t('admin.projects.testing') }
   try {
     const draft = llmDrafts.value[p.id] || {}
     const res = await useApi(`/api/admin/projects/${p.id}/llm/test/`, {
@@ -335,63 +338,66 @@ async function testLlm(p: Project) {
     })
     llmTestResult.value[p.id] = {
       ok: true,
-      message: `연결 성공 (${res.model}) — 응답: ${res.reply} (적용됨)`,
+      message: t('admin.projects.llmTestOk', { model: res.model, reply: res.reply }),
     }
     // 테스트 성공 시 적용되었으므로 저장된 값 갱신
     await loadLlm(p)
   } catch (e: any) {
     llmTestResult.value[p.id] = {
       ok: false,
-      message: e?.data?.error || e?.data?.detail || '테스트에 실패했습니다.',
+      message: e?.data?.error || e?.data?.detail || t('admin.projects.llmTestFailed'),
     }
   } finally {
     llmTesting.value[p.id] = false
   }
 }
 
-onMounted(loadUsers)
+onMounted(async () => {
+  await loadSilo()
+  loadUsers()
+})
 </script>
 
 <template>
   <main class="wrap">
     <header class="head">
-      <NuxtLink to="/dashboard" class="back-link">&larr; 대시보드</NuxtLink>
-      <h1>프로젝트 관리</h1>
+      <NuxtLink to="/dashboard" class="back-link">{{ t('prof.backToDash') }}</NuxtLink>
+      <h1>{{ t('admin.projects.title') }}</h1>
       <div class="filters">
-        <a href="/admin/profile" class="btn-link">⚙️ 관리자 프로필</a>
-        <button class="btn" @click="loadUsers">새로고침</button>
+        <a href="/admin/profile" class="btn-link">⚙️ {{ t('admin.projects.adminProfile') }}</a>
+        <button class="btn" @click="loadUsers">{{ t('admin.projects.refresh') }}</button>
       </div>
     </header>
 
     <!-- 계정 선택 -->
     <div class="user-select">
-      <label class="field-label">계정 선택</label>
+      <label class="field-label">{{ t('admin.projects.selectAccount') }}</label>
       <select v-model="selectedUserId" class="user-select-box" @change="selectUser">
-        <option value="" disabled>계정을 선택하세요</option>
+        <option value="" disabled>{{ t('admin.projects.selectPlaceholder') }}</option>
         <option v-for="u in users" :key="u.id" :value="u.id">
-          {{ u.email }} {{ u.role === 'admin' ? '(관리자)' : '' }} — {{ userPriceLabel(u) }}
+          {{ u.email }} {{ u.role === 'admin' ? t('admin.projects.admin') : '' }} — {{ userPriceLabel(u) }}
         </option>
       </select>
 
       <!-- 선택된 계정의 결제금액/연락처 편집 (계정 선택 시 자동 표시) -->
       <div v-if="selectedUser" class="pay-panel">
         <div class="pay-row">
-          <span class="pay-email">{{ selectedUser.email }}{{ selectedUser.role === 'admin' ? ' (관리자)' : '' }}</span>
+          <span class="pay-email">{{ selectedUser.email }}{{ selectedUser.role === 'admin' ? ' ' + t('admin.projects.admin') : '' }}</span>
           <span class="pay-price" :class="{ enterprise: selectedUser.monthlyPrice !== null }">{{ userPriceLabel(selectedUser) }}</span>
-          <span class="pay-phone muted">{{ [selectedUser.phone1, selectedUser.phone2].filter(Boolean).join(' · ') || '연락처 없음' }}</span>
+          <span class="pay-phone muted">{{ [selectedUser.phone1, selectedUser.phone2].filter(Boolean).join(' · ') || t('admin.projects.noPhone') }}</span>
         </div>
 
         <div class="pay-form">
           <div class="pay-form-grid">
-            <label class="field-label">전화번호 1
+            <label class="field-label">{{ t('admin.projects.phone1') }}
               <input v-model="payForm.phone1" placeholder="02-888-9999" />
             </label>
-            <label class="field-label">전화번호 2
+            <label class="field-label">{{ t('admin.projects.phone2') }}
               <input v-model="payForm.phone2" placeholder="010-1234-5678" />
             </label>
-            <label class="field-label">월 결제 금액 (비우면 또는 0이면 기본 요금)
+            <label class="field-label">{{ t('admin.projects.monthlyPrice') }}
               <div class="price-input-row">
-                <input v-model="payForm.monthlyPrice" type="number" min="0" step="0.01" placeholder="0 = 기본 요금" />
+                <input v-model="payForm.monthlyPrice" type="number" min="0" step="0.01" :placeholder="t('admin.projects.pricePlaceholder')" />
                 <select v-model="payForm.monthlyCurrency" class="cur-select">
                   <option value="KRW">KRW(원)</option>
                   <option value="USD">USD($)</option>
@@ -399,11 +405,11 @@ onMounted(loadUsers)
               </div>
             </label>
           </div>
-          <p class="pay-hint">기본 요금: {{ fmtPrice(selectedUser.defaultPrice, selectedUser.defaultCurrency) }} / 월 — 1 이상을 입력하면 엔터프라이즈 요금, 비우거나 0을 입력하면 기본 요금이 적용됩니다.</p>
+          <p class="pay-hint">{{ t('admin.projects.priceHint', { price: fmtPrice(selectedUser.defaultPrice, selectedUser.defaultCurrency) }) }}</p>
           <div class="pay-actions">
             <span v-if="payMessage[selectedUser.id]" class="msg-line">{{ payMessage[selectedUser.id] }}</span>
             <button class="btn primary" :disabled="paySaving" @click="savePaying(selectedUser)">
-              {{ paySaving ? '저장 중...' : '저장' }}
+              {{ paySaving ? t('admin.projects.saving') : t('admin.projects.save') }}
             </button>
           </div>
         </div>
@@ -412,20 +418,20 @@ onMounted(loadUsers)
 
     <template v-if="selectedUserId !== ''">
       <div class="list-bar">
-        <span class="muted">선택한 계정의 프로젝트 {{ projects.length }}개</span>
-        <input v-model="filter" class="search" placeholder="이름 / URL 검색" />
+        <span class="muted">{{ t('admin.projects.projectsCount', { n: projects.length }) }}</span>
+        <input v-model="filter" class="search" :placeholder="t('admin.projects.searchPlaceholder')" />
       </div>
 
       <p v-if="message" class="msg-line">{{ message }}</p>
-      <p v-if="loading" class="muted">불러오는 중...</p>
-      <p v-else-if="filtered.length === 0" class="muted">이 계정의 프로젝트가 없습니다.</p>
+      <p v-if="loading" class="muted">{{ t('common.loading') }}</p>
+      <p v-else-if="filtered.length === 0" class="muted">{{ t('admin.projects.noProjects') }}</p>
 
       <div v-else class="project-list">
         <div v-for="p in filtered" :key="p.id" class="project-card" :class="{ disabled: !p.enabled }">
           <div class="project-info">
             <span class="project-name">
               {{ p.name }}
-              <span v-if="!p.enabled" class="badge stopped">사용중지</span>
+              <span v-if="!p.enabled" class="badge stopped">{{ t('admin.projects.stopped') }}</span>
             </span>
             <span class="project-url">{{ p.url }}</span>
             <span class="project-meta">
@@ -435,37 +441,37 @@ onMounted(loadUsers)
           </div>
           <div class="project-actions">
             <button class="btn primary" :disabled="regenerating[p.id]" @click="regenerate(p)">
-              {{ regenerating[p.id] ? '재생성 중...' : 'Q&A 재생성' }}
+              {{ regenerating[p.id] ? t('admin.projects.regenerating') : t('admin.projects.regenerate') }}
             </button>
             <button class="btn" :disabled="toggling[p.id]" @click="toggleEnabled(p)">
-              {{ toggling[p.id] ? '처리 중...' : (p.enabled ? '사용중지' : '사용재개') }}
+              {{ toggling[p.id] ? t('admin.projects.processing') : (p.enabled ? t('admin.projects.disable') : t('admin.projects.enable')) }}
             </button>
-            <button class="btn" @click="toggleLlm(p)">⚙ LLM 설정</button>
-            <button class="btn danger" @click="removeProject(p)">삭제</button>
+            <button class="btn" @click="toggleLlm(p)">⚙ {{ t('admin.projects.llmSettings') }}</button>
+            <button class="btn danger" @click="removeProject(p)">{{ t('admin.projects.delete') }}</button>
           </div>
 
           <!-- 테넌트별 Gemini 설정 패널 -->
           <div v-if="llmOpen.has(p.id)" class="llm-panel">
-            <div v-if="llmLoading[p.id]" class="muted">LLM 설정 불러오는 중...</div>
+            <div v-if="llmLoading[p.id]" class="muted">{{ t('admin.projects.llmLoading') }}</div>
             <template v-else-if="llmData[p.id]">
               <div class="llm-panel-head">
-                <h3>LLM 설정 — {{ p.name }}</h3>
-                <span class="muted">비워두면 전역(.env) 값을 사용합니다. (OpenRouter는 .env 로만 관리)</span>
+                <h3>{{ t('admin.projects.llmSettings') }} — {{ p.name }}</h3>
+                <span class="muted">{{ t('admin.projects.llmNote') }}</span>
               </div>
               <div class="llm-grid">
                 <div class="llm-field">
-                  <label class="field-label">Gemini API Key</label>
-                  <input v-model="llmDrafts[p.id].geminiApiKey" type="password" placeholder="전역 값 사용" class="llm-input" />
+                  <label class="field-label">{{ t('admin.projects.geminiKey') }}</label>
+                  <input v-model="llmDrafts[p.id].geminiApiKey" type="password" :placeholder="t('admin.projects.llmNote')" class="llm-input" />
                 </div>
                 <div class="llm-field">
-                  <label class="field-label">Gemini 모델</label>
+                  <label class="field-label">{{ t('admin.projects.geminiModel') }}</label>
                   <input v-model="llmDrafts[p.id].geminiModel" :placeholder="'기본: ' + (llmData[p.id]?.defaults?.geminiModel || '')" class="llm-input" />
                 </div>
                 <div class="llm-field">
-                  <label class="field-label">Gemini 키 테스트 후 적용</label>
+                  <label class="field-label">{{ t('admin.projects.geminiTest') }}</label>
                   <div class="llm-test-row">
                     <button class="btn primary" :disabled="llmTesting[p.id]" @click="testLlm(p)">
-                      {{ llmTesting[p.id] ? '테스트 중...' : '🔌 테스트 후 적용' }}
+                      {{ llmTesting[p.id] ? t('admin.projects.testing') : '🔌 ' + t('admin.projects.testApply') }}
                     </button>
                     <span v-if="llmTestResult[p.id]" class="llm-test-result" :class="llmTestResult[p.id].ok ? 'ok' : 'fail'">
                       {{ llmTestResult[p.id].message }}
@@ -474,7 +480,7 @@ onMounted(loadUsers)
                 </div>
               </div>
               <div class="llm-actions">
-                <button class="btn" :disabled="llmSaving[p.id]" @click="resetLlm(p)">전역 값으로 초기화</button>
+                <button class="btn" :disabled="llmSaving[p.id]" @click="resetLlm(p)">{{ t('admin.projects.resetGlobal') }}</button>
               </div>
             </template>
           </div>
@@ -483,19 +489,19 @@ onMounted(loadUsers)
 
       <!-- 고객센터 Q&A 게시판 -->
       <section class="support-section">
-        <h2>고객센터 Q&A ({{ supportTotal }}건)</h2>
-        <p class="note">이 계정의 사용자가 올린 질문에 답변을 등록할 수 있습니다.</p>
+        <h2>{{ t('admin.projects.supportTitle', { n: supportTotal }) }}</h2>
+        <p class="note">{{ t('admin.projects.supportNote') }}</p>
 
-        <div v-if="supportLoading" class="muted">불러오는 중...</div>
-        <div v-else-if="supportItems.length === 0" class="muted">등록된 Q&A가 없습니다.</div>
+        <div v-if="supportLoading" class="muted">{{ t('common.loading') }}</div>
+        <div v-else-if="supportItems.length === 0" class="muted">{{ t('admin.projects.supportEmpty') }}</div>
         <div v-else class="support-list">
           <div v-for="t in supportItems" :key="t.id" class="support-item" :class="t.status">
             <div class="support-head" @click="toggleSupport(t.id)">
-              <span class="support-badge" :class="t.status">{{ t.status === 'answered' ? '답변완료' : '답변대기' }}</span>
+              <span class="support-badge" :class="t.status">{{ t.status === 'answered' ? t('admin.projects.answered') : t('admin.projects.pending') }}</span>
               <span class="support-project">{{ t.projectName }}</span>
               <span class="support-question">{{ t.question }}</span>
               <span class="support-time">{{ fmtSupportTime(t.createdAt) }}</span>
-              <span v-if="t.status === 'pending'" class="support-answer-hint">✏️ 답변하기</span>
+              <span v-if="t.status === 'pending'" class="support-answer-hint">✏️ {{ t('admin.projects.answerHint') }}</span>
             </div>
 
             <div v-if="expandedSupport.has(t.id)" class="support-detail">
@@ -516,11 +522,11 @@ onMounted(loadUsers)
                 <textarea
                   v-model="answerDrafts[t.id]"
                   rows="3"
-                  placeholder="답변 내용을 입력하세요"
+                  :placeholder="t('admin.projects.answerPlaceholder')"
                 ></textarea>
                 <div class="support-answer-actions">
                   <button class="btn primary" :disabled="answering[t.id]" @click="submitAnswer(t)">
-                    {{ answering[t.id] ? '등록 중...' : (t.answer ? '답변 수정' : '답변 등록') }}
+                    {{ answering[t.id] ? t('admin.projects.answerSubmitting') : (t.answer ? t('admin.projects.answerEdit') : t('admin.projects.answerSubmit')) }}
                   </button>
                 </div>
               </div>
@@ -530,17 +536,17 @@ onMounted(loadUsers)
 
         <!-- 페이지네이션 (10개/페이지) -->
         <div v-if="supportTotalPages > 1" class="pagination">
-          <button class="page-btn" :disabled="supportPage <= 1" @click="loadSupport(supportPage - 1)">← 이전</button>
+          <button class="page-btn" :disabled="supportPage <= 1" @click="loadSupport(supportPage - 1)">← {{ t('common.prev') }}</button>
           <button
             v-for="p in supportTotalPages" :key="p"
             class="page-btn" :class="{ active: p === supportPage }"
             @click="loadSupport(p)"
           >{{ p }}</button>
-          <button class="page-btn" :disabled="supportPage >= supportTotalPages" @click="loadSupport(supportPage + 1)">다음 →</button>
+          <button class="page-btn" :disabled="supportPage >= supportTotalPages" @click="loadSupport(supportPage + 1)">{{ t('common.next') }} →</button>
         </div>
       </section>
     </template>
-    <p v-else class="muted hint">계정을 선택하면 해당 계정에서 만든 프로젝트 목록이 표시됩니다.</p>
+    <p v-else class="muted hint">{{ t('admin.projects.selectHint') }}</p>
   </main>
 </template>
 

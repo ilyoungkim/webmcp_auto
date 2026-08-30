@@ -629,7 +629,25 @@ def _has_korean(text: str) -> bool:
 
 
 def _required_menu_answer(project: Project) -> str:
-    """필수 메뉴 'AI비서란?' 의 고정 답변 — AI비서 소개·사용 방법·문의 안내."""
+    """필수 메뉴 'AI비서란?' 의 고정 답변 — AI비서 소개·사용 방법·문의 안내.
+
+    언어 사일로에 따라 한국어/영어로 반환한다.
+    """
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    if lang == 'en':
+        return (
+            f'**What is the AI assistant?**\n\n'
+            f'The AI assistant is an AI-powered chat bot installed on the {project.name} website. '
+            'It learns from the website content to provide fast and accurate answers to visitors.\n\n'
+            '**How to use**\n'
+            '- Click the **AI** button at the bottom-right to open the chat window.\n'
+            '- Press a quick menu (quick question) button to automatically enter a question.\n'
+            '- Type a question directly or use **🎤 voice input** to ask.\n'
+            '- Answers are generated based on the collected website information.\n\n'
+            '**Contact**\n'
+            '- If you have any questions, leave a message in the **Customer Center Q&A** on the website.\n'
+            '- Or find more details at [AI Archive](https://ai-archive.co.kr/en).'
+        )
     return (
         f'**AI비서란?**\n\n'
         f'AI비서는 {project.name} 홈페이지에 설치된 인공지능 상담 챗봇입니다. '

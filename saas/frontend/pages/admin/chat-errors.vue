@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ middleware: 'admin' })
 
+const { t, load: loadSilo } = useSilo()
+
 interface ChatError {
   id: number
   publicId: string
@@ -20,11 +22,11 @@ const loading = ref(false)
 const filter = ref('')
 const expanded = ref<Set<number>>(new Set())
 
-const STATUS_LABELS: Record<string, string> = {
-  new: '신규',
-  read: '확인됨',
-  resolved: '해결됨',
-}
+const STATUS_LABELS = computed<Record<string, string>>(() => ({
+  new: t('admin.errors.new'),
+  read: t('admin.errors.read'),
+  resolved: t('admin.errors.resolved'),
+}))
 
 async function load() {
   loading.value = true
@@ -57,27 +59,30 @@ function fmtTime(iso: string): string {
   return d.toLocaleString('ko-KR', { hour12: false })
 }
 
-onMounted(load)
+onMounted(async () => {
+  await loadSilo()
+  load()
+})
 </script>
 
 <template>
   <main class="wrap">
     <header class="head">
-      <NuxtLink to="/dashboard" class="back-link">&larr; 대시보드</NuxtLink>
-      <h1>챗 오류 신고</h1>
+      <NuxtLink to="/dashboard" class="back-link">{{ t('prof.backToDash') }}</NuxtLink>
+      <h1>{{ t('admin.errors.title') }}</h1>
       <div class="filters">
         <select v-model="filter" @change="load">
-          <option value="">전체</option>
-          <option value="new">신규</option>
-          <option value="read">확인됨</option>
-          <option value="resolved">해결됨</option>
+          <option value="">{{ t('admin.errors.all') }}</option>
+          <option value="new">{{ t('admin.errors.new') }}</option>
+          <option value="read">{{ t('admin.errors.read') }}</option>
+          <option value="resolved">{{ t('admin.errors.resolved') }}</option>
         </select>
-        <button class="btn" @click="load">새로고침</button>
+        <button class="btn" @click="load">{{ t('admin.projects.refresh') }}</button>
       </div>
     </header>
 
-    <p v-if="loading" class="muted">불러오는 중...</p>
-    <p v-else-if="errors.length === 0" class="muted">신고된 오류가 없습니다.</p>
+    <p v-if="loading" class="muted">{{ t('common.loading') }}</p>
+    <p v-else-if="errors.length === 0" class="muted">{{ t('admin.errors.empty') }}</p>
 
     <div v-else class="error-list">
       <div v-for="r in errors" :key="r.id" class="error-card" :class="r.status">
@@ -89,22 +94,22 @@ onMounted(load)
 
         <div v-if="expanded.has(r.id)" class="error-detail">
           <dl>
-            <dt>프로젝트</dt>
+            <dt>{{ t('admin.errors.project') }}</dt>
             <dd>{{ r.projectName || r.publicId || '-' }}</dd>
             <dt>Origin</dt>
             <dd>{{ r.origin || '-' }}</dd>
-            <dt>질문</dt>
+            <dt>{{ t('admin.errors.question') }}</dt>
             <dd>{{ r.question || '-' }}</dd>
             <dt>IP</dt>
             <dd>{{ r.ip || '-' }}</dd>
             <dt>User-Agent</dt>
             <dd class="wrap-text">{{ r.userAgent || '-' }}</dd>
-            <dt>오류 상세</dt>
+            <dt>{{ t('admin.errors.detail') }}</dt>
             <dd><pre class="err-pre">{{ r.errorDetail || r.errorMessage }}</pre></dd>
           </dl>
           <div class="actions">
-            <button class="btn" :class="{ active: r.status === 'read' }" @click="setStatus(r, 'read')">확인됨</button>
-            <button class="btn" :class="{ active: r.status === 'resolved' }" @click="setStatus(r, 'resolved')">해결됨</button>
+            <button class="btn" :class="{ active: r.status === 'read' }" @click="setStatus(r, 'read')">{{ t('admin.errors.read') }}</button>
+            <button class="btn" :class="{ active: r.status === 'resolved' }" @click="setStatus(r, 'resolved')">{{ t('admin.errors.resolved') }}</button>
           </div>
         </div>
       </div>
