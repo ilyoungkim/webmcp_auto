@@ -190,6 +190,8 @@ def preview_html(request, pk):
     """동일 오리진 데모 HTML — iframe 내 렌더링을 위해 xframe_options_exempt 적용.
 
     사일로 언어(프로젝트 lang)에 따라 안내 문구를 한국어/영어로 표시한다.
+    모바일에서는 위젯 런처(AI 버튼)가 하단에 고정되므로, 화면 하단 콘텐츠와 겹치지
+    않게 safe-area + 하단 여백을 확보한다 (스마트폰에서 런처가 가려지는 문제 대응).
     """
     if not request.user.is_authenticated:
         return HttpResponse('login required', status=401)
@@ -203,21 +205,33 @@ def preview_html(request, pk):
     if lang == 'en':
         html_title = f'{project.name} Demo'
         hint = 'Check the AI assistant with the 💬 button at the bottom-right.'
+        badge = 'Preview'
     else:
         html_title = f'{project.name} 데모'
         hint = '우하단 💬 버튼으로 AI 비서를 확인하세요.'
+        badge = '미리보기'
     html = f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>{html_title}</title>
 <style>body{{font-family:sans-serif;margin:0;padding:48px;background:#fafafa}}
-.hero{{max-width:720px;margin:0 auto}}h1{{color:#0e7490}}</style>
+.hero{{max-width:720px;margin:0 auto}}h1{{color:#0e7490;margin:0 0 8px}}
+.preview-badge{{display:inline-block;padding:3px 10px;border-radius:999px;background:#e0f2fe;color:#0c4a6e;font-size:12px;margin-bottom:10px}}
+.hint{{color:#6b7280;font-size:14px;line-height:1.6}}
+p.hint-card{{margin-top:28px;padding:12px 16px;background:#fff;border:1px solid #e5e7eb;border-radius:10px}}
+/* 모바일: 위젯 런처(우하단 AI 버튼)와 콘텐츠가 겹치지 않게 하단 여백 확보.
+   safe-area-inset-bottom 까지 더해 iOS 홈 인디케이터/주소창에도 가려지지 않는다. */
+@media (max-width: 768px){{
+  body{{padding:24px 20px calc(120px + env(safe-area-inset-bottom, 0px))}}
+}}
+</style>
 <script>window.WebMCPConfig = {config};</script>
 <script src="{base}webmcp.js"></script>
 <link rel="stylesheet" href="{base}widget.css"/>
 <script src="{base}widget.js"></script>
 </head><body><div class="hero">
+<span class="preview-badge">{badge}</span>
 <h1>{project.name}</h1>
-<p>{hint}</p>
+<p class="hint">{hint}</p>
 </div></body></html>"""
     return HttpResponse(html)
