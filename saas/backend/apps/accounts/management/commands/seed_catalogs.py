@@ -119,16 +119,16 @@ SEED_KO = [
 
     # ── 일반회사·산업 계열 ─────────────────────────────────────
     ('company', '일반회사', '회사·서비스·제품 중심 사이트', '🏢', [
-        ('회사정보', '회사 정보를 알려줘', '회사 연혁·비전·규모·조직 중심'),
-        ('서비스', '제공하는 서비스를 알려줘', '서비스 종류·특징·강점 중심'),
-        ('제품', '제품 정보를 알려줘', '제품군·스펙·활용 분야 중심'),
-        ('연락처', '연락처와 위치를 알려줘', '전화·이메일·주소·찾아오는 길 중심'),
+        ('회사정보', '회사 소개를 알려줘', '회사 연혁·미션·규모·철학 중심'),
+        ('팀', '경영진과 주요 구성원을 알려줘', '경영진·주요 인력·조직 중심'),
+        ('서비스', '주요 제품·서비스를 알려줘', '서비스·제품·사업 영역 중심'),
+        ('연락처', '연락처와 사무실 위치를 알려줘', '전화·이메일·주소·찾아오는 길 중심'),
     ]),
     ('company_construction', '건설', '건설·시공·엔지니어링 회사 사이트', '🏗️', [
-        ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·시공능력 중심'),
-        ('사업분야', '주요 사업·시공 분야를 알려줘', '토목·건축·주택·플랜트 등 수행 분야 중심'),
-        ('실적', '주요 시공 실적·프로젝트를 알려줘', '대표 프로젝트·수주 실적·기술력 중심'),
-        ('연락처', '연락처와 위치를 알려줘', '전화·이메일·주소·지사 안내 중심'),
+        ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·주요 프로젝트·시공능력 중심'),
+        ('실적', '주요 시공 실적·프로젝트를 알려줘', '준공 프로젝트·레퍼런스·수주 실적 중심'),
+        ('서비스', '주요 서비스·사업 분야를 알려줘', '사업 영역·기술 역량·인증 중심'),
+        ('연락처', '연락처와 문의 방법을 알려줘', '전화·이메일·문의 절차 중심'),
     ]),
     ('company_chemical', '화학', '화학·소재 제조 회사 사이트', '🧪', [
         ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·연구역량 중심'),
@@ -166,17 +166,25 @@ SEED_KO = [
         ('이용안내', '배송·이용 방법을 알려줘', '배송 조회·요금·이용 절차·고객센터 중심'),
         ('연락처', '연락처와 고객센터를 알려줘', '전화·이메일·고객센터·지점 안내 중심'),
     ]),
-('company_retail', '리테일', '유통·리테일·쇼핑몰 회사 사이트 (판매·매장 중심)', '🛒', [
+    ('company_retail', '리테일', '유통·리테일·쇼핑몰 회사 사이트 (판매·매장 중심)', '🛒', [
         ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·브랜드 중심'),
         ('매장', '매장·지점 정보를 알려줘', '매장 위치·영업시간·지점 안내 중심'),
         ('제품', '판매 제품·상품을 알려줘', '상품군·브랜드·카테고리 중심'),
         ('연락처', '연락처와 고객센터를 알려줘', '전화·이메일·고객센터·매장 문의 중심'),
-    ]),    ('company_sales', '영업', '영업·판매·고객사 대상 서비스 팀 사이트 (영업·제안 중심)', '📈', [
+    ]),
+    ('company_tech', 'IT·테크', 'IT·소프트웨어·테크 회사 사이트 (솔루션·기술 중심)', '💻', [
+        ('회사정보', '회사 소개와 비전을 알려줘', '회사 개요·비전·연혁 중심'),
+        ('솔루션', '주요 솔루션·서비스를 알려줘', '제품·솔루션·기술 스택 중심'),
+        ('도입사례', '고객 도입 사례를 알려줘', '레퍼런스·도입 사례·성과 중심'),
+        ('연락처', '연락처와 데모 문의를 알려줘', '문의 채널·데모 요청·전화·이메일 중심'),
+    ]),
+    ('company_sales', '영업', '영업·판매·고객사 대상 서비스 팀 사이트 (영업·제안 중심)', '📈', [
         ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·영업 조직 중심'),
         ('제품·서비스', '판매 제품·서비스를 알려줘', '제품·서비스 구성·가격·구매 절차 중심'),
         ('제안·견적', '제안·견적 받는 방법을 알려줘', '견적 요청·제안서·도입 문의 중심'),
         ('연락처', '영업 담당자와 연락처를 알려줘', '영업팀·지역 담당·전화·이메일 중심'),
-    ]),    ('company_research', '연구회사', '연구소·연구개발 전문 회사 (연구·기술 중심)', '🔬', [
+    ]),
+    ('company_research', '연구회사', '연구소·연구개발 전문 회사 (연구·기술 중심)', '🔬', [
         ('회사정보', '회사 소개와 특징을 알려줘', '회사 연혁·규모·연구 분야 중심'),
         ('연구분야', '주요 연구 분야를 알려줘', '연구 주제·기술·특허·성과 중심'),
         ('성과', '연구 성과·논문·특허를 알려줘', '대표 성과·논문·특허·수상 중심'),
@@ -267,11 +275,18 @@ SEED_EN = [
     ]),
 
     # ── 교육·상담 (영어) ──────────────────────────────────────
-    ('edu_counseling', 'Counseling', 'Counseling & mental health centers', '💬', [
-        ('About', 'Introduce the counseling center', 'History, team, philosophy'),
-        ('Counselors', 'Introduce the counselors', 'Names, specialties, credentials'),
-        ('Programs', 'What programs and sessions are offered?', 'Program types, sessions, methods'),
-        ('Contact', 'Contact and reservation information', 'Phone, email, booking, address'),
+    # 코드 edu_counsel 로 통일 (ko 사일로와 동일 코드 — lang으로 격리되므로 충돌 없음)
+    ('edu_counsel', 'Counseling', 'Psychological counseling & coaching centers (program-focused)', '💬', [
+        ('About', 'Introduce the counseling center and its features', 'Center history, philosophy, expertise'),
+        ('Counselors', 'Introduce the counselors and specialists', 'Counselor names, specialties, credentials, experience'),
+        ('Programs', 'What counseling programs do you offer?', 'Program types, target audience, methods, pricing'),
+        ('Contact', 'Contact details and booking/directions', 'Phone, email, booking method, address'),
+    ]),
+    ('edu_care', 'Senior Care', 'Nursing homes, care hospitals & senior care facilities', '🏡', [
+        ('About', 'Introduce the care facility and its features', 'Facility history, scale, care philosophy'),
+        ('Facilities', 'Describe the facilities and living environment', 'Facility scale, living environment, meals, medical support'),
+        ('Services', 'What care services and programs are offered?', 'Care levels, care programs, pricing'),
+        ('Contact', 'Contact details and admission consultation/directions', 'Phone, email, admission consultation, address'),
     ]),
 
     # ── 일반회사/산업 (영어) ──────────────────────────────────
@@ -292,6 +307,66 @@ SEED_EN = [
         ('Products', 'What are the main products and categories?', 'Product lines, categories, bestsellers'),
         ('Store', 'Store locations and operating hours', 'Locations, hours, online store'),
         ('Contact', 'Customer service and support contacts', 'Customer service, support channels'),
+    ]),
+    ('company_chemical', 'Chemical', 'Chemical & materials manufacturing companies', '🧪', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, R&D capability'),
+        ('Products', 'What are the main products and materials?', 'Product lines, properties, applications'),
+        ('Technology', 'Describe the core technology and R&D', 'Process technology, patents, R&D capability'),
+        ('Contact', 'Contact information and site locations', 'Phone, email, address, plant locations'),
+    ]),
+    ('company_bio', 'Biotech', 'Biotechnology & life science companies (research, diagnostics)', '🧬', [
+        ('About', 'Introduce the company and its features', 'Company history, vision, research capability'),
+        ('Technology', 'Describe the core technology and R&D', 'Research areas, platform technology, patents'),
+        ('Products', 'What are the main products and services?', 'Diagnostics, therapeutics, research solutions'),
+        ('Contact', 'Contact information and office locations', 'Phone, email, address'),
+    ]),
+    ('company_health', 'Healthcare', 'Health, medical device & healthcare companies', '🩺', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, vision'),
+        ('Services', 'What are the main services and business areas?', 'Healthcare services, management programs'),
+        ('Products', 'What are the main products and devices?', 'Medical devices, health products, features'),
+        ('Contact', 'Contact information and office locations', 'Phone, email, address'),
+    ]),
+    ('company_pharma', 'Pharma', 'Pharmaceutical companies (drugs, R&D)', '💊', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, vision'),
+        ('Products', 'What are the main drugs and products?', 'Pharmaceuticals, supplements, product lines'),
+        ('R&D', 'Describe the R&D and pipeline', 'Drug development, clinical trials, research capability'),
+        ('Contact', 'Contact information and office locations', 'Phone, email, address'),
+    ]),
+    ('company_electronics', 'Electronics', 'Electronics, electrical & semiconductor companies', '🔌', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, vision'),
+        ('Products', 'What are the main electronic products and parts?', 'Product lines, specs, applications'),
+        ('Technology', 'Describe the core technology and R&D', 'Semiconductors, displays, process technology'),
+        ('Contact', 'Contact information and site locations', 'Phone, email, address, plant locations'),
+    ]),
+    ('company_logistics', 'Logistics', 'Transport, logistics & delivery companies', '🚚', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, logistics network'),
+        ('Services', 'What transport and logistics services do you offer?', 'Parcel, freight, international shipping, warehousing'),
+        ('How to Use', 'How do shipping and the service work?', 'Tracking, rates, procedures, customer service'),
+        ('Contact', 'Contact information and customer service', 'Phone, email, customer service, branch offices'),
+    ]),
+    ('company_research', 'Research', 'Research institutes & R&D companies', '🔬', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, research fields'),
+        ('Research Areas', 'What are the main research areas?', 'Research topics, technology, patents, outcomes'),
+        ('Achievements', 'Show research achievements, papers and patents', 'Key outcomes, papers, patents, awards'),
+        ('Contact', 'Contact information and collaboration inquiries', 'Phone, email, collaboration, partnership inquiries'),
+    ]),
+    ('company_investment', 'Investment', 'Investment, asset management & venture capital firms', '💰', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, investment philosophy'),
+        ('Investment Areas', 'What are the main investment areas?', 'Investment sectors, portfolio, strategy'),
+        ('Portfolio', 'Show the investment portfolio', 'Portfolio companies, funds, performance'),
+        ('Contact', 'Contact information and investment inquiries', 'Phone, email, investment, proposal inquiries'),
+    ]),
+    ('company_consulting', 'Consulting', 'Management, strategy & professional consulting firms', '📊', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, expertise'),
+        ('Services', 'What consulting services do you provide?', 'Management, strategy, finance, HR services'),
+        ('Experts', 'Introduce the consultants and experts', 'Consultant names, specialties, experience'),
+        ('Contact', 'Contact information and consultation inquiries', 'Phone, email, consultation, proposal inquiries'),
+    ]),
+    ('company_knowledge', 'Knowledge', 'Knowledge, information & content industry companies', '🧠', [
+        ('About', 'Introduce the company and its features', 'Company history, scale, vision'),
+        ('Services', 'What knowledge and information services do you offer?', 'Education, information, content, platform services'),
+        ('Content', 'What are the main content and resources?', 'Courses, materials, reports, data'),
+        ('Contact', 'Contact information and inquiries', 'Phone, email, customer service, inquiries'),
     ]),
     ('company_tech', 'Tech', 'IT, software & tech companies', '💻', [
         ('About', 'Introduce the company and its mission', 'Company overview, vision, history'),
