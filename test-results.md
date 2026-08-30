@@ -330,6 +330,25 @@
 
 ---
 
+### T-032. 구 docker-compose.yml 퇴역 — 단일 진실 공급원 정리 (커밋 5a29848)
+- **요구**: 사용자가 두 compose 파일 차이 확인 후 정리 승인
+- **실측**: `docker inspect`로 실행 컨테이너 라벨 확인 → **ko/en 모두 `docker-compose.silo.yml` 기반** (구 yml은 유산)
+- **정리 실행**:
+  1. `docker compose -f docker-compose.yml down` → 구버전 컨테이너(webmcp-backend/frontend/worker/postgres) 제거 — 사일로 무영향 확인 (헬스 200 유지)
+  2. `build.sh` `LANGS_KO`를 구 yml → **silo.yml로 교체** (단일 진실 공급원 확정)
+  3. **부수 위험 해소**: 기존에는 `--ko`여도 silo.yml 전체 build/up → en 사일로까지 영향 위험이었다. build/up 명령에 **언어별 서비스 필터**(`*-<lang>` 5개 서비스)를 추가해 `--ko`/`--en`/기본(전체) 모두 정확히 분리 실행되도록 수정
+- **검증**:
+  | 항목 | 결과 |
+  |---|---|
+  | `--dry-run --ko` | ✅ `*-ko` 5개 서비스만 빌드 대상 |
+  | `--dry-run --en` | ✅ `*-en`으로 분리 |
+  | `--run ko` 실제 실행 | ✅ 18초 완료, ko backend ready |
+  | 사일로 헬스 | ✅ ko/en 200 |
+  | 실행 컨테이너 | ✅ **10개만 남음**(구 4개 제거) |
+- **이후 권장**: `docker-compose.yml`은 참고용으로 보존하거나 삭제 — 현재는 build.sh가 silo만 참조하므로 안전
+
+---
+
 ## 부록 A. 커밋 이력 (시간 순)
 
 | 커밋 | 내용 |
