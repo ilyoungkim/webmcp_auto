@@ -34,12 +34,15 @@ plan() { printf "${C_M}[PLAN]${C_N} %s\n" "$1"; }
 
 # ── 언어 사일로 레지스트리 ───────────────────────────────────
 # 형식: 언어코드:compose파일:표시라벨:접속주소
+# ⚠️ 모든 사일로는 docker-compose.silo.yml 안에 서비스로 존재한다 (backend-ko/worker-ko/...).
+#    silo compose는 언어별 서비스가 하나의 파일에 있으므로 --ko/--en 구분은 서비스 필터로 한다:
+#    - ko 사일로 = silo.yml 의 *-ko 서비스들  |  en 사일로 = silo.yml 의 *-en 서비스
 # 새 언어 추가 방법:
-#   1) docker-compose 파일에 <lang> 사일로 서비스 추가 (backend-<lang> 등)
-#   2) 아래에 LANGS_XX="xx:docker-compose.xx.yml:...:http://localhost:POTR" 한 줄 추가 후 ALL_LANGS에 등록
+#   1) docker-compose.silo.yml 에 <lang> 사일로 서비스 추가 (backend-<lang> 등)
+#   2) 아래에 LANGS_XX="xx:docker-compose.silo.yml:...:http://localhost:PORT" 한 줄 추가 후 ALL_LANGS에 등록
 #   3) saas/backend/core/langsilo.py 의 SUPPORTED_LANGS 도 함께 확장
 #   4) ./build.sh --run xx  로 빌드·기동
-LANGS_KO="ko:docker-compose.yml:한국어(ko) 사일로:http://localhost:8080"
+LANGS_KO="ko:docker-compose.silo.yml:한국어(ko) 사일로:http://localhost:8080"
 LANGS_EN="en:docker-compose.silo.yml:영어(en) 사일로:http://localhost:8081"
 # LANGS_JA="ja:docker-compose.ja.yml:일본어(ja) 사일로:http://localhost:8082"
 # LANGS_ZH="zh:docker-compose.zh.yml:중국어(zh) 사일로:http://localhost:8083"
@@ -185,12 +188,14 @@ for lang in "${TARGET_LANGS[@]}"; do
   entry=$(find_entry "$lang")
   file=$(lang_file "$entry")
   label=$(lang_label "$entry")
-  info "── ${label} 이미지 빌드 (${file}) ──"
+  # silo compose는 언어별 서비스가 한 파일에 있으므로 해당 언어 서비스(*-<lang>)만 대상
+  svc=$(printf '%s ' postgres-${lang} backend-${lang} worker-${lang} frontend-${lang} nginx-${lang})
+  info "── ${label} 이미지 빌드 (${file} | 서비스: ${svc%% }) ──"
   if [ "$DRY_RUN" = true ]; then
-    plan "docker compose -f ${file} build ${NO_CACHE_FLAG}"
+    plan "docker compose -f ${file} build ${NO_CACHE_FLAG} ${svc}"
   else
     # shellcheck disable=SC2086
-    docker compose -f "${file}" build ${NO_CACHE_FLAG} \
+    docker compose -f "${file}" build ${NO_CACHE_FLAG} ${svc} \
       || { err "${label} 빌드 실패"; exit 1; }
     ok "${label} 이미지 빌드 완료"
   fi
@@ -203,11 +208,12 @@ if [ "$RUN_AFTER_BUILD" = true ]; then
     file=$(lang_file "$entry")
     label=$(lang_label "$entry")
     url=$(lang_url "$entry")
+    svc=$(printf '%s ' postgres-${lang} backend-${lang} worker-${lang} frontend-${lang} nginx-${lang})
     info "── ${label} 컨테이너 기동 ──"
     if [ "$DRY_RUN" = true ]; then
-      plan "docker compose -f ${file} up -d"
+      plan "docker compose -f ${file} up -d ${svc}"
     else
-      docker compose -f "${file}" up -d \
+      docker compose -f "${file}" up -d ${svc} \
         || { err "${label} 기동 실패"; exit 1; }
       ok "${label} 기동 완료 → ${url}"
     fi
