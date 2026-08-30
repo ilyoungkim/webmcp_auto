@@ -24,6 +24,7 @@ interface Project {
 const users = ref<User[]>([])
 const projects = ref<Project[]>([])
 const selectedUserId = ref<number | ''>('')
+const selectedUser = computed(() => users.value.find(u => u.id === Number(selectedUserId.value)) || null)
 const loading = ref(false)
 const filter = ref('')
 const regenerating = ref<Record<number, boolean>>({})
@@ -80,9 +81,9 @@ function userPriceLabel(u: User): string {
   return `${fmtPrice(u.defaultPrice, u.defaultCurrency)} (기본)`
 }
 
-function openPaying(u: User) {
-  payingFor.value = payingFor.value === u.id ? null : u.id
-  payMessage.value = {}
+function syncPayForm() {
+  const u = users.value.find(x => x.id === Number(selectedUserId.value))
+  if (!u || selectedUserId.value === '') return
   payForm.value = {
     phone1: u.phone1 || '',
     phone2: u.phone2 || '',
@@ -91,13 +92,29 @@ function openPaying(u: User) {
   }
 }
 
+function openPaying(u: User) {
+  payingFor.value = payingFor.value === u.id ? null : u.id
+  payMessage.value = {}
+  if (payingFor.value === u.id) {
+    selectedUserId.value = u.id
+    payForm.value = {
+      phone1: u.phone1 || '',
+      phone2: u.phone2 || '',
+      monthlyPrice: u.monthlyPrice !== null ? String(u.monthlyPrice) : '',
+      monthlyCurrency: u.monthlyCurrency || u.defaultCurrency,
+    }
+  }
+}
+
 async function savePaying(u: User) {
+  if (!u) return
   paySaving.value = true
   payMessage.value = { ...payMessage.value, [u.id]: '' }
   try {
-    const raw = (payForm.value.monthlyPrice || '').trim()
+    const raw = String(payForm.value.monthlyPrice ?? '').trim()
     await useApi(`/api/admin/users/${u.id}/`, {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
       body: {
         phone1: payForm.value.phone1,
         phone2: payForm.value.phone2,
@@ -109,7 +126,10 @@ async function savePaying(u: User) {
     payMessage.value = { ...payMessage.value, [u.id]: '저장 완료' }
     await loadUsers()
   } catch (e: any) {
-    payMessage.value = { ...payMessage.value, [u.id]: e?.data?.detail || '저장에 실패했습니다.' }
+    payMessage.value = {
+      ...payMessage.value,
+      [u.id]: e?.data?.detail || e?.data?.monthlyPrice?.[0] || '저장에 실패했습니다.',
+    }
   } finally {
     paySaving.value = false
   }
@@ -133,6 +153,10 @@ async function load() {
 function selectUser() {
   filter.value = ''
   message.value = ''
+  // 계정 선택 즉시 해당 사용자의 결제금액/연락처 편집 패널 열기
+  payingFor.value = selectedUserId.value === '' ? null : Number(selectedUserId.value)
+  payMessage.value = {}
+  syncPayForm()
   load()
 }
 
@@ -348,47 +372,41 @@ onMounted(loadUsers)
         </option>
       </select>
 
-      <!-- 사용자별 요금/연락처 관리 -->
-      <details class="pay-details">
-        <summary class="pay-summary">💰 사용자별 결제 금액 / 연락처 설정</summary>
-        <div class="pay-list">
-          <div v-for="u in users" :key="u.id" class="pay-item">
-            <div class="pay-row">
-              <span class="pay-email">{{ u.email }}{{ u.role === 'admin' ? ' (관리자)' : '' }}</span>
-              <span class="pay-price" :class="{ enterprise: u.monthlyPrice !== null }">{{ userPriceLabel(u) }}</span>
-              <span class="pay-phone muted">{{ [u.phone1, u.phone2].filter(Boolean).join(' · ') || '연락처 없음' }}</span>
-              <button class="btn" @click="openPaying(u)">{{ payingFor === u.id ? '닫기' : '수정' }}</button>
-            </div>
+      <!-- 선택된 계정의 결제금액/연락처 편집 (계정 선택 시 자동 표시) -->
+      <div v-if="selectedUser" class="pay-panel">
+        <div class="pay-row">
+          <span class="pay-email">{{ selectedUser.email }}{{ selectedUser.role === 'admin' ? ' (관리자)' : '' }}</span>
+          <span class="pay-price" :class="{ enterprise: selectedUser.monthlyPrice !== null }">{{ userPriceLabel(selectedUser) }}</span>
+          <span class="pay-phone muted">{{ [selectedUser.phone1, selectedUser.phone2].filter(Boolean).join(' · ') || '연락처 없음' }}</span>
+        </div>
 
-            <div v-if="payingFor === u.id" class="pay-form">
-              <div class="pay-form-grid">
-                <label class="field-label">전화번호 1
-                  <input v-model="payForm.phone1" placeholder="02-888-9999" />
-                </label>
-                <label class="field-label">전화번호 2
-                  <input v-model="payForm.phone2" placeholder="010-1234-5678" />
-                </label>
-                <label class="field-label">월 결제 금액 (비우면 기본 요금)
-                  <div class="price-input-row">
-                    <input v-model="payForm.monthlyPrice" type="number" min="0" step="0.01" :placeholder="String(u.defaultPrice)" />
-                    <select v-model="payForm.monthlyCurrency" class="cur-select">
-                      <option value="KRW">KRW(원)</option>
-                      <option value="USD">USD($)</option>
-                    </select>
-                  </div>
-                </label>
+        <div class="pay-form">
+          <div class="pay-form-grid">
+            <label class="field-label">전화번호 1
+              <input v-model="payForm.phone1" placeholder="02-888-9999" />
+            </label>
+            <label class="field-label">전화번호 2
+              <input v-model="payForm.phone2" placeholder="010-1234-5678" />
+            </label>
+            <label class="field-label">월 결제 금액 (비우면 기본 요금)
+              <div class="price-input-row">
+                <input v-model="payForm.monthlyPrice" type="number" min="0" step="0.01" :placeholder="String(selectedUser.defaultPrice)" />
+                <select v-model="payForm.monthlyCurrency" class="cur-select">
+                  <option value="KRW">KRW(원)</option>
+                  <option value="USD">USD($)</option>
+                </select>
               </div>
-              <p class="pay-hint">기본 요금: {{ fmtPrice(u.defaultPrice, u.defaultCurrency) }} / 월 — 숫자를 입력하면 엔터프라이즈 요금이 적용됩니다.</p>
-              <div class="pay-actions">
-                <span v-if="payMessage[u.id]" class="msg-line">{{ payMessage[u.id] }}</span>
-                <button class="btn primary" :disabled="paySaving" @click="savePaying(u)">
-                  {{ paySaving ? '저장 중...' : '저장' }}
-                </button>
-              </div>
-            </div>
+            </label>
+          </div>
+          <p class="pay-hint">기본 요금: {{ fmtPrice(selectedUser.defaultPrice, selectedUser.defaultCurrency) }} / 월 — 숫자를 입력하면 엔터프라이즈 요금이 적용됩니다. 금액을 비우고 저장하면 기본 요금으로 돌아갑니다.</p>
+          <div class="pay-actions">
+            <span v-if="payMessage[selectedUser.id]" class="msg-line">{{ payMessage[selectedUser.id] }}</span>
+            <button class="btn primary" :disabled="paySaving" @click="savePaying(selectedUser)">
+              {{ paySaving ? '저장 중...' : '저장' }}
+            </button>
           </div>
         </div>
-      </details>
+      </div>
     </div>
 
     <template v-if="selectedUserId !== ''">
@@ -536,12 +554,8 @@ onMounted(loadUsers)
 .user-select { margin-bottom: 16px; }
 .user-select-box { width: 100%; max-width: 400px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
 
-/* 사용자별 결제 금액/연락처 관리 */
-.pay-details { margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-.pay-summary { padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 600; color: #374151; }
-.pay-summary:hover { background: #f9fafb; }
-.pay-list { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
-.pay-item { border: 1px solid #f3f4f6; border-radius: 6px; padding: 8px 10px; }
+/* 선택된 사용자 요금/연락처 편집 패널 */
+.pay-panel { margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 12px 14px; }
 .pay-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pay-email { font-size: 13px; font-weight: 600; color: #111827; min-width: 180px; }
 .pay-price { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f0f9ff; color: #0e7490; }

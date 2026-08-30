@@ -96,7 +96,7 @@ services:
     container_name: webmcp-ko-nginx
     depends_on: [backend-ko, frontend-ko]
     ports: ["8080:80"]
-    volumes: ["./nginx.conf:/etc/nginx/nginx.conf:ro"]
+    volumes: ["./nginx-ko.conf:/etc/nginx/nginx.conf:ro"]
     logging: { driver: json-file, options: { max-size: "10m", max-file: "28" } }
 
   # ── 영어 사일로 — 완전히 독립된 DB·백엔드·프론트엔드·포트 ─────
