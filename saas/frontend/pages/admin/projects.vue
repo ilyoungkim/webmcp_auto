@@ -112,14 +112,15 @@ async function savePaying(u: User) {
   payMessage.value = { ...payMessage.value, [u.id]: '' }
   try {
     const raw = String(payForm.value.monthlyPrice ?? '').trim()
+    const parsed = Number(raw)
     await useApi(`/api/admin/users/${u.id}/`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: {
         phone1: payForm.value.phone1,
         phone2: payForm.value.phone2,
-        // 빈 값 → 기본 요금으로 복귀, 숫자 → 엔터프라이즈 금액
-        monthlyPrice: raw === '' ? null : Number(raw),
+        // 빈 값 또는 0 → 기본 요금으로 복귀, 1 이상 숫자 → 엔터프라이즈 금액
+        monthlyPrice: (raw === '' || !Number.isFinite(parsed) || parsed <= 0) ? null : parsed,
         monthlyCurrency: payForm.value.monthlyCurrency,
       },
     })
@@ -388,9 +389,9 @@ onMounted(loadUsers)
             <label class="field-label">전화번호 2
               <input v-model="payForm.phone2" placeholder="010-1234-5678" />
             </label>
-            <label class="field-label">월 결제 금액 (비우면 기본 요금)
+            <label class="field-label">월 결제 금액 (비우면 또는 0이면 기본 요금)
               <div class="price-input-row">
-                <input v-model="payForm.monthlyPrice" type="number" min="0" step="0.01" :placeholder="String(selectedUser.defaultPrice)" />
+                <input v-model="payForm.monthlyPrice" type="number" min="0" step="0.01" placeholder="0 = 기본 요금" />
                 <select v-model="payForm.monthlyCurrency" class="cur-select">
                   <option value="KRW">KRW(원)</option>
                   <option value="USD">USD($)</option>
@@ -398,7 +399,7 @@ onMounted(loadUsers)
               </div>
             </label>
           </div>
-          <p class="pay-hint">기본 요금: {{ fmtPrice(selectedUser.defaultPrice, selectedUser.defaultCurrency) }} / 월 — 숫자를 입력하면 엔터프라이즈 요금이 적용됩니다. 금액을 비우고 저장하면 기본 요금으로 돌아갑니다.</p>
+          <p class="pay-hint">기본 요금: {{ fmtPrice(selectedUser.defaultPrice, selectedUser.defaultCurrency) }} / 월 — 1 이상을 입력하면 엔터프라이즈 요금, 비우거나 0을 입력하면 기본 요금이 적용됩니다.</p>
           <div class="pay-actions">
             <span v-if="payMessage[selectedUser.id]" class="msg-line">{{ payMessage[selectedUser.id] }}</span>
             <button class="btn primary" :disabled="paySaving" @click="savePaying(selectedUser)">
