@@ -14,6 +14,7 @@
 > 파이프라인 워커로 5개 프로젝트가 `completed`까지 진행되었고, 위젯 임베드·채팅·미리보기·설치 번들까지 동작한다.
 > **2026-08-29~30: 보안 강화 → 다국어 사일로(ko/en) → 콘솔·Q&A 완전 영어화 · sitemap 수집 개선 · GitHub 퍼블리시 완료** (§0.9).
 > **2026-08-30 최신: 크롤러 WAF 폴백 → 프로필/결제(엔터프라이즈 요금) → 관리자 사일로 다국어 → ko DB 복구 · 도커 사일로 정합성 개선** (§0.10).
+> **2026-08-30(2): LAN 원격 접속 허용 → SECURE_COOKIES 스위치 → 갤럭시 음성입력 대응 → ALLOWED_HOSTS 자기 IP 자동 탐지** (§0.11 §0.12).
 
 ### 0.1 마일스톤 완료 현황
 
@@ -321,6 +322,69 @@ Hopkins Medicine처럼 robots.txt에 다른 호스트 sitemap(`profiles.xxx.org`
 #### 0.10.7 커밋 이력 (2026-08-30)
 
 `4e8e319` 크롤 WAF 폴백 → `903cdf3` 프로필/결제 기능 → `caf04fc` 계정선택 결제 패널 + nginx-ko.conf → `605a733` 0=기본요금 → `ea0abb7` 관리자 사일로 다국어
+
+---
+
+### 0.11 LAN 접속 + 스마트폰 실기 검증 + 운영 배포 준비 (2026-08-30)
+
+#### 0.11.1 LAN(192.168.x.x) 원격 접속 허용 (커밋 597b095)
+
+- `ALLOWED_HOSTS += 192.168.31.248, 192.168.64.1` (Mac 실 LAN IP + 가상 인터페이스)
+- `SAAS_PUBLIC_URL`: `http://192.168.31.248:{8080,8081}` — 위젯 config의 assetBase/proxyEndpoint **박제 주소**
+- `CSRF_TRUSTED_ORIGINS`: LAN URL 추가
+- 접속: 사무실 내 기기 → `http://192.168.31.248:8080`(ko) / `:8081`(en)
+- **DB(5432)는 `expose` 전용** — `ports` 없음 = 호스트/LAN 어디서도 직접 접속 불가 (요구 충족)
+
+#### 0.11.2 위젯 assetBase 박제 함정 (커밋 6eb0ee0)
+
+- **증상**: LAN 전환 후 갤럭시에서 preview 위젯 런처 미표출
+- **진짜 원인**: 기존 위젯 config에 `http://localhost:8080` 박제 — 폰에서는 localhost=폰 자신 → **위젯 JS/CSS 404**
+  (데스크톱은 서버 자체라 localhost도 통했던 것)
+- **수정**: DB REPLACE로 `config_json` 주소 치현 + `widget_asset()`에 `Cache-Control: no-cache, must-revalidate` (모바일 공격적 캐시 방지)
+- **교훈**: `SAAS_PUBLIC_URL`이 바뀌면 **기존 프로젝트 전부 재생성/치환 필요**
+
+#### 0.11.3 http(LAN) 로그인 쿠키 문제 (커밋 07e19df)
+
+- **원인**: `DJANGO_DEBUG=false` → Cookie Secure 강제 → http 접속 시 브라우저가 세션/CSRF 쿠키 폐기 (스마트폰 로그인 실패)
+- **수정**: `SECURE_COOKIES` env 스위치 신설(기본 `true` — https 배포 안전), compose는 개발용으로 `false` 주입
+- **2026-08-30 사용자 확정**: 아직 운영기 아니므로 **false 유지**, 운영 전환 시 true로 되돌림 (확정된 미래 작업)
+
+#### 0.11.4 갤럭시 음성입력 무반응 (커밋 0d50d3c)
+
+- **원인**: Web Speech API(SpeechRecognition)의 마이크 권한은 **보안 콘텍스트(HTTPS/localhost) 필수** — `http://192.168.x.x`는 규격상 차단
+  - MacBook localhost는 예외적으로 보안 콘텍스트라 동작했던 것
+- **개선**: onerror 오류코드별 ko/en 안내 표시, 미보안 콘텍스트 클릭 즉시 HTTPS 필요 안내, 8초 무음 타임아웃
+- **결론**: LAN http에서 폰 음성입력은 브라우저 규격상 불가 — **HTTPS 배포 시 자연 해결**
+
+#### 0.11.5 위젯/미리보기 모바일 대응 (커밋 ae8e3f9)
+
+- `widget.css`: 런처 bottom에 `calc(88px + env(safe-area-inset-bottom))` 반영, 모바일 런처 62px 확대
+- `preview_html()`: `viewport-fit=cover`, 하단 여백 `calc(120px + safe-area)`, 미리보기 배지·hint 카드
+- **주의**: widget.css 수정 시 `saas/widget-dist/`와 `saas/frontend/public/widget-dist/` **양쪽 동기화** 필수
+
+#### 0.11.6 ALLOWED_HOSTS 자기 IP 자동 탐지 (커밋 bfc49c9)
+
+**운영 서버 이관 준비** — 도메인 없이 서버 IP로 직접 접속하는 배포 지원:
+
+- `settings.py` `_detect_host_ips()` 신설: hostname 역질 + **SIOCGIFCONF ioctl**(fcntl)로 서버 자기 IPv4 전수 탐지 (루프백 제외)
+- `ALLOW_SELF_IP` env(기본 `true`)로 on/off
+- **효과**: 운영 서버 이관 시 **코드 수정 없이** ifconfig로 나오는 자기 주소 전부 자동 허용 (컨테이너 내부 IP 172.x 포함). IP가 바뀌어도 재시작으로 재탐지
+- **검증**: Mac(`192.168.31.248, 192.168.64.1`), ko 컨테이너(`172.21.0.6`), en 컨테이너(`172.21.0.8`) 각각 자기 IP 자동 포함 확인, ko/en 헬스 200
+- **유의**: `SAAS_PUBLIC_URL`/`CSRF_TRUSTED_ORIGINS`는 위젯 박제 주소라 **여전히 수동 갱신** 필요 (도메인 연결 시)
+
+#### 0.11.7 운영 배포 전환 체크리스트 (확정)
+
+| 항목 | 개발(현재) | 운영 전환 시 |
+|---|---|---|
+| `SECURE_COOKIES` | `false` | **`true`** |
+| `SAAS_PUBLIC_URL` | LAN IP | `https://도메인` (또는 공인 IP) |
+| `CSRF_TRUSTED_ORIGINS` | LAN URL | `https://도메인` (+기존 유지 가능) |
+| `ALLOWED_HOSTS` | 자기 IP 자동 탐지 | 자동 (도메인 추가시에만 수동) |
+| 기존 프로젝트 위젯 | — | **전부 재생성** (새 주소 재박제) |
+
+#### 0.11.8 커밋 이력 (2026-08-30 후반)
+
+`597b095` LAN 허용 → `0eccdd0` test-results T-026 → `2eb18e9` 배포문서 §5.1 → `07e19df` SECURE_COOKIES → `ae8e3f9` 모바일 위젯 → `6eb0ee0` 위젯 no-cache → `0d50d3c` 음성입력 → `bfc49c9` 자기 IP 자동 탐지
 
 ---
 

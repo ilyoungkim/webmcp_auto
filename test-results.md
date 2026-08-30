@@ -305,6 +305,31 @@
 
 ---
 
+### T-030. 운영 서버 이관 대비 — ALLOWED_HOSTS 자기 IP 자동 탐지 (커밋 bfc49c9)
+- **요구**: 운영 서버에서 `ifconfig`로 나오는 자기 주소를 **모두** 자동 허용 (도메인 없이 IP 직접 접속 포함)
+- **구현**: `settings.py`에 `_detect_host_ips()` 신설
+  - `socket.gethostbyname_ex(hostname)` + **SIOCGIFCONF ioctl** (fcntl)로 모든 인터페이스 IPv4 전수 탐지
+  - 루프백 제외, 중복 제거 후 `ALLOWED_HOSTS`에 병합
+  - `ALLOW_SELF_IP` env(기본 `true`)로 on/off
+  - 탐지 실패 시에도 기동이 죽지 않는 폴백
+- **검증**:
+  | 항목 | 결과 |
+  |---|---|
+  | Mac 로컬 탐지 | ✅ `127.0.0.1, 192.168.31.248, 192.168.64.1` |
+  | Django 로드 후 ALLOWED_HOSTS | ✅ 자동 병합 확인 |
+  | ko 컨테이너 | ✅ `..., 0.0.0.0, 172.21.0.6` (컨테이너 IP까지) |
+  | en 컨테이너 | ✅ `..., 172.21.0.8` |
+  | ko/en 헬스체크(localhost + LAN) | ✅ 200/200/200 |
+- **효과**: 운영 서버 이관 시 **코드 수정 없이** 자기 IP 전부 허용 (재부팅/IP 변경 후에는 재시작으로 재탐지)
+- **유의**: `SAAS_PUBLIC_URL`/`CSRF_TRUSTED_ORIGINS`는 위젯 assetBase **박제용 주소**라 별도 수동 갱신 필요 (T-028)
+
+### T-031. SECURE_COOKIES 운영 전환 — 사용자 판단으로 유예
+- **요청 경위**: 운영기 배포를 위해 `SECURE_COOKIES=true` 전환 검토 → **사용자가 "아직 운영기 아니니 true는 취소"로 확정**
+- **결정**: 개발 환경(LAN http)이므로 `false` 유지 — 스마트폰/브라우저 로그인 정상 유지
+- **기록**: 운영 전환 시점에 `true`로 되돌리는 것이 확정된 미래 작업 (§5.1 + compose 주석 참고)
+
+---
+
 ## 부록 A. 커밋 이력 (시간 순)
 
 | 커밋 | 내용 |
@@ -324,6 +349,9 @@
 | `8ab4abf` | test-results.md T-027 추가 |
 | `6eb0ee0` | 위젯 에셋 no-cache — 모바일 캐시 방지 (갤럭시 런처 미표출 해결) |
 | `0d50d3c` | 음성입력 갤럭시 대응 — 오류피드백 + HTTPS 필요 안내 + 8초 타임아웃 |
+| `1410158` | test-results.md T-029 추가 |
+| `bfc49c9` | ALLOWED_HOSTS 자기 IP 자동 탐지 (`_detect_host_ips`) — 운영 배포 준비 |
+| `f31c23c`/`ce780c2` | test-results.md 커밋 이력 갱신 |
 | `ce780c2` | test-results.md 커밋 이력 갱신 |
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
