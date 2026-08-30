@@ -267,6 +267,23 @@
 
 ---
 
+### T-028. 갤럭시(S26)에서 위젯 런처 미표출 — 진짜 원인 발견/수정 (커밋 6eb0ee0)
+- **증상**: iOS safe-area 조치 후에도 갤럭시에서 preview에 AI 런처 안 보임
+- **재조사**: 서빙 CSS/safe-area 정상, 런처 DOM 생성 로직 정상 → 위젯 config 실물 확인
+- **진짜 원인**: 위젯 `config_json`의 **`assetBase`/`proxyEndpoint`가 `http://localhost:8080`으로 박제** (LAN 전환 이전에 생성된 프로젝트). 갤럭시에서 `localhost`는 **폰 자신** → 위젯 JS/CSS 404 → 런처 표출 실패. 데스크톱(서버 자체)에서는 localhost가 서버라 멀쩡히 동작했던 것
+- **수정**:
+  1. DB UPDATE — 기존 is_current 위젯의 `config_json` 내 `http://localhost:8080`/`127.0.0.1` → `http://192.168.31.248:8080` 치환
+  2. `widget_asset()` 서빙에 **`Cache-Control: no-cache, must-revalidate`** 추가 — 모바일 브라우저의 공격적 캐시로 구버전 JS/CSS가 남는 문제 예방
+- **검증**:
+  | 항목 | 결과 |
+  |---|---|
+  | 위젯 config assetBase | ✅ `http://192.168.31.248:8080/widget-dist/` |
+  | preview HTML의 proxyEndpoint | ✅ `http://192.168.31.248:8080/api/chat/` |
+  | 위젯 에셋 Cache-Control | ✅ `no-cache, must-revalidate` |
+- **교훈**: 위젯 주소는 **빌드 시점 SAAS_PUBLIC_URL에 고정 박제**된다. 공개 주소를 바꾸면 기존 위젯은 "재생성/재빌드" 필수 — 아니면 LAN 사용자 위젯 로드 실패 (config 박제 특성)
+
+---
+
 ## 부록 A. 커밋 이력 (시간 순)
 
 | 커밋 | 내용 |
@@ -283,6 +300,8 @@
 | `0eccdd0` | test-results.md T-026 LAN 접속 테스트 추가 |
 | `2eb18e9` | DEPLOY_PORUDCTION.md §5.1 LAN 접속 절차 문서화 |
 | `07e19df` | SECURE_COOKIES 스위치 — LAN http 로그인 쿠키 폐기 문제 수정 |
+| `8ab4abf` | test-results.md T-027 추가 |
+| `6eb0ee0` | 위젯 에셋 no-cache — 모바일 캐시 방지 (갤럭시 런처 미표출 해결) |
 | `ce780c2` | test-results.md 커밋 이력 갱신 |
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
