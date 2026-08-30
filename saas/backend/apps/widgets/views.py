@@ -187,7 +187,10 @@ def widget_asset(request, path):
 
 @xframe_options_exempt
 def preview_html(request, pk):
-    """동일 오리진 데모 HTML — iframe 내 렌더링을 위해 xframe_options_exempt 적용."""
+    """동일 오리진 데모 HTML — iframe 내 렌더링을 위해 xframe_options_exempt 적용.
+
+    사일로 언어(프로젝트 lang)에 따라 안내 문구를 한국어/영어로 표시한다.
+    """
     if not request.user.is_authenticated:
         return HttpResponse('login required', status=401)
     project = Project.objects.filter(pk=pk).first()
@@ -196,10 +199,17 @@ def preview_html(request, pk):
     w = Widget.current(project)
     config = w.config_json if w else '{}'
     base = '/widget-dist/'
+    lang = (getattr(project, 'lang', '') or 'ko').lower()
+    if lang == 'en':
+        html_title = f'{project.name} Demo'
+        hint = 'Check the AI assistant with the 💬 button at the bottom-right.'
+    else:
+        html_title = f'{project.name} 데모'
+        hint = '우하단 💬 버튼으로 AI 비서를 확인하세요.'
     html = f"""<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"/>
+<html lang="{lang}"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>{project.name} 데모</title>
+<title>{html_title}</title>
 <style>body{{font-family:sans-serif;margin:0;padding:48px;background:#fafafa}}
 .hero{{max-width:720px;margin:0 auto}}h1{{color:#0e7490}}</style>
 <script>window.WebMCPConfig = {config};</script>
@@ -208,6 +218,6 @@ def preview_html(request, pk):
 <script src="{base}widget.js"></script>
 </head><body><div class="hero">
 <h1>{project.name}</h1>
-<p>우하단 💬 버튼으로 AI 비서를 확인하세요.</p>
+<p>{hint}</p>
 </div></body></html>"""
     return HttpResponse(html)
