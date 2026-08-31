@@ -184,3 +184,39 @@ echo | openssl s_client -connect 127.0.0.1:8443 -servername webmcp.duckdns.org 2
 3. `docker-compose.silo.yml`에 서비스 5개 추가 (postgres-XX, backend-XX, worker-XX, frontend-XX, nginx-XX)
 4. `.env`에 `GEMINI_API_KEY_XX` 설정(선택)
 5. `up -d --build` → `migrate` → 시드 → nginx 설정 추가
+## 8. Render Blueprint (클라우드 원클릭 포팅)
+
+> Linux 서버 대신 **Render**에 올린다면 repo 루트의 **`render.yaml`** (Blueprint)으로
+> 웹 2 + 워커 2 + DB 2를 한 번에 프로비저닝할 수 있다.
+
+```bash
+# 구성 요약 (render.yaml)
+#   databases: webmcp-postgres-ko / webmcp-postgres-en  (Managed PG, plan basic-256mb)
+#   services:
+#     webmcp-web-ko    (web,    Dockerfile.backend, healthCheck /api/health/)
+#     webmcp-worker-ko (worker, dockerCommand: run_pipeline_worker --interval 2.0)
+#     webmcp-web-en    / webmcp-worker-en (동일 구성의 en 사일로)
+```
+
+**배포 절차**
+1. Render Dashboard → `New → Blueprint` → 이 저장소 선택 (render.yaml 자동 인식)
+2. `sync: false` 항목 입력 (GEMINI_API_KEY, OPENROUTER_API_KEY, SAAS_PUBLIC_URL, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS)
+3. 첫 배포 완료 후 헬스체크 `https://webmcp-ko.onrender.com/api/health/` 확인
+
+**필수 코드 조정 (1줄)** — entrypoint가 0.0.0.0:8000 고정이므로 Render 포트와 맞추려면:
+```dockerfile
+# docker/Dockerfile.backend 의 CMD → 환경변수 PORT 지원
+# docker-entrypoint.sh 의 gunicorn bind 를 다음으로 교체 권장:
+#   --bind "0.0.0.0:${PORT:-8000}"
+```
+
+**요금 개요**
+| 서비스 | 플랜 | 월 |
+|---|---|---|
+| Web ×2 (starter) | 512MB | $7 × 2 |
+| Worker ×2 (starter) | — | $7 × 2 |
+| PostgreSQL ×2 (basic-256mb) | | $6.90 × 2 |
+| **합계** | | **약 $28/mo** |
+
+- 개발 검증은 ko 1개(web+worker+db ≈ $14/mo)로 먼저 시작하는 것을 권장.
+- 프론트(Nuxt)를 Cloudflare Pages로 분리하면 비용·성능 모두 개선 가능.

@@ -1,0 +1,176 @@
+# render.yaml — Render Blueprint (IaC) for WebMCP Auto 사일로
+# ─────────────────────────────────────────────────────────────────
+# GitHub 연동 배포용 Blueprint.
+#  - ko/en 사일로를 한 Blueprint로 정의 (웹 2 + 워커 2 + DB 2)
+#  - 웹은 docker/Dockerfile.backend 사용, 워커는 같은 이미지에
+#    startCommand 오버라이드로 run_pipeline_worker 실행
+#  - DB는 Render Managed PostgreSQL (자동 프로비저닝 + DATABASE_URL 주입)
+#
+# 사용법:
+#   1) GitHub에서 이 저장소를 선택 → Render Dashboard "New → Blueprint"
+#      (또는 repo 루트에 이 파일이 있으면 자동 인식)
+#   2) 각 서비스의 envValue는 대시보드/Secret Files에서 채움 (아래 placeholders)
+#   3) 배포 후 최초 1회: 웹 서비스 Shell에서
+#        python manage.py seed_catalogs && python manage.py seed_admin
+#      (entrypoint가 자동 수행하므로 보통 불필요)
+#
+# 포트: Render는 $PORT 자동 주입 — Gunicorn을 0.0.0.0:$PORT로 바인딩해야 한다.
+#       (entrypoint 기본 8000 → PORT 오버라이드)
+
+# ── 공통 환경변수 ───────────────────────────────────────────────
+envVars:
+  - key: DJANGO_DEBUG
+    value: "false"
+  - key: SECURE_COOKIES            # https 환경이므로 Secure 쿠키 사용
+    value: "true"
+  - key: WEBMCP_LANGS
+    value: ko                      # 웹 서비스별로 ko/en 개별 정의 (아래)
+  - key: TERSER_CMD
+    value: terser
+  - key: GUNICORN_WORKERS
+    value: "2"
+  - key: GUNICORN_THREADS
+    value: "2"
+  - key: LOG_RETENTION_DAYS
+    value: "28"
+
+# ─────────────────────────────────────────────────────────────────
+# 데이터베이스 (ko / en 사일로 분리)
+# ─────────────────────────────────────────────────────────────────
+databases:
+  - name: webmcp-postgres-ko
+    databaseName: webmcp_ko
+    user: webmcp
+    plan: basic-256mb            # 개발용 최소 — 운영 시 standard 이상 권장
+    postgresMajorVersion: "16"   # Render 관리형 최대치 (자체 호스팅은 18 가능)
+
+  - name: webmcp-postgres-en
+    databaseName: webmcp_en
+    user: webmcp
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+# ─────────────────────────────────────────────────────────────────
+# ko 사일로
+# ─────────────────────────────────────────────────────────────────
+services:
+  - type: web                    # Django 웹 (ko)
+    name: webmcp-web-ko
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.backend
+    dockerContext: .
+    plan: starter                # 512MB — 개발 검증용, 스테이징은 standard 권장
+    healthCheckPath: /api/health/
+    envVars:
+      - key: WEBMCP_LANG
+        value: ko
+      - key: GUNICORN_WORKERS
+        sync: false              # 대시보드에서 조정 가능
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webmcp-postgres-ko
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false              # 대시보드에서 입력 ( Secret )
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: SAAS_PUBLIC_URL
+        sync: false              # 예: https://webmcp-ko.onrender.com
+      - key: ALLOWED_HOSTS
+        sync: false              # 예: webmcp-ko.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false              # https://webmcp-ko.onrender.com
+      - key: SUPPORT_PHONE
+        sync: false
+
+  - type: worker                 # 파이프라인 워커 (ko) — 무한 루프 백그라운드
+    name: webmcp-worker-ko
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.backend
+    dockerContext: .
+    # 같은 이미지, 다른 시작 커맨드 — 워커는 gunicorn 대신 파이프라인 루프 실행
+    dockerCommand: python manage.py run_pipeline_worker --interval 2.0
+    plan: starter
+    envVars:
+      - key: WEBMCP_LANG
+        value: ko
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webmcp-postgres-ko
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+  # ───────────────────────────────────────────────────────────────
+  # en 사일로
+  # ───────────────────────────────────────────────────────────────
+  - type: web                    # Django (en)
+    name: webmcp-web-en
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.backend
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /api/health/
+    envVars:
+      - key: WEBMCP_LANG
+        value: en
+      - key: WEBMCP_LANGS
+        value: en
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webmcp-postgres-en
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY_EN   # en 전용 키(선택) — 없으면 삭제해도 무방
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: SAAS_PUBLIC_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+
+  - type: worker                 # 파이프라인 워커 (en)
+    name: webmcp-worker-en
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.backend
+    dockerCommand: python manage.py run_pipeline_worker --interval 2.0
+    plan: starter
+    envVars:
+      - key: WEBMCP_LANG
+        value: en
+      - key: WEBMCP_LANGS
+        value: en
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webmcp-postgres-en
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+# ─────────────────────────────────────────────────────────────────
+# 참고
+#  1) runtime: docker + dockerfilePath/dockerContext 로 기존 Dockerfile 재사용.
+#     Render는 포트를 자동 감지하지 않으므로 앱이 $PORT 또는 8000에서 Listen 해야 함.
+#     entrypoint가 0.0.0.0:8000 고정 → Render가 자동 감지(포워딩)하므로 보통 무방.
+#  2) preview/1 같은 경로 = Django의 /preview/<pk>/ — URL은 Render 할당 도메인.
+#  3) 관리형 PG의 최대 연결 수 제한이 있어 Gunicorn workers는 2 권장.
+#  4) sync: false 항목은 첫 배포 시 대시보드에서 값을 입력해야 activate 된다.
+#  5) 무료 플랜: Web 1 + Postgres 1 만 무료. 워커/2DB는 유료 플랜 필요 ($7~15/mo).
+#  6) 스포/사설망 접속제어(IP 화이트리스트/Bruteforce 방어)는 앱 내 정책 그대로 동작.
+# ─────────────────────────────────────────────────────────────────
