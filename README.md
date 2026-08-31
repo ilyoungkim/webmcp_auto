@@ -365,3 +365,4 @@ ko/en 사일로는 **동일 코드베이스**에서 `WEBMCP_LANG` env로 언어�
 - [`plan.md`](plan.md) — 전체 설계·구현 현황·API 스펙
 - [`docker/HOWTO.md`](docker/HOWTO.md) — Docker 설치·운영·백업
 - [`DEPLOY_PORUDCTION.md`](DEPLOY_PORUDCTION.md) — 프로덕션 배포
+- [`PORTING.md`](PORTING.md) — **다른 서버로 포팅 가이드** (136 배포판 기준 전체 절차·트러블슈팅 FAQ)

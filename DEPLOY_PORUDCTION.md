@@ -652,3 +652,9 @@ nginx -s stop  -c ~/webmcp_auto/webmcp_silo_https.conf   # 정지
   → DuckDNS 갱신 시 반드시 `ip=192.168.31.136` 명시.
 - 136의 8080은 wiki-engine이 사용 → 사일로는 **18080/18081** 고정.
 - Mac 개발 환경의 `SAAS_PUBLIC_URL`(192.168.0.5)과 136 배포본(`webmcp.duckdns.org`)은 서버별로 다름 — 소스는 동일.
+
+### 13.5 포팅 가이드
+
+> 이 구성을 **다른 서버에 동일하게 이식**하는 전체 절차(사전 요건/소스 확보/
+> 포트 계획/SSL 발급/검증 체크리스트/트러블슈팅 FAQ)는
+> **[`PORTING.md`](PORTING.md)** 참조 — 136 배포판 기준 실측 문서.
