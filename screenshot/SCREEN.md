@@ -113,92 +113,93 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 
 ---
 
-# 파트 B — 영어 사일로 (en, 포트 8081) 설명
+# Part B — English Silo (en, port 8081) Explanation
 
-> 여기부터는 **en 사일로** 설명이다. 같은 코드베이스지만 `NUXT_PUBLIC_SILO_LANG=en` 주입으로
-> 모든 UI가 영어로 렌더링된다. ko 사일로의 화면 구성과 1:1로 대응하며 **언어만 다르다**.
+> This section explains the **en silo**. Same codebase, but with `NUXT_PUBLIC_SILO_LANG=en`
+> injected, all UI is rendered in English. Screens map 1:1 to the ko silo —
+> **only the language differs**.
 
-## B-1. 로그인 화면
+## B-1. Login Screen
 
-### `en-login.png` — 영어 로그인 화면
+### `en-login.png` — English Login Screen
 <a href="en-login.png"><img src="en-login.png" alt="en-login" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
 
-**영어 로그인 화면.** "Log in" / "Sign up" — ko의 `ko-login.png`와 같은 URL 경로(`/login`)이며 UI 문구가 사일로 언어를 따르는 것 = useSilo(또는 SSR env) 기반 i18n의 기본 동작 확인.
+**English login screen.** "Log in" / "Sign up" — same URL path (`/login`) as `ko-login.png` in the ko silo. The UI copy following the silo language on the identical route confirms the useSilo (SSR env) based i18n works.
 
-## B-2. 개인 사용자 (tensun@naver.com)
+## B-2. Individual User (tensun@naver.com)
 
-### `en-user-01-dashboard.png` — My Projects
+### `en-user-01-dashboard.png` — My Projects (Dashboard)
 <a href="en-user-01-dashboard.png"><img src="en-user-01-dashboard.png" alt="en-user-01-dashboard" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 제목 **My Projects**, 안내 `📌 You can create up to 5 projects.` — en 사일로 카피가 영어로 표시.
-- 소유 프로젝트 5개: **delta dentalins / realtor / autolist / edmunds / stanfordhealthcare**.
-- 프로젝트 상태 배지가 한국어가 아닌 **`Completed 100%` / `Failed 10%`** 로 렌더링 — STATUS_LABELS가 useSilo computed로 언어 전환되는 부분 확인.
-- edmunds 실패 건에는 안내 문구 `Regenerate, or contact us at 02-888-9999.` — 오류 시 지원 연락처 자동 노출.
+- Heading **My Projects**, hint `📌 You can create up to 5 projects.` — en silo copy rendered in English.
+- 5 owned projects: **delta dentalins / realtor / autolist / edmunds / stanfordhealthcare**.
+- Status badges render as **`Completed 100%` / `Failed 10%`** rather than Korean — confirming STATUS_LABELS is a useSilo computed that switches with language.
+- The failed edmunds card shows `Regenerate, or contact us at 02-888-9999.` — support contact auto-exposed on errors.
 
 ### `en-user-02-project-detail.png` — Project Detail (stanfordhealthcare)
 <a href="en-user-02-project-detail.png"><img src="en-user-02-project-detail.png" alt="en-user-02-project-detail" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- ko 화면과 동일 구성이지만 모두 영어: 소스 목록 **Collected sources (10)**, 설치 안내는 **Installation & Usage** 영어 컴포넌트(`InstallGuideEn.vue`), 정적 문서는 **Terms & Policies** 영어 컴포넌트(`TermsEn.vue` — 이용약관/AI Disclosure/Privacy Policy/Program Use Agreement).
-- Quick menus: About / Doctors / Treatments / Contact / **About AI Assistant** (필수 메뉴의 영어 라벨).
-- 고객센터 Q&A 영어 문구("Ask a question…", 0/2000 카운터).
+- Same layout as the ko screen but entirely in English: source list **Collected sources (10)**, installation guide as the English component **Installation & Usage** (`InstallGuideEn.vue`), static docs as **Terms & Policies** (`TermsEn.vue` — Terms of Service / AI Disclosure / Privacy Policy / Program Use Agreement).
+- Quick menus: About / Doctors / Treatments / Contact / **About AI Assistant** (English label of the required menu).
+- Customer Center Q&A copy in English ("Ask a question…", 0/2000 counter).
 
-### `en-user-03-preview-widget.png` — 위젯 미리보기 (런처 닫힘)
+### `en-user-03-preview-widget.png` — Widget Preview (Launcher Closed)
 <a href="en-user-03-preview-widget.png"><img src="en-user-03-preview-widget.png" alt="en-user-03-preview-widget" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 배지 **Preview**, 안내 `Check the AI assistant with the 💬 button at the bottom-right.` — `preview_html()`의 en 분기 문구.
-- ko와 동일한 데모 레이아웃/런처 위치로 **언어만 다름** → 사일로 격리 + UI 공통 구조 확인.
+- **Preview** badge and hint `Check the AI assistant with the 💬 button at the bottom-right.` — the en branch of `preview_html()`.
+- Same demo layout/launcher position as ko with **only the language differing** → confirms silo isolation with a shared UI structure.
 
 ### `en-user-04-profile.png` — My Profile
 <a href="en-user-04-profile.png"><img src="en-user-04-profile.png" alt="en-user-04-profile" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- **월 결제 금액 $49** (en 사일로 기본가, USD). ko(50,000원)와 같은 화면이 `DEFAULT_MONTHLY_PRICE={'ko':('KRW',50000),'en':('USD',49)}`로 갈라짐.
-- 라벨 전체 영어: ID (email) / Name / Change Password / Primary phone / Billing 등 — useSilo prof.* 키 적용.
-- 통화 표기도 `$49` 로케일 연동(이번 커밋의 `fmtPrice` 로케일 분기 결과).
+- **Monthly price $49** (en silo default, USD). The same screen shows 50,000 KRW in ko — split by `DEFAULT_MONTHLY_PRICE={'ko':('KRW',50000),'en':('USD',49)}`.
+- All labels in English: ID (email) / Name / Change Password / Primary phone / Billing, etc. — useSilo prof.* keys.
+- Currency display `$49` is locale-aware (result of the `fmtPrice` locale branch added in this change set).
 
 ### `en-user-05-new-project.png` — New Project
 <a href="en-user-05-new-project.png"><img src="en-user-05-new-project.png" alt="en-user-05-new-project" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- Industry Category 5개(**Healthcare / Legal / Education & Counseling / Company / Others**) + Widget Theme 5종 — 카탈로그 27종이 영어로 노출되는 것의 진입점.
-- 업종별 세부 유형은 Company 선택 시 15개(Chemical, Biotech, Healthcare, Pharma, Electronics, Logistics, Research, Investment, Consulting, Knowledge, Tech, Sales, Construction, Retail, Company) 영어 라벨.
+- 5 Industry Categories (**Healthcare / Legal / Education & Counseling / Company / Others**) + 5 Widget Themes — the entry point to the 27-type catalog rendered in English.
+- Sub types per industry: selecting Company lists 15 English labels (Chemical, Biotech, Healthcare, Pharma, Electronics, Logistics, Research, Investment, Consulting, Knowledge, Tech, Sales, Construction, Retail, Company).
 
-### `en-user-06-widget-open.png` — 위젯 열림 (영어 UI)
+### `en-user-06-widget-open.png` — Widget Open (English UI)
 <a href="en-user-06-widget-open.png"><img src="en-user-06-widget-open.png" alt="en-user-06-widget-open" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 미리보기에서 AI 런처 클릭 → 패널 오픈.
-- 헤더 제목 **stanfordhealthcare AI Assistant** (config.title en 분기), 상태 배지 **✅ Connected**, Quick menu pills(About/Doctors/Treatments/Contact/About AI Assistant), 입력 placeholder **Type a message...**, 런처 라벨 **Voice input**, `⚙️ How it works` — 전부 위젯 I18N 사전(32키)에서 가져온 영어.
-- 시간 표시 `09:48 AM` — 위젯 시계도 사일로 로케일(`en-US`) 적용.
+- Clicking the AI launcher in the preview opens the panel.
+- Header title **stanfordhealthcare AI Assistant** (en branch of config.title), status badge **✅ Connected**, quick menu pills (About/Doctors/Treatments/Contact/About AI Assistant), input placeholder **Type a message...**, mic label **Voice input**, and `⚙️ How it works` — all served from the widget I18N dictionary (32 keys).
+- The clock shows `09:48 AM` — the widget clock also uses the silo locale (`en-US`).
 
-### `en-user-07-widget-answer.png` — 위젯 실시간 대화 (영어 답변)
+### `en-user-07-widget-answer.png` — Widget Live Chat (English Answer)
 <a href="en-user-07-widget-answer.png"><img src="en-user-07-widget-answer.png" alt="en-user-07-widget-answer" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 입력창에 "What treatments does Stanford Healthcare offer?" 직접 전송 → LLM 응답 수신.
-- 답변이 **영어 마크다운**(bold 섹션 + 불릿)으로 생성되고 **실제 사이트 정보만 인용**: Emergency Department 911 / Express Care / Primary Care / Specialized Treatments, 예약 방법(MyHealth Portal 링크, **650-498-3333**, **GuestServices@stanfordhealthcare.org**).
-- = en 사일로 system_prompt + 프록시(`/api/chat/`) + 서버 부착 지식 요약 파이프라인이 end-to-end 동작.
+- Sent "What treatments does Stanford Healthcare offer?" directly via the input → received the LLM response.
+- The answer is generated as **English markdown** (bold sections + bullets) and cites **only real site data**: Emergency Department 911 / Express Care / Primary Care / Specialized Treatments, plus booking info (MyHealth Portal link, **650-498-3333**, **GuestServices@stanfordhealthcare.org**).
+- = the en silo system_prompt + proxy (`/api/chat/`) + server-attached knowledge summary pipeline works end-to-end.
 
-## B-3. 관리자 (admin@local)
+## B-3. Admin (admin@local)
 
 ### `en-admin-01-dashboard.png` — Admin Dashboard
 <a href="en-admin-01-dashboard.png"><img src="en-admin-01-dashboard.png" alt="en-admin-01-dashboard" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- **🛠 Manage Projects / 📮 Error Reports** 링크, 본인 프로젝트 1개(Stanford Healthcare, Completed 100%) — 개인 대시보드와 동일 구성에 관리 링크만 추가된 모습.
+- **🛠 Manage Projects / 📮 Error Reports** links, plus 1 own project (Stanford Healthcare, Completed 100%) — same layout as the user dashboard with admin links added.
 
-### `en-admin-02-admin-projects.png` — Manage Projects (진입)
+### `en-admin-02-admin-projects.png` — Manage Projects (Entry)
 <a href="en-admin-02-admin-projects.png"><img src="en-admin-02-admin-projects.png" alt="en-admin-02-admin-projects" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 계정 선택 드롭다운이 영어로 표시: `admin@local (Admin) — $49 (Default)` / `tensun@naver.com — $49 (Default)`.
-- 안내 문구 `Select an account to see the projects created by that account.` — admin.projects.* 키 적용.
+- Account selector dropdown in English: `admin@local (Admin) — $49 (Default)` / `tensun@naver.com — $49 (Default)`.
+- Hint `Select an account to see the projects created by that account.` — admin.projects.* keys applied.
 
-### `en-admin-03-billing-panel.png` — 사용자별 결제/연락처 설정 (en)
+### `en-admin-03-billing-panel.png` — Per-user Billing/Contact Settings (en)
 <a href="en-admin-03-billing-panel.png"><img src="en-admin-03-billing-panel.png" alt="en-admin-03-billing-panel" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- tensun@naver.com 선택 → 결제 패널 영어 버전:
-  - **$49 (Default)**, Phone 1/Phone 2, Monthly price 입력 + 통화 콤보(**KRW(원) / USD($)** — 옵션 라벨은 통용 목적으로 한글 유지).
-  - 설명 문구 `Default price: $49 / month — enter 1+ for enterprise pricing, or leave empty / 0 for the default price.` — 0 입력 시 기본 복귀 규칙까지 영어로 안내.
-- 하단 프로젝트 목록 5건(Delta Dentalins=**Dental**/Completed, realtor=**Real Estate**, autolist=**Retail**, edmunds=Retail/**Failed**, stanfordhealthcare=**Hospital**) — 이번 카탈로그 대칭화(27종)로 en에 추가된 도메인 배지가 그대로 보임.
-- **Customer Center Q&A (0)** — 관리자가 답변 등록하는 영역도 영어화.
+- Selecting tensun@naver.com → the English version of the billing panel:
+  - **$49 (Default)**, Phone 1/Phone 2, Monthly price input + currency combo (**KRW(원) / USD($)** — the option labels keep Korean for universal recognition).
+  - Copy: `Default price: $49 / month — enter 1+ for enterprise pricing, or leave empty / 0 for the default price.` — even the "0 resets to default" rule is explained in English.
+- The project list below shows 5 rows (Delta Dentalins=**Dental**/Completed, realtor=**Real Estate**, autolist=**Retail**, edmunds=Retail/**Failed**, stanfordhealthcare=**Hospital**) — domain badges newly added to en by the 27-type catalog symmetric seeding are visible as-is.
+- **Customer Center Q&A (0)** — the admin answer area is also fully in English.
 
 ### `en-admin-04-admin-profile.png` — Admin Profile
 <a href="en-admin-04-admin-profile.png"><img src="en-admin-04-admin-profile.png" alt="en-admin-04-admin-profile" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 문의 연락처 섹션(**Support contact**) + 개인 계정/비밀번호/연락처/Billing 편집 — ko 관리자 프로필과 1:1 대응의 영어판.
+- The **Support contact** section (site-wide) plus account/password/contact/Billing editing — the 1:1 English counterpart of the ko admin profile.
 
 ### `en-admin-05-chat-errors.png` — Error Reports
 <a href="en-admin-05-chat-errors.png"><img src="en-admin-05-chat-errors.png" alt="en-admin-05-chat-errors" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- 오류 신고 관리 화면 — 빈 상태 문구 영어(`admin.errors.empty` = "No error reports."). 프로젝트/질문/상세 컬럼 라벨 포함.
+- Error report management screen — empty-state copy in English (`admin.errors.empty` = "No error reports."). Project/Question/Detail column labels included.
 
 ### `en-admin-06-manual.png` — Integration Manual (`/manual`)
 <a href="en-admin-06-manual.png"><img src="en-admin-06-manual.png" alt="en-admin-06-manual" width="720" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- **영어 전용 매뉴얼 페이지**. 1) Recommended installation(한 줄 스크립트) 2) Self-hosted bundle(bundle.zip 구성 코드) 3) Register Origin 4) Troubleshooting(403/429/CSP 해설).
-- 이전에는 한글 고정이던 `/manual`이 useSilo `manual.*` 10키로 사일로 언어를 따르게 된 직접적인 결과(=이번 i18n 개선의 대표 사례).
+- **English-only manual page**: 1) Recommended installation (one-line script) 2) Self-hosted bundle (bundle.zip contents/code) 3) Register Origin 4) Troubleshooting (403/429/CSP explanations).
+- `/manual` used to be hardcoded in Korean; it now follows the silo language via the 10 useSilo `manual.*` keys — a direct result (and representative case) of this i18n improvement.
 
 ---
 
