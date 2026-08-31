@@ -600,3 +600,55 @@ ko/en 사일로는 동일 코드베이스에서 `WEBMCP_LANG` env로 언어가 �
 > 언어 사일로 모듈: `saas/backend/core/langsilo.py` (`SUPPORTED_LANGS=('ko','en')`)
 > 카탈로그: ko 27종 / en 27종 완전 대칭 (각 4메뉴 = 일반메뉴 108개)
 > i18n: 백엔드 msg() 37키, 위젯 I18N 32키, useSilo 226키 — 모두 ko/en 대칭
+
+---
+
+## 13. 136 서버 운영 배포 (2026-08-31 완료)
+
+> 개발판(saas ko/en)을 **192.168.31.136 서버에 Docker로 구축**하고
+> `webmcp.duckdns.org` 공인 인증서로 경고 없는 HTTPS를 제공한다.
+
+### 13.1 아키텍처
+
+```
+LAN 기기(예: 192.168.31.145)
+   │ https://webmcp.duckdns.org:8443 (ko) / :8444 (en)
+   ▼
+136 호스트 nginx  (TLS 종료 — Let's Encrypt 공인 인증서)
+   ├─ → 127.0.0.1:18080  Docker ko 사일로 (webmcp-ko-nginx → backend-ko/frontend-ko)
+   └─ → 127.0.0.1:18081  Docker en 사일로
+기존 :443 (구버전 webmcp standalone) / :8080 (wiki-engine) 은 그대로 유지
+```
+
+### 13.2 구성 위치 (136: tensun 홈)
+
+| 항목 | 경로 |
+|---|---|
+| 소스 | `~/webmcp_auto/saas/{backend, frontend, widget-dist}` |
+| Docker | `~/webmcp_auto/docker/{docker-compose.silo.yml, Dockerfile.*, nginx-*.conf}` |
+| SSL | `~/webmcp_auto/ssl/{fullchain.cer, webmcp.duckdns.org.key}` |
+| nginx 설정 | `~/webmcp_auto/webmcp_silo_https.conf` (독립 인스턴스, pid/logs는 사용자 홈) |
+
+### 13.3 운영 명령
+
+```bash
+# 사일로 재기동/빌드
+ssh tensun@192.168.31.136
+cd ~/webmcp_auto/docker
+DOCKER_HOST=unix:///var/run/docker.sock docker compose -f docker-compose.silo.yml up -d --build
+
+# 사일로 HTTPS nginx (sudo 불필요 — 1024 초과 포트, pid/tmp를 홈에 배치)
+nginx -c ~/webmcp_auto/webmcp_silo_https.conf          # 시작
+nginx -s reload -c ~/webmcp_auto/webmcp_silo_https.conf  # 설정 변경 후
+nginx -s stop  -c ~/webmcp_auto/webmcp_silo_https.conf   # 정지
+
+# SSL 자동갱신: acme.sh가 DNS-01(DuckDNS)로 갱신 + reloadcmd로 nginx 자동 restart
+# (토큰은 ~/.acme.sh/account.conf 에 저장됨)
+```
+
+### 13.4 주의
+
+- **DNS = 192.168.31.136 (사설 IP)**: LAN 전용. 공인 IP로 자동갱신하면 인터넷에 노출되고 LAN 접속이 깨진다.
+  → DuckDNS 갱신 시 반드시 `ip=192.168.31.136` 명시.
+- 136의 8080은 wiki-engine이 사용 → 사일로는 **18080/18081** 고정.
+- Mac 개발 환경의 `SAAS_PUBLIC_URL`(192.168.0.5)과 136 배포본(`webmcp.duckdns.org`)은 서버별로 다름 — 소스는 동일.

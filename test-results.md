@@ -399,6 +399,70 @@
 | `89049fc` | README.md compose 전문 백업(복구용) + silo.yml 실행안내 주석 최신화 |
 | `9a57701` | nginx Docker DNS resolver 전환 — 정적 upstream 캐시 502 근본 방지 |
 | `9a57702` | test-results.md T-033 502 복구·검증 기록 |
+| `4baf95b` | 사일로 i18n 정합성 — en 한국어 노출 6건 해소 (위젯 I18N 32키, ask() lang, msg() 37키, /manual, 로케일) |
+| `5398145` | 카탈로그 ko/en 완전 대칭 — 27종 × 4메뉴 = 108개 (edu_counsel 코드 통일, company_tech 추가) |
+| `4590f56` | 문서: 구조적 특성(설계상 의도) 섹션 3개 md 반영 |
+| `38ad594`~`778bf26` | screenshot/ 27장 + SCREEN.md (임베드·테두리·파트 A/B 구조·이미지 확대) |
+| `38ad594`~ | 테스트 스크린샷 수집(27장) + SCREEN.md 문서화 |
+| `07fff6b` | SCREEN.md 이미지 임베드 (상대경로) |
+| `ce78f45` | SCREEN.md 파트 A(한국어)/파트 B(영어) 구조 재편 |
+| `cc85434` | SCREEN.md 이미지 테두리 적용 |
+| `e1fc893` | SCREEN.md 이미지 50% 확대 (720→1080) |
+| `dbb3921` | (원격 머지) IIS ARR 프록시 X-Forwarded-For 포트 포함 형식 → core/clientip.py 신설 |
+
+---
+
+## 2026-08-31 — mac nginx/SSL 구성 및 136 서버 배포 (운영 환경 전환)
+
+### T-034. mac 호스트 nginx 설치·SSL·사일로 리버스 프록시
+- **배경**: 사용자가 mac 호스트 nginx 설치 + SSL + 8080/8081 포워딩 요청 → 이후 **8443/8444**로 포트 확정
+- **설치**: Homebrew `nginx 1.31.4` + `mkcert`
+- **SSL**: `mkcert -install`(CA를 mac 시스템 신뢰 저장소 등록) → localhost/127.0.0.1/192.168.31.248/192.168.64.1 인증서 발급 (`/opt/homebrew/etc/nginx/certs/`)
+- **오류 수정( 실측)**:
+  1. homebrew nginx.conf 기본 서버 블록이 `listen 8080` → Docker와 bind 충돌(`Address already in use`) → **주석 처리 후 기동 성공**
+  2. `nginx -s reload` → PID 파일 불일치(`invalid PID number`) → **`brew services restart nginx` 사용**
+- **설정 파일**: `/opt/homebrew/etc/nginx/servers/webmcp-silo.conf`
+  - `https://localhost:8443` → `http://127.0.0.1:8080` (ko)
+  - `https://localhost:8444` → `http://127.0.0.1:8081` (en)
+  - `X-Forwarded-Proto: https`, `Origin: https://$host` 헤더 전달(CSRF/세션 정합)
+- **검증**: curl(-k 없이) 200 ×2, ko 랜딩 "무료로 시작" / en "Get started free"
+
+### T-035. 외부 컴퓨터 "연결이 비공개… " 오류 2단계 원인 해소
+- **1단계(방화벽)**: macOS 방화벽이 nginx 차단(`Block incoming connections`) → 자기 LAN IP(192.168.31.248) 접속 시 TLS 전 `SSL_ERROR_SYSCALL`로 재현 → `socketfilterfw --unblockapp` 허용 → 자기 LAN IP 200 확인
+- **2단계(인증서 신뢰)**: 그 후 `NET::ERR_CERT_AUTHORITY_INVALID` → **외부 컴퓨터에 mkcert CA 미설치**가 근본 원인 (mkcert 로컬 신뢰는 그 Mac에만 유효)
+
+### T-036. DuckDNS + Let's Encrypt 공인 인증서 전환 (136 서버)
+- **토큰 검증**: DuckDNS update API로 webmcp.duckdns.org → (사고로 248 → **원복 136** 확정, TTL 60s)
+- **acme.sh 3.1.4 설치** → `dns_duckdns` DNS-01 방식 발급 성공 (env는 `DuckDNS_Token` — DUCKDNS_TOKEN이 아님)
+- **136 nginx 장착**: `~/webmcp_auto/ssl/{fullchain.cer, webmcp.duckdns.org.key}` + `install-cert --reloadcmd`
+- **결과**: `openssl Verify return code: 0 (ok)` — 외부 컴퓨터 경고 없이 도메인 접속 가능
+- **아키텍처 최종**: 
+  - 136 서버 = `webmcp.duckdns.org` (공인 DNS+SSL) / Docker로 ko/en 사일로 구동
+  - 맥은 개발 머신. mac nginx(8443/8444)는 136 안정화 후 제거 예정
+- **DNS 사고 복구**: 진단 중 `ip` 파라미터 없는 갱신 호출이 1회 외부 IP로 A 레코드를 덮어씀 → 즉시 `ip=192.168.31.136` 재호출로 복원 (공용 DNS 조회로 확인 완료)
+
+### T-037. 136 서버에 ko/en 사일로 Docker 배포
+- **전송**: rsync(screenshot/logging/git 제외) → 136 `~/webmcp_auto/{saas, docker, ssl}`
+  - 누락 보완: Dockerfile.backend/frontend, silo.yml, frontend 소스, `saas/widget-dist/`(compose context 기준 경로) 2차 전송
+- **빌드 실패 2건 해소**: Dockerfile 누락 → 재전송, `saas/widget-dist` 누락 → 복사
+- **포트 충돌**: 8080은 wiki-engine(docker)이 점유 → **18080/18081로 변경**
+- **compose 치환(136 전용)**: `SAAS_PUBLIC_URL=https://webmcp.duckdns.org:8443/8444`, `ALLOWED_HOSTS=webmcp.duckdns.org`, CSRF 오리진 갱신
+- **결과**: 10개 컨테이너 전부 Up, health ok, ko `{"status":"ok"}`
+
+### T-038. 504 Gateway Time-out — "대표 상담사가 누구야?"
+- **증상**: `preview/1` 질문 → 504 (다른 퀵메뉴 질문은 즉답)
+- **실측( 원인)`: Django RequestLog — `blocked_401 llm_error: The read operation timed out` = **Gemini 실시간 API 응답 지연** (nginx 110~120초 타임아웃에 도달). OpenRouter는 정상(0.87s). 재호출 시 200/15.7s로 정상 — 일시적 응답 지연
+- **조치**:
+  1. 구버전 데이터 Origin(`yonza.co.kr`만 허용) → **`https://webmcp.duckdns.org:8443` 갱신** (403 해소)
+  2. ( 권장) 호스트 nginx `proxy_read_timeout 180s` 상향 — 배치 파일 `~/webmcp_auto/webmcp_silo_https.conf`
+- **체크리스트 재정립**: LLM 지연 대응 — 퀵메뉴(DB 캐시)는 즉답, 신규 질문은 Gemini 지연 시 504 가능성 존재 → 타임아웃 정책 조정으로 해소 가능
+
+### 136 DB 데이터 복원
+- **en 백업 복원**: Mac en DB `pg_dump --data-only --inserts` → `auth_permission/django_content_type/django_migrations/django_session` 제외 후 적용, **11개 테이블 setval 시퀀스 동기화**
+  - 결과: users 2 / projects 6 / widgets 10 / Q&A 25 / 카탈로그 27/135 — Mac과 동일
+  - en 5개 프로젝트에 현재 위젯 보유(edmunds는 failed → 없음, 정상)
+
+---
 
 ## 부록 B. 배포·운영 체크리스트 (테스트 중 도출)
 

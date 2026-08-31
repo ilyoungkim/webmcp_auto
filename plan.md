@@ -1071,6 +1071,11 @@ docker compose -f docker-compose.silo.yml up -d --build
 - 언어 접미사 LLM env는 `saas/backend/.env`에 설정 (`GEMINI_API_KEY_EN`, `OPENROUTER_MODEL_EN` 등 — 없으면 전역 폴백)
 - 콘솔 SSR 언어는 `NUXT_PUBLIC_SILO_LANG`(ko/en) env로 확정
 - 운영 배포·백업·복원·로그 절차는 **`DEPLOY_PORUDCTION.md`** 참조 (§12 다국어 사일로 섹션 포함)
+- **136 서버(운영) 배포 완료(2026-08-31)**: `~/webmcp_auto/{saas, docker, ssl}` 구조.
+  Docker 포트 18080/18081(wiki-engine 8080 충돌 회피), 호스트 nginx 8443/8444 TLS 종료,
+  `webmcp.duckdns.org` 공인 인증서(acme.sh DNS-01, 자동갱신 구성).
+  검증: 10개 컨테이너 Up, health ok, 공인 체인 Verify 0(ok).
+  자세한 이력은 **test-results.md** T-034~T-038 참조.
 
 ### 16.6 다국어 사일로 구조적 특성 (설계상 의도)
 

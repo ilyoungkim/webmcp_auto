@@ -66,12 +66,17 @@ cd docker
 
 | 사일로 | 주소 | 언어 |
 |--------|------|------|
-| ko | http://localhost:8080 | 한국어 콘솔·위젯 (도메인 26종) |
-| en | http://localhost:8081 | English console·widget (도메인 16개) |
-| ko (LAN) | http://192.168.31.248:8080 | 사내망 기기에서 접속 (같은 192.168 네트워크) |
+| ko | http://localhost:8080 | 한국어 콘솔·위젯 (도메인 27종) |
+| en | http://localhost:8081 | English console·widget (도메인 27종) |
+| **ko (136 서버·운영)** | https://webmcp.duckdns.org:8443 | 한국어 — Let's Encrypt 공인 인증서, 경고 없음 |
+| **en (136 서버·운영)** | https://webmcp.duckdns.org:8444 | English — 동일 인증서 |
+| ko (LAN) | http://192.168.31.248:8080 | 사내망 기기에서 접속 (개발 Mac 기준) |
 | en (LAN) | http://192.168.31.248:8081 | 사내망 기기에서 접속 |
 
 - en 사일로는 별도 DB(`webmcp_en`)·컨테이너로 완전 분리되어 있습니다.
+- **136 서버(운영) 구성**: `webmcp.duckdns.org` = 192.168.31.136 (사설 IP, LAN 전용)
+  → 호스트 nginx가 8443/8444에서 TLS 종료 → Docker 사일로(18080/18081).
+  기존 443 구버전 서비스와 병행. SSL 자동갱신: acme.sh (DuckDNS DNS-01).
 - **LAN 접속**: `192.168.x.x` 대역에서 8080/8081 접속 허용 (DB 5432는 로컬 전용 — 포트매핑 없음)
 - **새 언어 추가** (일본어·중국어·프랑스어·스페인어·포르투갈어 등)는
   [`docker/HOWTO.md`](docker/HOWTO.md) §4.0의 4단계 절차를 따릅니다.
