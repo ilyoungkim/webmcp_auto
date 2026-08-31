@@ -4,27 +4,27 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 주요 기능을 실제로 실행하며 캡처한 화면 모음이다. 각 사일로는 완전히 격리된 브라우저
 세션(ko: 8080, en: 8081)으로 테스트했다.
 
+문서 구성: **파트 A — 한국어 사일로(ko) 전체 설명** → **파트 B — 영어 사일로(en) 전체 설명** →
+핵심 요약. 한글 사일로를 먼저 전부 설명하고, 다음에 영어 사일로를 설명한다.
+
 - **ko 사일로**: http://127.0.0.1:8080 (Docker `webmcp-ko-*` 스택)
 - **en 사일로**: http://127.0.0.1:8081 (Docker `webmcp-en-*` 스택)
 - 테스트 계정: 개인 `tensun@naver.com` / 10dlfdud, 관리자 `admin@local` / test1234
 
 ---
 
-## 1. 공통 — 로그인 화면
+# 파트 A — 한국어 사일로 (ko, 포트 8080) 설명
+
+## A-1. 로그인 화면
 
 ### `ko-login.png` — 한국어 로그인
 ![ko-login](ko-login.png)
 
 **한국어 로그인 화면.** 이메일·비밀번호 입력과 "회원가입" 링크. CSRF 쿠키 기반 세션 로그인 (SECURE_COOKIES 스위치로 http 환경에서도 쿠키 저장).
 
-### `en-login.png` — 영어 로그인 화면
-![en-login](en-login.png)
+---
 
-**영어 로그인 화면.** "Log in" / "Sign up" — 같은 코드베이스지만 `NUXT_PUBLIC_SILO_LANG=en` 주입으로 랜딩·인증 UI 전체가 영어로 렌더링된다.
-
-> 같은 URL 경로(`/login`)이며 UI 문구가 사일로 언어를 따르는 것 = useSilo(또는 SSR env) 기반 i18n의 기본 동작 확인.
-
-## 2. 개인 사용자 (tensun@naver.com) — ko 사일로
+## A-2. 개인 사용자 (tensun@naver.com)
 
 ### `ko-user-01-dashboard.png` — 내 프로젝트 (대시보드)
 ![ko-user-01-dashboard](ko-user-01-dashboard.png)
@@ -72,7 +72,7 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 
 - 세션 유지 상태에서의 대시보드. 프로젝트 상태가 카드별로 `완료 100%` 표시되는 것을 재확인.
 
-## 3. 관리자 (admin@local) — ko 사일로
+## A-3. 관리자 (admin@local)
 
 ### `ko-admin-01-dashboard.png` — 관리자 대시보드
 ![ko-admin-01-dashboard](ko-admin-01-dashboard.png)
@@ -111,7 +111,21 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 - `/django-admin/` — Django 관리자 화면(인증 및 권한/그룹 등).
 - 브라우저 캡처 시점에 `/static/admin/*` 정적 파일이 JSON MIME으로 내려오는 이슈가 관찰됨(스타일 미적용). **콘솔 UI 사용에는 영향 없음** — 필요 시 `collectstatic` 서빙 설정 개선 과제.
 
-## 4. 개인 사용자 (tensun@naver.com) — en 사일로
+---
+
+# 파트 B — 영어 사일로 (en, 포트 8081) 설명
+
+> 여기부터는 **en 사일로** 설명이다. 같은 코드베이스지만 `NUXT_PUBLIC_SILO_LANG=en` 주입으로
+> 모든 UI가 영어로 렌더링된다. ko 사일로의 화면 구성과 1:1로 대응하며 **언어만 다르다**.
+
+## B-1. 로그인 화면
+
+### `en-login.png` — 영어 로그인 화면
+![en-login](en-login.png)
+
+**영어 로그인 화면.** "Log in" / "Sign up" — ko의 `ko-login.png`와 같은 URL 경로(`/login`)이며 UI 문구가 사일로 언어를 따르는 것 = useSilo(또는 SSR env) 기반 i18n의 기본 동작 확인.
+
+## B-2. 개인 사용자 (tensun@naver.com)
 
 ### `en-user-01-dashboard.png` — My Projects
 ![en-user-01-dashboard](en-user-01-dashboard.png)
@@ -154,7 +168,7 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 - 답변이 **영어 마크다운**(bold 섹션 + 불릿)으로 생성되고 **실제 사이트 정보만 인용**: Emergency Department 911 / Express Care / Primary Care / Specialized Treatments, 예약 방법(MyHealth Portal 링크, **650-498-3333**, **GuestServices@stanfordhealthcare.org**).
 - = en 사일로 system_prompt + 프록시(`/api/chat/`) + 서버 부착 지식 요약 파이프라인이 end-to-end 동작.
 
-## 5. 관리자 (admin@local) — en 사일로
+## B-3. 관리자 (admin@local)
 
 ### `en-admin-01-dashboard.png` — Admin Dashboard
 ![en-admin-01-dashboard](en-admin-01-dashboard.png)
@@ -165,7 +179,7 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 - 계정 선택 드롭다운이 영어로 표시: `admin@local (Admin) — $49 (Default)` / `tensun@naver.com — $49 (Default)`.
 - 안내 문구 `Select an account to see the projects created by that account.` — admin.projects.* 키 적용.
 
-### `en-admin-03-billing-panel.png` — 결제/연락처 설정 (en)
+### `en-admin-03-billing-panel.png` — 사용자별 결제/연락처 설정 (en)
 ![en-admin-03-billing-panel](en-admin-03-billing-panel.png)
 - tensun@naver.com 선택 → 결제 패널 영어 버전:
   - **$49 (Default)**, Phone 1/Phone 2, Monthly price 입력 + 통화 콤보(**KRW(원) / USD($)** — 옵션 라벨은 통용 목적으로 한글 유지).
