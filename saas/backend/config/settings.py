@@ -184,6 +184,10 @@ if SECURE_COOKIES:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
+# IIS/nginx 등 TLS 종료 리버스 프록시 뒤에서 요청 스킴을 https 로 인식 (secure context),
+# HTTPS 접속 시 Absolute URL·쿠키 Secure 속성이 올바르게 결정된다.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # ── SaaS 설정 ────────────────────────────────────────────────
 GEMINI_API_KEY = env('GEMINI_API_KEY')
 GEMINI_MODEL = env('GEMINI_MODEL', 'gemini-3.5-flash-lite')

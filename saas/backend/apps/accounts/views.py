@@ -28,14 +28,15 @@ LOCK_DURATION = 300       # 잠금 지속 시간 (초, 5분)
 def _client_ip(request) -> tuple:
     """(클라이언트 IP, 직접 연결 여부) 반환.
 
-    - X-Forwarded-For 헤더가 있으면(nginx 프록시 경유) 첫 번째 IP 사용, direct=False
+    - X-Forwarded-For 헤더가 있으면(프록시 경유) 첫 번째 IP 사용, direct=False
     - 없으면(직접 연결) REMOTE_ADDR 사용, direct=True
       → 이 경우 사설망/루프백이면 ipguard 에서 항상 허용(락아웃 방지)
+    - 'IP:포트'·'[IPv6]:포트' 형태(IIS ARR 등)는 core.clientip 에서 정제
     """
+    from core.clientip import client_ip
     fwd = request.META.get('HTTP_X_FORWARDED_FOR')
-    if fwd:
-        return fwd.split(',')[0].strip(), False
-    return (request.META.get('REMOTE_ADDR') or ''), True
+    direct = not fwd
+    return client_ip(request), direct
 
 
 def _is_locked(key: str):

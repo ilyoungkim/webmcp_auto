@@ -29,7 +29,9 @@ COPY saas/widget-dist/ /app/widget-dist/
 COPY docker/docker-entrypoint.sh /app/backend/docker-entrypoint.sh
 
 WORKDIR /app/backend
-RUN chmod +x /app/backend/docker-entrypoint.sh
+# Windows CRLF → LF 변환 (셸 스크립트 호환)
+RUN sed -i 's/\r$//' /app/backend/docker-entrypoint.sh \
+    && chmod +x /app/backend/docker-entrypoint.sh
 
 # gunicorn 실행 (entrypoint에서 migrate/seed 후 기동)
 EXPOSE 8000

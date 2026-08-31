@@ -20,8 +20,8 @@ from .quotas import monthly_ok, per_minute_ok, record
 
 
 def _client_ip(request):
-    fwd = request.META.get('HTTP_X_FORWARDED_FOR')
-    return (fwd.split(',')[0].strip() if fwd else request.META.get('REMOTE_ADDR')) or ''
+    from core.clientip import client_ip
+    return client_ip(request)
 
 
 def _log(request, verdict, reason='', public_id=''):

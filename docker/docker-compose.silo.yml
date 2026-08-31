@@ -24,7 +24,7 @@ x-backend-env: &backend-env
   SECURE_COOKIES: "false"
   # LAN(192.168.x.x) 원격 접속 허용 — 네트워크가 바뀌면 이 목록과 아래 CSRF에도 IP 추가 필요
   # (보안 유의: 이 값은 로컬/사내망 공유용. 인터넷 공인 노출 시엔 공인 도메인으로 교체할 것)
-  ALLOWED_HOSTS: "127.0.0.1,localhost,backend,192.168.31.248,192.168.64.1"
+  ALLOWED_HOSTS: "127.0.0.1,localhost,backend,192.168.0.5,192.168.0.2,100.97.114.127"
   TERSER_CMD: "terser"
   GUNICORN_WORKERS: "2"
   GUNICORN_THREADS: "2"
@@ -60,8 +60,8 @@ services:
       WEBMCP_LANGS: ko
       DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-ko:5432/webmcp_ko
       # 위젯 assetBase/proxyEndpoint 에 박제되는 공개 주소 — LAN 접속자도 이 주소로 위젯 로드
-      SAAS_PUBLIC_URL: http://192.168.31.248:8080
-      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://192.168.31.248:8080
+      SAAS_PUBLIC_URL: https://192.168.0.5:8443
+      CSRF_TRUSTED_ORIGINS: https://localhost:8443,https://127.0.0.1:8443,https://192.168.0.5:8443,http://localhost:8080,http://127.0.0.1:8080,http://192.168.0.5:8080
     depends_on:
       postgres-ko: { condition: service_healthy }
     expose: ["8000"]
@@ -79,8 +79,8 @@ services:
       WEBMCP_LANG: ko
       WEBMCP_LANGS: ko
       DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-ko:5432/webmcp_ko
-      SAAS_PUBLIC_URL: http://192.168.31.248:8080
-      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://192.168.31.248:8080
+      SAAS_PUBLIC_URL: https://192.168.0.5:8443
+      CSRF_TRUSTED_ORIGINS: https://localhost:8443,https://127.0.0.1:8443,https://192.168.0.5:8443,http://localhost:8080,http://127.0.0.1:8080,http://192.168.0.5:8080
     depends_on:
       postgres-ko: { condition: service_healthy }
     expose: ["8000"]
@@ -136,8 +136,8 @@ services:
       WEBMCP_LANGS: en
       DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-en:5432/webmcp_en
       # 위젯 assetBase/proxyEndpoint 에 박제되는 공개 주소 — LAN 접속 허용
-      SAAS_PUBLIC_URL: http://192.168.31.248:8081
-      CSRF_TRUSTED_ORIGINS: http://localhost:8081,http://127.0.0.1:8081,http://192.168.31.248:8081
+      SAAS_PUBLIC_URL: https://192.168.0.5:8444
+      CSRF_TRUSTED_ORIGINS: https://localhost:8444,https://127.0.0.1:8444,https://192.168.0.5:8444,http://localhost:8081,http://127.0.0.1:8081,http://192.168.0.5:8081
       # ── 영어 사일로 전용 엔진 (env 접미사 _EN — 없으면 전역 키 폴백) ──
       # GEMINI_MODEL_EN=gemini-2.0-flash
       # GEMINI_API_KEY_EN=...
@@ -160,8 +160,8 @@ services:
       WEBMCP_LANG: en
       WEBMCP_LANGS: en
       DATABASE_URL: postgres://webmcp:webmcp_dev_pass@postgres-en:5432/webmcp_en
-      SAAS_PUBLIC_URL: http://192.168.31.248:8081
-      CSRF_TRUSTED_ORIGINS: http://localhost:8081,http://127.0.0.1:8081,http://192.168.31.248:8081
+      SAAS_PUBLIC_URL: https://192.168.0.5:8444
+      CSRF_TRUSTED_ORIGINS: https://localhost:8444,https://127.0.0.1:8444,https://192.168.0.5:8444,http://localhost:8081,http://127.0.0.1:8081,http://192.168.0.5:8081
     depends_on:
       postgres-en: { condition: service_healthy }
     expose: ["8000"]
