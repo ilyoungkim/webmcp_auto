@@ -1071,3 +1071,24 @@ docker compose -f docker-compose.silo.yml up -d --build
 - 언어 접미사 LLM env는 `saas/backend/.env`에 설정 (`GEMINI_API_KEY_EN`, `OPENROUTER_MODEL_EN` 등 — 없으면 전역 폴백)
 - 콘솔 SSR 언어는 `NUXT_PUBLIC_SILO_LANG`(ko/en) env로 확정
 - 운영 배포·백업·복원·로그 절차는 **`DEPLOY_PORUDCTION.md`** 참조 (§12 다국어 사일로 섹션 포함)
+
+### 16.6 다국어 사일로 구조적 특성 (설계상 의도)
+
+ko/en 사일로는 동일 코드베이스에서 `WEBMCP_LANG` env로 언어가 결정된다. 아래는 비대칭이 아닌 설계상 의도된 동작이다.
+
+| 항목 | 설명 | 영향 범위 |
+|---|---|---|
+| Django `LANGUAGE_CODE='ko-kr'`, `TIME_ZONE='Asia/Seoul'` | en 사일로도 한국 시간/로케일 | Django admin 타임스탬프, 서버 로그. 사용자 UI는 프론트엔드 `formatDate()`가 사일로 로케일(`en-US`/`ko-KR`) 적용 |
+| Django 모델 `verbose_name` 한글 8건 | `accounts/models.py` phone/billing 필드 라벨 | Django admin(`/django-admin/`) 전용. 일반 사용자 UI는 useSilo 자체 라벨 사용 |
+| compose `SUPPORT_PHONE` 언어별 미분리 | `.env` 전역 값 폴백 | 필요 시 compose에 `SUPPORT_PHONE_EN` 등 언어별 env 추가로 분리 가능 |
+| compose `GEMINI_API_KEY_EN` 주석 처리 | `.env`에 설정하면 `langsilo.py`가 자동 인식 | `_EN` 접미사 키 우선, 없으면 전역 폴백 |
+| `projects/[id].vue` 템플릿 내 한글 185줄 | 전부 `v-else`(ko 전용) 블록 내부 | en에서는 `TermsEn`/`InstallGuideEn` 컴포넌트 렌더링. v-else 밖 미번역 0줄 |
+| 위젯 I18N 외 잔존 한글 4건 | ko 사전 데모 타이틀 3건 + 토큰화 정규식 `[가-힣]` | 기능상 정상 |
+
+**현재 i18n 대칭 현황**:
+- 카탈로그: ko 27종 / en 27종 완전 대칭 (각 4메뉴 = 일반메뉴 108개 + 필수메뉴 27개)
+- 백엔드 오류 메시지: `core.langsilo.msg()` 37키 ko/en 대칭
+- 위젯 I18N: 32키 ko/en 대칭
+- useSilo 프론트엔드: 226키 ko/en 대칭
+
+> **운영 전환 시 고려**: en 사일로를 해외 서버에 배포할 경우 `TIME_ZONE`을 env로 분리 권장.

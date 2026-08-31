@@ -338,6 +338,23 @@ python manage.py run_pipeline_worker --interval 2.0
 
 프론트엔드(Nuxt)는 `saas/frontend`에서 `npm install && npm run dev`로 실행합니다.
 
+## 다국어 사일로 구조적 특성 (설계상 의도)
+
+ko/en 사일로는 **동일 코드베이스**에서 `WEBMCP_LANG` env로 언어가 결정됩니다. 아래 항목은 비대칭이 아닌 설계상 의도된 동작입니다.
+
+| 항목 | 설명 | 영향 범위 |
+|---|---|---|
+| Django `LANGUAGE_CODE='ko-kr'`, `TIME_ZONE='Asia/Seoul'` | en 사일로도 한국 시간/로케일 사용 | Django admin 타임스탬프, 서버 로그. 사용자 UI는 프론트엔드 `formatDate()`가 사일로 로케일(`en-US`/`ko-KR`) 적용 |
+| Django 모델 `verbose_name` 한글 8건 | `accounts/models.py`의 phone/billing 필드 라벨 | Django admin(`/django-admin/`) 전용. 일반 사용자 UI는 프론트엔드가 자체 라벨(useSilo) 사용 |
+| compose `SUPPORT_PHONE` 언어별 미분리 | `.env` 전역 값 폴백 | 필요 시 compose에 `SUPPORT_PHONE_EN` 등 언어별 env 추가로 분리 가능 |
+| compose `GEMINI_API_KEY_EN` 주석 처리 | `.env`에 설정하면 자동 적용 | `core/langsilo.py`가 `_EN` 접미사 키를 우선 사용, 없으면 전역 키 폴백 |
+| `projects/[id].vue` 템플릿 내 한글 185줄 | 전부 `v-else`(ko 전용) 블록 내부 | en에서는 `TermsEn`/`InstallGuideEn` 컴포넌트 렌더링. v-else 밖 미번역 0줄 |
+| 위젯 I18N 외 잔존 한글 4건 | ko 사전 데모 타이틀 3건 + 토큰화 정규식 `[가-힣]` | 기능상 정상 — 데모 타이틀은 ko 사전 내부, 정규식은 한글 토큰화용 |
+
+> **참고**: 카탈로그는 ko 27종 / en 27종 완전 대칭(각 4메뉴 = 일반메뉴 108개).
+> 백엔드 오류 메시지는 `core.langsilo.msg()` 37키 ko/en 대칭.
+> 위젯 I18N은 32키 ko/en 대칭. useSilo는 226키 ko/en 대칭.
+
 ## 문서
 
 - [`plan.md`](plan.md) — 전체 설계·구현 현황·API 스펙

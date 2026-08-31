@@ -574,11 +574,29 @@ en 위젯은 제목 기본값 "AI Assistant", 상태 "Connected", "Voice input" 
 en 위젯을 얻으려면 **en 사일로에서 프로젝트를 생성**해야 하며,
 이때 프로젝트의 `lang=en`이 위젯 config에 박제되어 I18N 선택에 사용된다.
 
-### 12.6 요약
+### 12.6 구조적 특성 (설계상 의도 — 비대칭 아님)
 
-> ko: `docker compose up -d` → `127.0.0.1:8080` (25개 한국어 도메인)
-> en: `docker compose -f docker-compose.silo.yml up -d` → `127.0.0.1:8081` (15개 영어 도메인)
+ko/en 사일로는 동일 코드베이스에서 `WEBMCP_LANG` env로 언어가 결정된다. 아래는 버그가 아닌 설계상 의도된 동작이다.
+
+| 항목 | 설명 | 영향 범위 |
+|---|---|---|
+| Django `LANGUAGE_CODE='ko-kr'`, `TIME_ZONE='Asia/Seoul'` | en 사일로도 한국 시간/로케일 | Django admin 타임스탬프, 서버 로그. 사용자 UI는 프론트엔드 `formatDate()`가 사일로 로케일 적용 |
+| Django 모델 `verbose_name` 한글 8건 | `accounts/models.py` phone/billing 필드 | Django admin 전용. 일반 UI는 useSilo 자체 라벨 사용 |
+| `SUPPORT_PHONE` 언어별 미분리 | `.env` 전역 값 폴백 | 필요 시 compose에 언어별 env 추가 가능 |
+| `GEMINI_API_KEY_EN` 등 주석 처리 | `.env`에 설정하면 `langsilo.py`가 자동 인식 | `_EN` 접미사 키 우선, 없으면 전역 폴백 |
+| `projects/[id].vue` 한글 185줄 | 전부 `v-else`(ko 전용) 블록 내부 | en은 `TermsEn`/`InstallGuideEn` 컴포넌트 렌더링 |
+| 위젯 I18N 외 잔존 한글 4건 | ko 사전 데모 타이틀 + 토큰화 정규식 | 기능상 정상 |
+
+> **운영 전환 시 고려**: en 사일로를 해외 서버에 배포할 경우 `TIME_ZONE`을 env로 분리 권장.
+> `SUPPORT_PHONE`도 언어별 분리가 필요하면 compose에 `SUPPORT_PHONE_EN` 추가.
+
+### 12.7 요약
+
+> ko: `./build.sh --run` → `127.0.0.1:8080` (27개 한국어 도메인)
+> en: `./build.sh --run` → `127.0.0.1:8081` (27개 영어 도메인)
 >
 > en 사일로는 별도 PostgreSQL 인스턴스(`webmcp-postgres-en`), 별도 DB(`webmcp_en`),
 > 별도 nginx conf(`nginx-en.conf`), 별도 env 접미사(`_EN`)로 **완전 격리**된다.
 > 언어 사일로 모듈: `saas/backend/core/langsilo.py` (`SUPPORTED_LANGS=('ko','en')`)
+> 카탈로그: ko 27종 / en 27종 완전 대칭 (각 4메뉴 = 일반메뉴 108개)
+> i18n: 백엔드 msg() 37키, 위젯 I18N 32키, useSilo 226키 — 모두 ko/en 대칭
