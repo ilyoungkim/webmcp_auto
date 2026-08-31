@@ -198,20 +198,3 @@ ko/en 두 언어 사일로에서 **개인 사용자(`tensun@naver.com`)** 와 **
 
 ### `en-admin-06-manual.png` — Integration Manual (`/manual`)
 <a href="en-admin-06-manual.png"><img src="en-admin-06-manual.png" alt="en-admin-06-manual" width="1080" style="border:1px solid #d1d5db; border-radius:8px; padding:2px;"/></a>
-- **English-only manual page**: 1) Recommended installation (one-line script) 2) Self-hosted bundle (bundle.zip contents/code) 3) Register Origin 4) Troubleshooting (403/429/CSP explanations).
-- `/manual` used to be hardcoded in Korean; it now follows the silo language via the 10 useSilo `manual.*` keys — a direct result (and representative case) of this i18n improvement.
-
----
-
-## 테스트에서 확인된 핵심 동작 요약
-
-1. **언어 격리 완성** — 같은 코드베이스를 2개 컨테이너로 띄우고 `WEBMCP_LANG`/`NUXT_PUBLIC_SILO_LANG`만 달리 했을 때, 로그인→대시보드→프로젝트→위젯→프로필→관리 전 구간 UI가 완전히 해당 언어로 동작한다.
-2. **요금 체계 사일로 분리** — ko 50,000원/KRW vs en $49/USD, 관리자가 특정 계정의 금액(엔터프라이즈)을 지정하면 개인 프로필에도 그 값이 반영된다.
-3. **en 위젯 LLM 응답 품질** — 실제 크롤링 지식 기반의 영어 마크다운 답변 + 실제 연락처/링크 인용(지어내기 금지 프롬프트 정상 동작).
-4. **역할 분리** — 사용자는 자기 프로젝트/프로필만, 관리자는 전체 사용자의 결제·연락처·프로젝트·Q&A·오류 신고를 관리.
-5. **모바일 대응** — 미리보기 페이지 safe-area/하단 여백이 적용되어 런처가 콘텐츠와 겹치지 않는다.
-
-## 관측된 사소한 이슈 (기능 영향 없음)
-
-- `ko-admin-06-django-admin.png`: Django admin 정적 파일(`static/admin/*`)이 `application/json` MIME으로 응답되어 스타일이 깨져 보임 — 향후 nginx/collectstatic 서빙 점검 과제.
-- 세션 CSRF 만료 후 재로그인이 한 번 실패했다가 성공(정상 동작 — 페이지 새로고침으로 CSRF 쿠키 재발급).
