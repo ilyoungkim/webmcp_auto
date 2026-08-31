@@ -42,3 +42,10 @@ docker/backups/
 # sqlmigrate 산출물 / 일회성 디버그
 **/init.sql
 **/debug_url.py
+
+# ── 참고 자료 (Gemini 대화 기록 — 저장소 제외) ──
+AI-챗봇-서비스-현황.md
+WebMCP-브라우저-AI-도구-표준.md
+
+# ── 특허 문서 (저장소 제외) ──
+patent.md
