@@ -9,8 +9,11 @@ COPY saas/frontend/ ./
 # 위젯 원본을 콘솔 정적 자산으로 동기화 (Nuxt가 직접 서빙)
 COPY saas/widget-dist/ ./public/widget-dist/
 
-# 프로덕션 빌드 (API 호스트는 런타임에 설정)
+# 프로덕션 빌드 (프록시 대상은 빌드 타임에 고정 — routeRules 컴파일)
+# Docker: --build-arg API_HOST=http://webmcp-web-ko:10000
+# Render: dockerfilePath 빌드 시 envVars의 buildEnv 사용
 ARG API_HOST=http://backend:8000
+ENV NUXT_API_PROXY_TARGET=${API_HOST}
 ENV NUXT_PUBLIC_API_HOST=${API_HOST}
 RUN npm run build
 

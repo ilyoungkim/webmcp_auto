@@ -120,10 +120,89 @@
 - Tool execute가 일반 필드까지 자동 주입 후 `status: "NEEDS_HUMAN_INPUT"`과 함께 **포커스 이동 + 안내 반환** → 제어권 사용자 전환.
 - 위젯 채팅과 연동 시: 사용자가 채팅으로 보안문자를 말해주면 하네스가 이어서 제출하는 **바통 터치** 모드.
 
-### F8. Agent-First 전용 창구 (`/ai`) — 옵션 모듈
-- 캡차·주소팝업·본인인증이 구조적으로 불가피한 서비스(병원 예약, 내차팔기 견적)용 **경량 전용 페이지** 생성기.
-- `<form tool-name="..." tool-description="...">` + `hidden agent_auth_token`(고정값)만 담은 KB 단위 HTML — 콘솔 1클릭 생성, 하네스와 상호 보완.
-- User-Agent 감지 리다이렉트: `WebMCP-Agent|ChatGPT|Claude|Gemini` → `/ai` 하위 대응 페이지 (nginx 규칙 동봉).
+### F8. Agent-First 통합 창구 (`/ai/ai.html`) — 정적 보장 계층
+
+**설계 동기**: 동적 주입(하네스)은 언제든 실패할 수 있다 — WebGPU 미지원, 모델 로드 실패, CSP 제한, 극한 SPA, 브라우저 보안 정책 변경 등. 주입식이 전부 다이내믹할 때 이 부분이 동작하지 않으면 AI 에이전트는 사용할 도구가 **전무**해진다.
+`/ai/ai.html`은 사이트의 **모든 WebMCP 도구를 하나로 모은 정적 파일**로, 동적 주입 성패와 무관하게 100% 동작하는 "최후 보장 계층"이다.
+
+#### 8.1 ai.html이 한데 모으는 것
+
+| 통합 대상 | 내용 |
+|----------|------|
+| **모든 WebMCP 도구** | 하네스가 등록한 전체 스키마(모든 폼·예약·장바구니·문진표) → `<form tool-name="...">` 선언형 마크업으로 Tool 노출 |
+| **CAPTCHA·본인인증(PASS/KCP) 우회** | `hidden agent_auth_token`(HMAC 서명)이 캡차/본인인증을 대체 — 백엔드가 토큰 검증 시 사람 인증 절차 스킵 (해킹적 우회가 아닌 **설계적 대체**) |
+| **멀티 툴 단일 페이지** | 한 페이지에 복수 Tool 배치 → 에이전트가 사용자 의도에 맞는 도구를 자동 선택·실행 |
+| **최소 인간 UI** | 사람 직접 접속 시 이용 가능 서비스 목록 안내(경량 CSS) |
+
+#### 8.2 정적 파일 구조 (개념 예시)
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>AI Agent Services Portal</title></head>
+<body>
+  <!-- TOOL 1: 예약 (캡차 구간을 토큰으로 대체) -->
+  <form action="/api/agent/v1/reserve" method="POST"
+        tool-name="request_reservation"
+        tool-description="병원 전화상담·진료 예약을 접수합니다.">
+    <input type="hidden" name="agent_auth_token" value="HMAC_SIGNED_TOKEN"
+           tool-param-description="에이전트 인증 토큰 (고정값, 캡차 대체)"/>
+    <input type="text" name="patient_name" tool-param-description="예약 환자 실명"/>
+    <input type="tel"  name="patient_phone" tool-param-description="연락처 (숫자만)"/>
+    <button type="submit">접수</button>
+  </form>
+  <!-- TOOL 2: 장바구니 / TOOL 3: 문진표 / ... 전체 도구 나열 -->
+</body>
+</html>
+```
+
+#### 8.3 생성·재생성 파이프라인 (OpenRouter)
+
+ai.html은 수동 작성이 아니라 **OpenRouter(`openai/gpt-oss-120b`)가 자동 생성·재생성**한다.
+
+```
+[트리거]
+  ├─ 수동: Admin Dashboard "ai.html 재생성" 버튼
+  ├─ 자동: 하네스가 스키마 변경 감지 (UI 개편·신규 Tool 등록·DOM Hash 불일치)
+  ├─ 자동: 클러스터 캐시 스키마 갱신 이벤트
+  └─ 정기: 토큰 만료 대응 주기 재생성 (선택, 주 1회)
+
+[파이프라인]
+  1. 수집  — 클러스터 캐시(PostgreSQL)에서 테넌트의 전체 스키마 집계
+  2. 요청  — 백엔드 POST /api/webmcp/generate-ai-page (스키마 배열 + 사이트 메타)
+  3. 생성  — OpenRouter oss-120b Structured Outputs로 완성형 ai.html 생성
+             (입력: 스키마 JSON + tool-* 마크업 규칙 + 신규 발급 토큰)
+  4. 검증  — HTML 유효성·셀렉터 실존·토큰 서명 검증 (실패 시 1회 재생성)
+  5. 배포  — CDN(Cloudflare R2) 또는 고객 사이트 /ai/ 경로 업로드 + 버전 태그
+  6. 통지  — Admin Dashboard 완료 알림 + 텔레메트리 기록
+```
+
+- 재생성 비용은 캐시 히트 구조와 무관한 **서버 측 1회 호출**이므로 저렴하며, 생성물은 정적 파일이라 이후 서빙 비용 0에 수렴.
+
+#### 8.4 토큰 인증 설계 (캡차·본인인증의 설계적 대체)
+
+정적 파일과 동적 요청은 토큰 수명 요구가 다르므로 **2종 토큰 체계**로 분리한다.
+
+| 토큰 종 | 수명 | 사용처 | 보안 장치 |
+|---------|------|--------|----------|
+| **단기 HMAC 토큰** | 5분 + Nonce | 동적 주입·실시간 에이전트 요청 | 타임스탬프·논스 검증, Replay 차단 |
+| **장기 서명 토큰** | 30~90일 (siteKey 바인딩) | **ai.html 내장** (정적 파일이라 단기 토큰 불가) | 서명 검증 + **토큰 버전 폐기 목록**(서버 측), 유출 시 즉시 폐기 |
+
+- **발급**: 백엔드가 테넌트별 서명 토큰 발급(`siteKey + version + expiry`, 비밀키 서명).
+- **내장**: ai.html의 `hidden agent_auth_token` — **재생성 시마다 신규 버전 토큰 발급**, 구 버전은 폐기 목록에 등록 → 유출·만료 문제를 재생성 주기로 관리.
+- **검증**: `/api/agent/v1/*`가 서명·만료·폐기 목록 검증 → 통과 시 캡차/PASS/KCP 구간을 스킵하고 처리.
+- **2차 확정 유지**: 토큰은 "봇 차단"만 대체한다. 예약 확정·결제 등 **의사 확인은 알림톡 2차 승인**(§7.1 4단)으로 유지 → 보안 수준은 캡차 이상.
+
+#### 8.5 동적 주입과의 관계 (폴백 매트릭스)
+
+| 상황 | 동작 경로 |
+|------|----------|
+| 동적 주입 성공 | 하네스 Tool(주력) + ai.html(예비 대기) |
+| **동적 주입 실패** (WebGPU ❌·CSP·모델 실패·스펙 미달) | **ai.html 정적 보장** — 에이전트가 `/ai/ai.html` 직접 접근 |
+| UA 감지 | `WebMCP-Agent|ChatGPT|Claude|Gemini` → nginx/Cloudflare 규칙으로 `/ai/ai.html` 리다이렉트 |
+| 양쪽 모두 실패 | 보수 모드 + Admin Dashboard 장애 알림 |
+
+- ai.html은 **정적 파일**이므로 WebGPU·WebLLM·자바스크립트 실행 환경에 대한 의존이 전혀 없다 — HTTP 요청이 가능한 모든 환경에서 동작한다.
 
 ### F9. 보안 레이어 (§7 상세)
 - Edge(Cloudflare WAF·Rate Limit) → Gateway(HMAC 서명·Nonce) → API(Strict Regex·Sanitization) → Business(알림톡 2차 승인) 4단 구조를 1.x 위젯 프록시에 이식·확장.
@@ -140,6 +219,7 @@
 | **구조화 출력 엔진 설정** | XGrammar on/off, temperature·max_tokens 조정, JSON Schema 템플릿 편집 |
 | **캐시 정책 관리** | 스키마/Q&A/원시 데이터 TTL 일괄 조정, 강제 무효화(flush), 클러스터 캐시 동기화 트리거 |
 | **`/ai` 전용 창구 빌더** | Agent-First 페이지 1클릭 생성·편집·삭제, UA 리다이렉트 규칙 관리 |
+| **ai.html 재생성** | 수동 재생성 버튼 + 자동 트리거(스키마 변경 감지·캐시 갱신·정기) 상태 확인, 생성 이력·배포 버전 관리(§2 F8.3) |
 
 #### B. 사용자·접속 관리 (User & Access)
 | 기능 | 설명 |
@@ -512,11 +592,13 @@ on offline / CLOUD 실패                → STATIC(정적 규칙, confidence �
 ### 6.4 신뢰성 체인 (폴백 사다리)
 
 ```text
-수동 config(선택) → 쇼핑몰 프리셋 → 로컬 sLLM → 클라우드(oss-120b, WebLLM 기기 한정) → 정적 규칙 → Tool 등록 스킵(조용히 종료)
+수동 config(선택) → 쇼핑몰 프리셋 → 로컬 sLLM → 클라우드(oss-120b, WebLLM 기기 한정) → 정적 규칙
+→ [동적 주입 최종 실패 시] /ai/ai.html 정적 보장 계층 안내(§2 F8) → Tool 등록 스킵(조용히 종료)
 ```
 
 - 각 단계 결과는 **셀렉터 실존 검증**(document.querySelector로 fields/submitSelector 존재 확인) 통과 시에만 채택.
 - 검증 실패 시 다음 단계로 폴백하고, 최종 실패해도 페이지 동작에 영향 0(비침입 원칙).
+- 동적 주입이 완전히 실패해도 **ai.html 정적 보장 계층**(OpenRouter로 생성·재생성)이 있어 에이전트 도구가 전무해지는 상황은 발생하지 않는다.
 
 ---
 
@@ -563,7 +645,7 @@ on offline / CLOUD 실패                → STATIC(정적 규칙, confidence �
 | W2 | 로컬 엔진 — **WebLLM(WebGPU+WASM) 주력** + Chrome window.ai 보조 통합, Engine Router v1, **Qwen2.5-1.5B/0.5B MLC 빌드 검증** | grade A/B 기기 로컬 합성 성공 |
 | W3 | 클라우드 엔진 — `/api/webmcp/analyze-dom` Structured Outputs, 클러스터 캐시 | 로컬↔클라우드 폴백 E2E |
 | W4 | SPA·쇼핑몰 — MutationObserver/History 패칭, 카페24·고도몰·메이크샵 프리셋 | React/Vue 데모 + 쇼핑몰 데모 통과 |
-| W5 | 보안·Agent 창구 — HMAC·Rate Limit·알림톡 2차, `/ai` 빌더 | 4단 보안 E2E, UA 리다이렉트 |
+| W5 | 보안·Agent 창구 — HMAC·Rate Limit·알림톡 2차, **ai.html 정적 보장 계층**(OpenRouter 생성·재생성 파이프라인, 토큰 2종 체계) | 4단 보안 E2E, UA 리다이렉트, ai.html 재생성 E2E |
 | W6 | Harness Studio — 콘솔 통합(키 발급·텔레메트리·스키마 검수), 문서 | **v2.0 GA** (136/Render 배포 준비) |
 
 - 1.x 인프라(136 서버, docker-compose.silo, Django/Nuxt, PG18, Gemini 키)를 **그대로 확장** 사용 — 인프라 중복 투자 없음.

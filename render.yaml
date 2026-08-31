@@ -1,10 +1,11 @@
 # render.yaml — Render Blueprint (IaC) for WebMCP Auto 사일로
 # ─────────────────────────────────────────────────────────────────
 # GitHub 연동 배포용 Blueprint.
-#  - ko/en 사일로를 한 Blueprint로 정의 (웹 2 + 워커 2 + DB 2)
-#  - 웹은 docker/Dockerfile.backend 사용, 워커는 같은 이미지에
-#    startCommand 오버라이드로 run_pipeline_worker 실행
-#  - DB는 Render Managed PostgreSQL (자동 프로비저닝 + DATABASE_URL 주입)
+#  - ko/en 사일로를 한 Blueprint로 정의 (웹 4 + 워커 2 + DB 2)
+#  - 웹: Django 백엔드(webmcp-web-ko/en) + Nuxt 프론트엔드(webmcp-front-ko/en) 역할 분리
+#  - 워커는 같은 백엔드 이미지에 dockerCommand 오버라이드로 run_pipeline_worker 실행
+#  - DB는 Render Managed PostgreSQL 17 (자동 프로비저닝 + DATABASE_URL 주입)
+#  - 프론트→백엔드 통신: Render 내부 주소 https://<서비스명>.internal
 #
 # 사용법:
 #   1) GitHub에서 이 저장소를 선택 → Render Dashboard "New → Blueprint"
@@ -41,14 +42,14 @@ databases:
   - name: webmcp-postgres-ko
     databaseName: webmcp_ko
     user: webmcp
-    plan: basic-256mb            # 개발용 최소 — 운영 시 standard 이상 권장
-    postgresMajorVersion: "16"   # Render 관리형 최대치 (자체 호스팅은 18 가능)
+    plan: basic-256mb            # 개발용 최소 — 운영 시 standard-2gb 이상 권장
+    postgresMajorVersion: "17"   # Render 관리형 최대 버전 (자체 호스팅 136 서버는 PG18)
 
   - name: webmcp-postgres-en
     databaseName: webmcp_en
     user: webmcp
     plan: basic-256mb
-    postgresMajorVersion: "16"
+    postgresMajorVersion: "17"
 
 # ─────────────────────────────────────────────────────────────────
 # ko 사일로
@@ -77,11 +78,12 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: SAAS_PUBLIC_URL
-        sync: false              # 예: https://webmcp-ko.onrender.com
+        sync: false              # 예: https://webmcp-front-ko.onrender.com (프론트 도메인)
       - key: ALLOWED_HOSTS
-        sync: false              # 예: webmcp-ko.onrender.com
+        sync: false              # 예: webmcp-front-ko.onrender.com,webmcp-web-ko.internal
+                                 # ⚠️ .internal 반드시 포함 — 프론트 프록시의 Host 헤더가 이것으로 옴
       - key: CSRF_TRUSTED_ORIGINS
-        sync: false              # https://webmcp-ko.onrender.com
+        sync: false              # https://webmcp-front-ko.onrender.com
       - key: SUPPORT_PHONE
         sync: false
 
@@ -96,6 +98,8 @@ services:
     envVars:
       - key: WEBMCP_LANG
         value: ko
+      - key: WEBMCP_LANGS
+        value: ko
       - key: DATABASE_URL
         fromDatabase:
           name: webmcp-postgres-ko
@@ -106,6 +110,23 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+
+  - type: web                    # Nuxt 프론트엔드 (ko) — 백엔드와 역할 분리
+    name: webmcp-front-ko
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.frontend
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      # 빌드 타임: routeRules 프록시 대상 — Render 내부 주소는 https://<서비스명>.internal
+      # (Render는 환경변수를 Docker 빌드 ARG로 자동 전달 → Dockerfile의 ARG API_HOST로 주입)
+      - key: API_HOST
+        value: https://webmcp-web-ko.internal
+      - key: NUXT_API_PROXY_TARGET
+        value: https://webmcp-web-ko.internal
+      - key: NUXT_PUBLIC_SILO_LANG
+        value: ko
 
   # ───────────────────────────────────────────────────────────────
   # en 사일로
@@ -135,16 +156,18 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: SAAS_PUBLIC_URL
-        sync: false
+        sync: false              # 예: https://webmcp-front-en.onrender.com (프론트 도메인)
       - key: ALLOWED_HOSTS
-        sync: false
+        sync: false              # 예: webmcp-front-en.onrender.com,webmcp-web-en.internal
+                                 # ⚠️ .internal 반드시 포함 — 프론트 프록시의 Host 헤더가 이것으로 옴
       - key: CSRF_TRUSTED_ORIGINS
-        sync: false
+        sync: false              # https://webmcp-front-en.onrender.com
 
   - type: worker                 # 파이프라인 워커 (en)
     name: webmcp-worker-en
     runtime: docker
     dockerfilePath: ./docker/Dockerfile.backend
+    dockerContext: .
     dockerCommand: python manage.py run_pipeline_worker --interval 2.0
     plan: starter
     envVars:
@@ -163,14 +186,34 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
 
+  - type: web                    # Nuxt 프론트엔드 (en) — 백엔드와 역할 분리
+    name: webmcp-front-en
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.frontend
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      # 빌드 타임: routeRules 프록시 대상 — Render 내부 주소는 https://<서비스명>.internal
+      - key: API_HOST
+        value: https://webmcp-web-en.internal
+      - key: NUXT_API_PROXY_TARGET
+        value: https://webmcp-web-en.internal
+      - key: NUXT_PUBLIC_SILO_LANG
+        value: en
+
 # ─────────────────────────────────────────────────────────────────
 # 참고
-#  1) runtime: docker + dockerfilePath/dockerContext 로 기존 Dockerfile 재사용.
-#     Render는 포트를 자동 감지하지 않으므로 앱이 $PORT 또는 8000에서 Listen 해야 함.
-#     entrypoint가 0.0.0.0:8000 고정 → Render가 자동 감지(포워딩)하므로 보통 무방.
-#  2) preview/1 같은 경로 = Django의 /preview/<pk>/ — URL은 Render 할당 도메인.
-#  3) 관리형 PG의 최대 연결 수 제한이 있어 Gunicorn workers는 2 권장.
+#  1) 역할 분리 아키텍처: 프론트엔드(Nuxt)와 백엔드(Django)를 별도 서비스로 배포.
+#     - 웹 서비스 4개: webmcp-web-ko/en (Django API) + webmcp-front-ko/en (Nuxt SSR)
+#     - 워커 2개: webmcp-worker-ko/en (파이프라인 백그라운드)
+#     - DB 2개: webmcp-postgres-ko/en (Managed PostgreSQL 17)
+#  2) 서비스 간 통신: Nuxt routeRules 프록시가 백엔드를 호출할 때
+#     Render 내부 주소 `https://<서비스명>.internal` 사용 (빌드 타임에 고정).
+#     nuxt.config.ts의 NUXT_API_PROXY_TARGET 환경변수로 주입됨.
+#  3) 포트: Render는 $PORT 자동 주입 — entrypoint가 0.0.0.0:${PORT:-8000} 바인딩.
+#     Nuxt는 HOST=0.0.0.0 + $PORT 자동 인식 (Dockerfile.frontend).
 #  4) sync: false 항목은 첫 배포 시 대시보드에서 값을 입력해야 activate 된다.
-#  5) 무료 플랜: Web 1 + Postgres 1 만 무료. 워커/2DB는 유료 플랜 필요 ($7~15/mo).
-#  6) 스포/사설망 접속제어(IP 화이트리스트/Bruteforce 방어)는 앱 내 정책 그대로 동작.
+#  5) 무료 플랜: Web 1 + Postgres 1 만 무료. 전체 구성(웹4+워커2+DB2)은 유료 필요.
+#  6) 보안 정책(IP 화이트리스트/브루트포스 방어)은 앱 내 정책 그대로 동작.
 # ─────────────────────────────────────────────────────────────────

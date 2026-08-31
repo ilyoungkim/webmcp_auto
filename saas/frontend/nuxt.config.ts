@@ -1,3 +1,7 @@
+// 백엔드 프록시 대상 — 로컬 개발은 127.0.0.1:8000, Render/클라우드는 서비스 내부 주소
+// Dockerfile.frontend의 ARG API_HOST 또는 Render envVars에서 NUXT_API_PROXY_TARGET으로 주입
+const API_PROXY_TARGET = process.env.NUXT_API_PROXY_TARGET || 'http://127.0.0.1:8000'
+
 export default defineNuxtConfig({
   ssr: true,
   devServer: { port: 53300 },
@@ -13,13 +17,13 @@ export default defineNuxtConfig({
     '/dashboard/**': { ssr: false },
     '/projects/**': { ssr: false },
     '/admin/**': { ssr: false },
-    '/api/**': { proxy: 'http://127.0.0.1:8000/api/**' },
-    '/preview/**': { proxy: 'http://127.0.0.1:8000/preview/**' },
-    '/embed/**': { proxy: 'http://127.0.0.1:8000/embed/**' },
-    '/widget-dist/**': { proxy: 'http://127.0.0.1:8000/widget-dist/**' },
-    '/django-admin/**': { proxy: 'http://127.0.0.1:8000/django-admin/**' },
-    '/health/**': { proxy: 'http://127.0.0.1:8000/health/**' },
-    '/ready/**': { proxy: 'http://127.0.0.1:8000/ready/**' },
+    '/api/**': { proxy: `${API_PROXY_TARGET}/api/**` },
+    '/preview/**': { proxy: `${API_PROXY_TARGET}/preview/**` },
+    '/embed/**': { proxy: `${API_PROXY_TARGET}/embed/**` },
+    '/widget-dist/**': { proxy: `${API_PROXY_TARGET}/widget-dist/**` },
+    '/django-admin/**': { proxy: `${API_PROXY_TARGET}/django-admin/**` },
+    '/health/**': { proxy: `${API_PROXY_TARGET}/health/**` },
+    '/ready/**': { proxy: `${API_PROXY_TARGET}/ready/**` },
   },
   runtimeConfig: {
     public: {
