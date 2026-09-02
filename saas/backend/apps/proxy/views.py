@@ -71,6 +71,21 @@ def chat(request):
         request.user.is_authenticated
         and (project.user_id == request.user.id or request.user.role == 'admin')
     )
+    # 오리진 자동 학습 — 소유자/관리자가 자기 위젯을 설치 사이트에서 시험하면
+    # 그 오리진을 화이트리스트에 자동 등록한다. 이후 익명 방문자도 403 없이 사용 가능.
+    # (스크린샷 사례: 콘솔에서 다운로드한 위젯을 다른 도메인에 설치하면
+    #  프로젝트 URL과 달라 403이 반복되는 문제의 근본 해소)
+    if session_owner and origin and not allowed_origin:
+        from apps.projects.models import TenantOrigin
+        from core.origins import normalize_origin
+        normalized = normalize_origin(origin)
+        if TenantOrigin.objects.filter(origin=normalized).exists():
+            # 다른 프로젝트가 점유 중인 오리진 — 자동 등록 불가
+            pass
+        else:
+            TenantOrigin.objects.get_or_create(origin=normalized, defaults={'project': project})
+            allowed_origin = True
+            _log(request, 'ok', f'origin_learned:{normalized[:80]}', public_id)
     if not allowed_origin and not session_owner:
         _log(request, 'blocked_403', 'origin_not_allowed', public_id)
         return JsonResponse({'error': msg('proxy.domainNotAllowed')}, status=403)

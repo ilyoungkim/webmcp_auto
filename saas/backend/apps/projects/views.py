@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from urllib.parse import urlsplit
 
 from apps.catalogs.models import DomainType
 from apps.pipeline.crawler import fetch_sitemap_items, fetch_sitemap_urls
@@ -20,6 +21,26 @@ def _get_owned(request, pk) -> Project:
     if project.user_id != request.user.id and request.user.role != 'admin':
         raise PermissionDenied()
     return project
+
+
+def _register_origins(project: Project, url: str) -> None:
+    """URL의 오리진(+ www 변형)을 프로젝트 화이트리스트에 자동 등록.
+
+    - https://www.example.com → https://www.example.com + https://example.com 양쪽
+    - 위젯 설치 시 www 유무가 URL 입력 시점과 달라도 접속 가능하도록 403 방지
+    """
+    base = normalize_origin(url)
+    candidates = {base}
+    parts = urlsplit(base)
+    host = parts.hostname or ''
+    suffix = f':{parts.port}' if parts.port else ''
+    if host.startswith('www.'):
+        candidates.add(f"{parts.scheme}://{host[4:]}{suffix}")
+    else:
+        candidates.add(f"{parts.scheme}://www.{host}{suffix}")
+    for org in candidates:
+        if org:
+            TenantOrigin.objects.get_or_create(origin=org, defaults={'project': project})
 
 
 @api_view(['GET', 'POST'])
@@ -53,7 +74,7 @@ def projects(request):
         theme=(request.data.get('theme') or 'blue_sky'),
         lang=dt.lang or cur_lang,  # 프로젝트 언어 = 카탈로그(도메인 유형)의 언어
     )
-    TenantOrigin.objects.get_or_create(origin=project.origin, defaults={'project': project})
+    _register_origins(project, url)
     from apps.pipeline.models import PipelineJob
     # 생성 시 선택한 소스 페이지(최대 10개)가 있으면 해당 URL로 크롤링
     selected_urls = request.data.get('selectedUrls') or []
