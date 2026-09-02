@@ -70,7 +70,7 @@ services:
     dockerfilePath: ./docker/Dockerfile.backend
     dockerContext: .
     dockerCommand: |
-      sh -c "python manage.py migrate && python manage.py run_pipeline_worker --interval 2.0"
+      ./docker-worker-entrypoint.sh
     envVars:
       - fromGroup: webmcp-common
       - fromGroup: webmcp-secrets
@@ -111,7 +111,7 @@ services:
     dockerContext: .
     dockerfilePath: ./docker/Dockerfile.backend
     dockerCommand: |
-      sh -c "python manage.py migrate && python manage.py run_pipeline_worker --interval 2.0"
+      ./docker-worker-entrypoint.sh
     envVars:
       - fromGroup: webmcp-common
       - fromGroup: webmcp-secrets

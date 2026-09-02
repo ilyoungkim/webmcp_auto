@@ -27,11 +27,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 COPY saas/backend/ /app/backend/
 COPY saas/widget-dist/ /app/widget-dist/
 COPY docker/docker-entrypoint.sh /app/backend/docker-entrypoint.sh
+COPY docker/docker-worker-entrypoint.sh /app/backend/docker-worker-entrypoint.sh
 
 WORKDIR /app/backend
 # Windows CRLF → LF 변환 (셸 스크립트 호환)
-RUN sed -i 's/\r$//' /app/backend/docker-entrypoint.sh \
-    && chmod +x /app/backend/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /app/backend/docker-entrypoint.sh /app/backend/docker-worker-entrypoint.sh \
+    && chmod +x /app/backend/docker-entrypoint.sh /app/backend/docker-worker-entrypoint.sh
 
 # gunicorn 실행 (entrypoint에서 migrate/seed 후 기동)
 EXPOSE 8000

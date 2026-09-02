@@ -61,8 +61,9 @@ services:
     branch: main
     dockerContext: .
     dockerfilePath: ./docker/Dockerfile.backend
-    dockerCommand: |
-      sh -c "python manage.py migrate && python manage.py run_pipeline_worker --interval 2.0"
+    # ⚠️ 체인 커맨드("a && b")는 Render가 파일명으로 오판해 크래시 루프(실측) —
+    # 반드시 스크립트 파일로 실행할 것
+    dockerCommand: ./docker-worker-entrypoint.sh
     envVars:
       - fromGroup: webmcp-common
       - fromGroup: webmcp-secrets
