@@ -1,3 +1,44 @@
+# WebMCP Auto — Fully Automated AI Assistant SaaS
+
+> **Paste a URL** → crawl → LLM Q&A → widget build → preview → install.
+> A multi-tenant AI assistant widget SaaS — live in production on Render.
+
+**🌐 Live (hackathon, production)**: https://webmcp-front-en.onrender.com/
+
+- **Console frontend**: Nuxt.js 3 (`saas/frontend`)
+- **Backend**: Python Django 5 + DRF (`saas/backend`)
+- **DB**: SQLite (local dev) / PostgreSQL (Docker prod, Render managed)
+- **Deployment**: Docker Compose (`docker/`) or **Render Blueprint** (`render.yaml`)
+
+## Key features
+
+| Area | Features |
+|------|----------|
+| Accounts | Sign-up, login, password change (forced change included), free/pro/admin plans, session fully cleared on logout |
+| Projects | URL → crawl → LLM Q&A → widget build, fully automated (max 5 projects) |
+| Quick menu | One-time question editing, answer regeneration from saved sources, mandatory "What is an AI assistant?" menu |
+| Widget | 5 themes, preview, `bundle.zip` install package, voice input, input lock while generating |
+| **WebMCP** | Widget registers site-specific tools via `document.modelContext.registerTool()` — quick-menu tools + free-form Q&A tool for Chrome AI agents |
+| Data plane | `/embed/<publicId>.js` loader, `/api/chat/` real-time chat, Origin allowlist, quotas |
+| Multilingual silos | **ko/en fully separated** — per-language DB, containers, LLM engines, catalogs, widget/console UI |
+| Cloud | **Render Blueprint (EN silo live)** + Docker Compose (self-hosted ko/en) |
+
+## Quick start (Docker)
+
+```bash
+cd docker
+# fill GEMINI_API_KEY, OPENROUTER_API_KEY in saas/backend/.env
+./build.sh --run        # build + start ko(8080) + en(8081) + health check
+```
+
+For the Render cloud deployment (Blueprint IaC), LLM configuration, multi-tenant
+security model, and the full troubleshooting FAQ, see the detailed Korean
+documentation below.
+
+> 🇰🇷 **한국어 안내는 아래에 있습니다** — [WebMCP Auto — 완전 자동화 AI 비서 SaaS](#webmcp-auto--완전-자동화-ai-비서-saas)
+
+---
+
 # WebMCP Auto — 완전 자동화 AI 비서 SaaS
 
 > **URL만 입력하면** 크롤 → LLM Q&A → 위젯 생성 → 미리보기 → 설치까지 자동화하는
@@ -70,6 +111,7 @@ cd docker
 | en | http://localhost:8081 | English console·widget (도메인 27종) |
 | **ko (136 서버·운영)** | https://webmcp.duckdns.org:8443 | 한국어 — Let's Encrypt 공인 인증서, 경고 없음 |
 | **en (136 서버·운영)** | https://webmcp.duckdns.org:8444 | English — 동일 인증서 |
+| **en (Render 실운영·해커톤)** | https://webmcp-front-en.onrender.com | English — Render Blueprint 클라우드 배포 (E2E 검증 완료) |
 | ko (LAN) | http://192.168.31.248:8080 | 사내망 기기에서 접속 (개발 Mac 기준) |
 | en (LAN) | http://192.168.31.248:8081 | 사내망 기기에서 접속 |
 
