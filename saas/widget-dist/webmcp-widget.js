@@ -598,7 +598,13 @@
     if (launcher && panel) {
       launcher.addEventListener('click', function () {
         panel.hidden = !panel.hidden;
-        if (!panel.hidden) { welcome(); $('#wmcpInput').focus(); }
+        if (!panel.hidden) {
+          welcome();
+          // ⚠️ 모바일에서는 자동 포커스하지 않는다 — 소프트 키보드가 즉시 떠오르면
+          // 100dvh 패널이 밀려 인사말이 키보드 뒤로 가려진다. 데스크톱만 자동 포커스.
+          var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+          if (!isTouch && $('#wmcpInput')) $('#wmcpInput').focus();
+        }
       });
     }
     if (close && panel) {
@@ -686,8 +692,8 @@
     mic.addEventListener('click', function () {
       if (listening) {
         clearMicTimeout();
-        recognition.stop();
-        setMicState(false);
+        setMicState(false);          // 즉시 UI 해제 (테두리 잔존 방지 — onend보다 우선)
+        try { recognition.stop(); } catch (_) {}
       } else {
         // 보안 콘텍스트(http)가 아니면 마이크 권한 요청 자체가 차단되므로 사전 안내
         if (insecure) {
@@ -731,7 +737,9 @@
     listening = on;
     var mic = $('#wmcpMic');
     if (!mic) return;
-    mic.classList.toggle('wmcp-mic--active', on);
+    // 해제 시 pulse 애니메이션까지 확실히 제거 (브라우저별 애니메이션 상태 잔존 방지)
+    mic.classList.remove('wmcp-mic--active');
+    if (on) mic.classList.add('wmcp-mic--active');
     mic.title = on ? t('micStop') : t('micStart');
   }
 

@@ -47,6 +47,10 @@ const supportSaving = ref(false)
 const supportMessage = ref('')
 const supportError = ref('')
 
+// IP 화이트리스트 전역 On/Off (PaaS 프록시 환경용)
+const ipGuardEnabled = ref(true)
+const ipGuardSaving = ref(false)
+
 const loading = ref(true)
 const saving = ref(false)
 const message = ref('')
@@ -85,8 +89,28 @@ async function loadSettings() {
     const res = await useApi('/api/admin/settings/')
     supportPhoneDefault.value = res?.defaultSupportPhone || ''
     if (supportPhone.value === '') supportPhone.value = res?.supportPhone || ''
+    ipGuardEnabled.value = res?.ipGuardEnabled !== false
   } catch {
     // 설정 값은 빈 값 유지
+  }
+}
+
+async function toggleIpGuard() {
+  ipGuardSaving.value = true
+  supportMessage.value = ''
+  supportError.value = ''
+  const next = !ipGuardEnabled.value
+  try {
+    const res = await useApi('/api/admin/settings/', {
+      method: 'PATCH',
+      body: { ipGuardEnabled: next },
+    })
+    ipGuardEnabled.value = res?.ipGuardEnabled !== false
+    supportMessage.value = next ? t('prof.ipGuard.on') : t('prof.ipGuard.off')
+  } catch (e: any) {
+    supportError.value = e?.data?.detail || t('prof.loadFailed')
+  } finally {
+    ipGuardSaving.value = false
   }
 }
 
@@ -174,7 +198,7 @@ onMounted(async () => {
 
     <p v-if="loading" class="muted">{{ t('common.loading') }}</p>
     <template v-else-if="profile">
-      <!-- ── 사이트 대표 연락처 (관리자 전용) ──────────── -->
+      <!-- ── 사이트 설정 (관리자 전용) ──────────── -->
       <section class="card highlight">
         <h2>{{ t('prof.section.support') }}</h2>
         <div class="grid2">
@@ -190,6 +214,19 @@ onMounted(async () => {
             <p v-if="supportMessage" class="ok">{{ supportMessage }}</p>
             <p v-if="supportError" class="err">{{ supportError }}</p>
           </div>
+        </div>
+
+        <!-- IP 화이트리스트 전역 스위치 -->
+        <div class="ipguard-row">
+          <label class="ipguard-toggle">
+            <input
+              type="checkbox" :checked="ipGuardEnabled" :disabled="ipGuardSaving"
+              @change="toggleIpGuard"
+            />
+            <span class="switch" aria-hidden="true"></span>
+            <span class="label">{{ t('prof.ipGuard.title') }}</span>
+          </label>
+          <span class="hint">{{ t('prof.ipGuard.note') }}</span>
         </div>
       </section>
 
@@ -326,6 +363,23 @@ input, textarea { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6
 input:disabled { background: #f3f4f6; color: #6b7280; }
 .hint { font-size: 11px; color: #9ca3af; }
 .save-col { display: flex; align-items: flex-start; gap: 10px; flex-direction: column; padding-top: 18px; }
+
+/* IP 화이트리스트 토글 스위치 */
+.ipguard-row { margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e5e7eb; display: flex; flex-direction: column; gap: 6px; }
+.ipguard-toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.ipguard-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.ipguard-toggle .switch {
+  width: 40px; height: 22px; border-radius: 999px; background: #d1d5db;
+  position: relative; transition: background 0.2s; flex-shrink: 0;
+}
+.ipguard-toggle .switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%; background: #fff;
+  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.ipguard-toggle input:checked + .switch { background: #0e7490; }
+.ipguard-toggle input:checked + .switch::after { transform: translateX(18px); }
+.ipguard-toggle input:disabled + .switch { opacity: 0.5; }
 .row { display: flex; justify-content: flex-start; margin-top: 8px; }
 .row.end { justify-content: flex-end; }
 .btn { padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; cursor: pointer; font-size: 13px; }

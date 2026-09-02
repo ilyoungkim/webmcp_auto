@@ -71,7 +71,22 @@ def ip_allowed(raw_allowed: str, ip: str, *, direct: bool = False) -> bool:
       서버가 사내망/도커 네트워크/로컬에서 접속되는 환경에서는 화이트리스트
       실수와 무관하게 내부 접속을 보장한다. 공인 IP만 화이트리스트 판정 대상.
     - 목록이 비어 있으면 True (제한 없음)
+    - 전역 스위치(WEBMCP_IPGUARD env 또는 SiteSetting ipguard_enabled)가
+      false이면 항상 True — 기능 자체 비활성화 (PaaS 프록시 환경용)
     """
+    # 전역 스위치 — DB 설정(ipguard_enabled) 우선, 없으면 env(WEBMCP_IPGUARD)
+    # 순환 import 회피: 함수 내부에서 lazy import
+    import os
+    try:
+        from apps.proxy.models import SiteSetting
+        if SiteSetting.get('ipguard_enabled', '') != '':
+            if SiteSetting.get('ipguard_enabled', 'true') != 'true':
+                return True
+        elif os.environ.get('WEBMCP_IPGUARD', 'true').strip().lower() == 'false':
+            return True
+    except Exception:  # noqa: BLE001 — DB 미초기화 등 실패 시 env 폴백
+        if os.environ.get('WEBMCP_IPGUARD', 'true').strip().lower() == 'false':
+            return True
     if (ip or '').strip() in ALWAYS_LOCAL:
         return True
     try:

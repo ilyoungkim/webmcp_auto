@@ -73,6 +73,11 @@ function statusLabel(s: string): string {
   return map[s] || s
 }
 
+// 파이프라인 진행 중 여부 (스피너 표시 조건) — 실패/완료가 아니면 모두 처리 중
+const isProcessing = computed(() =>
+  !!project.value && ['queued', 'crawling', 'generating'].includes(project.value.status)
+)
+
 async function load() {
   project.value = await useApi(`/api/projects/${id}/`)
   snippet.value = project.value.installSnippet
@@ -281,7 +286,10 @@ onUnmounted(() => clearInterval(timer))
         <h1>{{ project.name }}</h1>
       </div>
       <div class="actions">
-        <span class="badge" :class="project.status">{{ statusLabel(project.status) }} {{ project.progress }}%</span>
+        <span class="badge" :class="project.status">
+          <span v-if="isProcessing" class="spin" aria-hidden="true"></span>
+          {{ statusLabel(project.status) }} {{ project.progress }}%
+        </span>
         <span v-if="project.status === 'failed'" class="fail-msg">{{ t('proj.edit.failMsg') }}</span>
         <button class="btn" @click="openRerunModal">{{ t('proj.btn.regenerate') }}</button>
         <button class="btn" @click="startEdit">{{ t('proj.btn.edit') }}</button>
@@ -795,9 +803,17 @@ header { display: flex; justify-content: space-between; align-items: flex-start;
 .back-link { font-size: 13px; color: #6b7280; text-decoration: none; }
 .back-link:hover { color: #111827; }
 .actions { display: flex; gap: 8px; align-items: center; }
-.badge { color: #0e7490; font-size: 13px; padding: 3px 10px; background: #f0f9ff; border-radius: 9999px; }
+.badge { color: #0e7490; font-size: 13px; padding: 3px 10px; background: #f0f9ff; border-radius: 9999px; display: inline-flex; align-items: center; gap: 6px; }
 .badge.failed { color: #b91c1c; background: #fef2f2; }
 .badge.completed { color: #047857; background: #ecfdf5; }
+/* 처리 중 스피너 — 크롤/Q&A 생성이 돌고 있음을 시각적으로 알림 */
+.spin {
+  width: 11px; height: 11px; flex-shrink: 0;
+  border: 2px solid #0e7490; border-top-color: transparent;
+  border-radius: 50%;
+  animation: badge-spin 0.8s linear infinite;
+}
+@keyframes badge-spin { to { transform: rotate(360deg); } }
 .fail-msg { color: #b91c1c; font-size: 13px; }
 pre { background: #f3f4f6; padding: 12px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }
 .err { color: #b91c1c; }

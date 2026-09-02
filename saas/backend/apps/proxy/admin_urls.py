@@ -96,8 +96,10 @@ def user_patch(request, pk):
 def site_settings(request):
     """전역 사이트 설정 조회/수정 (관리자 전용).
 
-    현재 지원: supportPhone(문의 안내 연락처 — 오류 메시지 등에 노출).
-    값이 비어 있으면 settings.SUPPORT_PHONE 기본값 사용.
+    현재 지원:
+    - supportPhone(문의 안내 연락처 — 오류 메시지 등에 노출)
+    - ipGuardEnabled(IP 화이트리스트 전역 On/Off — PaaS 프록시 환경에서 끄는 용도)
+    값이 비어 있으면 settings 기본값 사용.
     """
     _require_admin(request)
     from django.conf import settings as dj_settings
@@ -107,9 +109,15 @@ def site_settings(request):
     if request.method == 'PATCH':
         if 'supportPhone' in request.data:
             SiteSetting.set('support_phone', (request.data['supportPhone'] or '').strip())
+        if 'ipGuardEnabled' in request.data:
+            SiteSetting.set('ipguard_enabled', 'true' if request.data['ipGuardEnabled'] else 'false')
+
+    import os
+    env_default = os.environ.get('WEBMCP_IPGUARD', 'true').strip().lower() != 'false'
     return Response({
         'supportPhone': SiteSetting.get('support_phone', dj_settings.SUPPORT_PHONE),
         'defaultSupportPhone': dj_settings.SUPPORT_PHONE,
+        'ipGuardEnabled': SiteSetting.get('ipguard_enabled', 'true' if env_default else 'false') == 'true',
     })
 
 
