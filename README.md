@@ -6,7 +6,7 @@
 - **콘솔 프론트**: Nuxt.js 3 (`saas/frontend`)
 - **백엔드**: Python Django 5 + DRF (`saas/backend`)
 - **DB**: SQLite(로컬 검증) / PostgreSQL(Docker 운영)
-- **배포**: Docker Compose (`docker/`)
+- **배포**: Docker Compose (`docker/`) 또는 **Render Blueprint** (`render.yaml`)
 
 ---
 
@@ -104,6 +104,78 @@ docker compose -f docker-compose.silo.yml exec backend-ko python manage.py migra
   이관 시 `SAAS_PUBLIC_URL`/`CSRF_TRUSTED_ORIGINS`(위젯 박제용)만 수동 갱신하면 된다.
 
 > 관리자 계정: `admin@local` / `.env`의 `ADMIN_SEED_PASSWORD`
+
+---
+
+## Render 클라우드 배포 (Blueprint IaC)
+
+Docker Compose를 쓰지 않고도 **Render Managed 플랫폼**에 전체 스택을 IaC로 배포할 수 있다.
+repo 루트의 `render.yaml`이 Blueprint(인프라 정의)이며, 2026-09-02 실배포로 전 경로가 검증됐다.
+
+### 파일 구성
+
+| 파일 | 내용 |
+|------|------|
+| `render.yaml` | **현재 배포 버전 — EN 사일로 단독** (web/front/worker/db 4리소스) |
+| `render-full-silo.yaml` | ko+en 전체 8리소스 버전 (보존용 — ko 필요 시 이 파일을 `render.yaml`로 복원해 커밋) |
+
+### 배포 절차 (실측)
+
+1. Render Dashboard → **New → Blueprint** → GitHub 저장소(`webmcp_auto`) 연결
+2. 생성 프롬프트에서 `sync: false` 항목 입력: `GEMINI_API_KEY`, `OPENROUTER_API_KEY`
+   (웹/워커 각각 — 초기 생성 때만 묻고 이후 수정은 대시보드 Environment 탭에서)
+3. **Deploy Blueprint** → 웹 2 + 워커 1 + DB 1 자동 프로비저닝 (0.5c-512mb × 3, PG 0.5c-1g)
+4. 배포 완료(3~5분) 후 `https://webmcp-front-en.onrender.com` 접속
+
+### 생성되는 리소스 (EN 단독)
+
+| 타입 | 서비스 | 역할 |
+|------|--------|------|
+| web | `webmcp-web-en` | Django + Gunicorn (docker-entrypoint.sh가 migrate/seed/collectstatic 후 기동) |
+| web | `webmcp-front-en` | Nuxt 3 SSR 콘솔 — routeRules 프록시로 내부 네트워크에서 백엔드 호출 |
+| worker | `webmcp-worker-en` | `run_pipeline_worker` (migrate 선행) |
+| postgres | `webmcp-db-en` | `DATABASE_URL` 자동 주입 (`fromDatabase: connectionString`) |
+
+- 백엔드 간 통신은 공개 URL이 아닌 **Render 내부 네트워크**(`http://webmcp-web-en:10000`)를 사용한다.
+  이 값은 **빌드 타임에 Nuxt routeRules에 컴파일**되므로 백엔드 서비스명을 바꾸면 프론트 재빌드가 필요하다.
+
+### E2E 검증 결과 (2026-09-02, med.stanford.edu)
+
+| 단계 | 소요 | 비고 |
+|------|------|------|
+| 크롤 (10페이지) | ~1분 | 10%→30% |
+| **Q&A 배치 생성 (OpenRouter)** | **~4분** | **30%에 오래 머무는 게 정상 — 멈춤 아님** |
+| 위젯 생성 → 완료 | 수 초 | 100% |
+| 실시간 채팅 (Gemini) | 즉시 | 영어 응답 정상 |
+
+> 파이프라인 진행률이 `queued 0%` 또는 `generating 30%`에 머물러도 워커 로그에
+> 크래시가 없으면 기다리면 된다. 진행률 폴링은 콘솔이 `/api/projects/<id>/status/`를
+> 주기 호출하는 정상 동작이다.
+
+### Render 포팅 시 실측 함정 (중요)
+
+1. **`dockerCommand` 체인 커맨드 오판** — `sh -c "a && b"` 형태를 Render가 **전체를 하나의
+   실행 파일명으로 해석**해 `not found` 무한 크래시 루프에 빠진다(실측). 워커처럼 여러
+   명령이 필요하면 `docker/docker-worker-entrypoint.sh`처럼 **스크립트 파일로 분리**하고
+   `dockerCommand: ./docker-worker-entrypoint.sh` 한 줄로 실행할 것.
+2. **`sync: false`는 envVarGroups 안에서 무시됨** — API 키 등 시크릿은 각 서비스의
+   `envVars`에 직접 정의해야 생성 프롬프트가 뜬다. `generateValue`와 `sync: false`도 동시 지정 불가.
+3. **DB 참조는 `fromDatabase`** — `fromService: type: postgres`라는 타입은 존재하지 않는다.
+4. **`hostport` 속성은 web/pserv 전용** — worker에는 없다.
+5. **Render 내부 포트는 10000** — `$PORT` 자동 주입. 프론트 프록시 대상:
+   `http://webmcp-web-<lang>:10000`
+6. **헬스체크** — `/api/health/` (widgets 앱). `/healthz` 같은 경로는 없다.
+7. **`DJANGO_SETTINGS_MODULE: config.settings.ko/en` 같은 분기 모듈은 없다** — 단일
+   `config/settings.py`가 `WEBMCP_LANG`/`WEBMCP_LANGS` env로 사일로를 분기한다.
+8. **관리자 시드** — `ADMIN_SEED_PASSWORD`를 넣지 않으면 `seed_admin`이 생략된다.
+   첫 로그인 계정이 없으면 웹 서비스 Shell에서 `python manage.py seed_admin` 또는
+   `createsuperuser` 실행.
+
+### 커스텀 도메인 연결 시 (중요)
+
+`webmcp-front-en`에 도메인을 달면 **`SAAS_PUBLIC_URL`과 `CSRF_TRUSTED_ORIGINS`를 반드시
+갱신**해야 한다. 이 값은 위젯 config의 `assetBase`/`proxyEndpoint`에 **빌드 시점에 박제**되므로,
+갱신 후 기존 프로젝트는 위젯을 재생성해야 새 주소가 반영된다(로컬 Docker 운영 때와 동일한 함정).
 
 ---
 
