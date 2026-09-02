@@ -1,6 +1,6 @@
 # WebMCP Auto — 테스트 결과 기록 (test-results.md)
 
-> 2026-08-28 ~ 2026-08-30까지 수행된 테스트를 시간 순으로 기록한다.
+> 2026-08-28 ~ 2026-09-02까지 수행된 테스트를 시간 순으로 기록한다.
 > 각 항목은 **날짜 / 대상 / 방법 / 결과** 순으로 정리한다.
 
 ---
@@ -461,6 +461,76 @@
 - **en 백업 복원**: Mac en DB `pg_dump --data-only --inserts` → `auth_permission/django_content_type/django_migrations/django_session` 제외 후 적용, **11개 테이블 setval 시퀀스 동기화**
   - 결과: users 2 / projects 6 / widgets 10 / Q&A 25 / 카탈로그 27/135 — Mac과 동일
   - en 5개 프로젝트에 현재 위젯 보유(edmunds는 failed → 없음, 정상)
+
+---
+
+---
+
+## 2026-09-02 — Render 클라우드 배포 (Blueprint IaC) — 실측 문제점과 해결
+
+> ko+en 전체 Blueprint → **EN 사일로 단독**으로 전환해 배포. URL: `https://webmcp-front-en.onrender.com`
+> 관련 커밋: `714293d`(Blueprint 검증 수정) / `384050a`(EN 단독 전환) / `0e83bca`(워커 크래시 수정) / `4360e6d`(UX 4건) / `faec401`(오리진 자동학습) / `d4fc8e1`(v-for 충돌 수정)
+
+### T-039. Blueprint 초기 버전 — 검증/빌드 실패 다수 (커밋 714293d)
+- **문제**: 초안 render.yaml이 Blueprint 사양 위반으로 배포 불가 상태였음
+  1. `dockerfilePath: ./backend` — 실제 위치는 `docker/Dockerfile.backend`, 컨텍스트는 repo 루트 (빌드 즉시 실패)
+  2. `DATABASE_URL`을 `fromService: type: postgres`로 참조 — **postgres 타입 서비스는 존재하지 않음**, DB는 `databases:`에 정의하고 `fromDatabase: connectionString`으로 참조해야 함
+  3. `DJANGO_SETTINGS_MODULE: config.settings.ko/en` — 그런 모듈이 없음. 단일 `config/settings.py`가 `WEBMCP_LANG` env로 사일로 분기
+  4. 워커 커맨드 `python -m rq worker -u ${CELERY_BROKER_URL}` — rq/celery/redis가 requirements에 없음. 실제 워커는 `manage.py run_pipeline_worker`(폴링 방식)
+  5. 프론트엔드(Nuxt) 서비스 누락 — Dockerfile.frontend를 쓰는 서비스가 정의에 없음
+  6. `hostport` 속성을 worker에서 참조 — **hostport는 web/pserv 전용**, worker에는 없음
+  7. 헬스체크 `/healthz` — 존재하지 않는 경로. 실제는 `/api/health/`(widgets 앱)
+  8. `sync: false`를 envVarGroups에 넣음 — **Render가 그룹 내 sync:false를 무시** → API 키가 프롬프트에 안 뜨고 빈 값 배포됨 → 각 서비스 envVars에 직접 정의로 수정
+- **교훈**: Render Blueprint 사양 검증은 `render blueprints validate render.yaml` (CLI v2.7+)로 사전 확인 가능
+
+### T-040. 워커 무한 크래시 루프 — job이 영원히 queued 0% (커밋 0e83bca)
+- **증상**: 콘솔에서 신규 등록 → `Queued 0%` 멈춤. 콘솔이 `/api/projects/1/`을 폴링(이건 정상 동작)하는데 상태가 안 바뀜
+- **진단**: Render 워커 로그에서 `sh: 1: python manage.py migrate && python manage.py run_pipeline_worker --interval 2.0: not found` + `Instance restarted` 무한 반복 확인
+- **원인**: `dockerCommand: sh -c "a && b"` 형태의 **체인 커맨드를 Render가 전체 문자열을 하나의 실행 파일명으로 오판** → 시작 즉시 죽고 재시작 반복(크래시 루프)
+- **해결**: 체인 커맨드를 `docker/docker-worker-entrypoint.sh`(migrate 후 `exec run_pipeline_worker --interval 2.0`) 스크립트로 분리, `dockerCommand: ./docker-worker-entrypoint.sh` 한 줄로 실행. Dockerfile에 스크립트 COPY + CRLF→LF sed + chmod 추가
+- **검증**: 워커 로그 `pipeline worker 시작` 확인, 재시작 없음
+
+### T-041. EN 사일로 E2E 검증 — 파이프라인 전 경로 성공
+- **테스트**: med.stanford.edu 프로젝트 (id 3, publicId SWDosYoKeXmS)
+- **소요**: 크롤 10페이지 ~1분(10→30%) → **Q&A 배치 생성(OpenRouter) ~4분(30% 구간이 가장 김 — 멈춤 아님)** → completed 100%
+- **채팅**: Gemini 실시간 응답 정상(영어). `example.com` 같은 경량 사이트는 "크롤에 성공한 페이지가 없습니다"로 실패 가능(정상 동작)
+- **운영 팁**: 진행률이 `queued 0%`/`generating 30%`에 머물러도 워커 로그에 크래시가 없으면 대기. 상태 폴링은 `/api/projects/<id>/status/` 주기 호출(정상)
+
+### T-042. UX 4건 + IP 화이트리스트 전역 스위치 (커밋 4360e6d)
+1. 프로젝트 상태 배지에 **스피너** 추가(queued/crawling/generating) — "30% 멈춤" 인상 해소
+2. 위젯 음성입력 **해제 시 테두리 잔존** → `setMicState`가 classList.remove→add 방식으로 확실히 토글 + 클릭 핸들러에서 UI 해제를 stop()보다 먼저
+3. 모바일 채팅 패널 열림 시 **자동 포커스가 소프트 키보드를 띄워 인사말 가림** → 터치 디바이스(`ontouchstart`/`maxTouchPoints`)에서는 자동 포커스 생략, 데스크톱만 유지
+4. **IP 화이트리스트 전역 On/Off**: Render처럼 프록시 뒤에서 클라이언트 IP가 사설 대역으로 보이는 환경은 화이트리스트 판정 자체가 불가 → `SiteSetting.ipguard_enabled` → env `WEBMCP_IPGUARD` 순으로 판정, OFF면 검증 생략. 관리자 프로필에 토글 UI 추가
+- **위젯 수정 시** `saas/widget-dist`와 `saas/frontend/public/widget-dist` 양쪽 cp 동기화 필수 (기존 규칙 재확인)
+
+### T-043. 위젯 설치 사이트에서 채팅 403 — Origin 화이트리스트 누락 (커밋 faec401)
+- **증상**: 고객 사이트(heewon.luvd.kr)에 설치한 위젯에서 채팅 시 `POST /api/chat/ 403 (Forbidden)`, 콘솔 오류 피드백 표시
+- **원인**: 위젯 채팅 인증은 ① Origin이 프로젝트 화이트리스트에 등록 ② 또는 소유자/관리자 세션 — 중 하나 필요. **콘솔에서 다운로드한 위젯을 프로젝트 URL과 다른 도메인에 설치하면** 오리진이 없어 익명 방문자가 전부 403
+- **진단**: curl로 `Origin` 헤더를 달고 익명 `POST /api/chat/` → 403 재현 (`Domain not allowed`, RequestLog reason=`origin_not_allowed`)
+- **해결 2건**:
+  1. 프로젝트 **생성 시 www/비www 양쪽 오리진 자동 등록** (`_register_origins()`)
+  2. **소유자/관리자 세션으로 채팅 시험하면 접속 Origin을 자동 학습 등록** (다른 프로젝트가 점유한 오리진은 제외) — 위젯 설치 → 소유자가 1회 대화 → 이후 익명 방문자 정상
+- **수동 등록**: `POST /api/projects/<id>/origins/` {"origin": "https://..."} — 콘솔 프로젝트 상세에서도 가능
+
+### T-044. admin@local 원격 로그인 — 계정 부재 vs IP 제약 구분
+- **증상**: Render에서 admin@local 로그인 401
+- **핵심 구분**: `403 ipNotAllowed` = IP 차단 / `401 invalidCredentials` = **계정 없음 또는 비번 오류**. 401이면 IP 제약이 아니라 계정 부재
+- **원인**: Blueprint에 `ADMIN_SEED_PASSWORD` 미설정 → entrypoint의 `seed_admin`이 생략됨 (`seed_admin.py`는 비어 있으면 exit)
+- **해결**: Render 웹 서비스 Shell에서 `ADMIN_SEED_PASSWORD='...' python manage.py seed_admin` → 원격 로그인 200 확인
+- **강제변경 해제**: `/api/auth/password/`가 500을 반환(원인 미파악) → Shell에서 `python manage.py reset_password admin@local '<pw>' --no-force-change`가 안전
+- **IP 제약 상태**: admin@local의 `allowed_ips`는 빈 값 = 제한 없음. 전역 스위치(ipguard_enabled/WEBMCP_IPGUARD)도 관리자 프로필에서 OFF 가능
+
+### T-045. admin/projects 특정 계정 선택 시 화면 공백 (커밋 d4fc8e1)
+- **증상**: kkumsa@gmail.com 계정 선택 시 화면이 통째로 공백
+- **진단**: 브라우저 콘솔 `TypeError: t is not a function` — **고객센터 Q&A 목록 `v-for="t in supportItems"`의 변수 `t`가 useSilo 번역 함수 `t()`를 가리는 충돌**. kkumsa만 고객센터 질문이 있어 이 블록이 렌더되며 컴포넌트 전체 크래시
+- **해결**: v-for 변수를 `t` → `s`로 변경(15곳 일괄)
+- **교훈**: useSilo의 `t`를 쓰는 템플릿에서 v-for 변수명으로 `t` 사용 금지. "고객센터 질문이 있는 계정"에서만 발생해 재현이 까다로웠음
+
+### Render 배포 최종 상태
+- 리소스: `webmcp-web-en`(Django) / `webmcp-front-en`(Nuxt) / `webmcp-worker-en`(파이프라인) / `webmcp-db-en`(PG 0.5c-1g) — 모두 0.5c-512mb
+- 접속: `https://webmcp-front-en.onrender.com` (콘솔) / 백엔드 프록시 `/api/**`는 Nuxt routeRules → 내부 `http://webmcp-web-en:10000`
+- 관리자: admin@local (Shell에서 시드) — 원격 로그인 확인
+- ko 사일로: 미배포. 필요 시 `render-full-silo.yaml`을 `render.yaml`로 복원해 커밋
 
 ---
 

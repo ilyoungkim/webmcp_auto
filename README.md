@@ -171,6 +171,16 @@ repo 루트의 `render.yaml`이 Blueprint(인프라 정의)이며, 2026-09-02 �
    첫 로그인 계정이 없으면 웹 서비스 Shell에서 `python manage.py seed_admin` 또는
    `createsuperuser` 실행.
 
+### 배포 중 실제로 겪은 문제 (2026-09-02 — 상세 이력은 `test-results.md` T-039~T-045)
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| 워커 `not found` 무한 크래시 루프, job이 Queued 0% 멈춤 | `dockerCommand: sh -c "a && b"` 체인을 Render가 **파일명으로 오판** | 워커 entrypoint 스크립트로 분리 (`0e83bca`) |
+| 고객 사이트 위젯 채팅 403 | 설치 도메인이 Origin 화이트리스트에 없음 | 생성 시 www 양쪽 자동 등록 + **소유자 세션 시험 시 오리진 자동 학습** (`faec401`) |
+| admin@local 로그인 401 | `ADMIN_SEED_PASSWORD` 미설정 → 시드 생략 (401=계정 부재, 403=IP 차단) | 웹 서비스 Shell에서 `seed_admin` 실행 |
+| admin/projects 특정 계정 선택 시 화면 공백 | 고객센터 목록 `v-for="t"`가 **번역 함수 `t()`를 가림** | v-for 변수 `s`로 변경 (`d4fc8e1`) |
+| "Queued 0% / 30% 멈춤"처럼 보임 | Q&A 배치(OpenRouter)가 3~5분 정상 소요 | 상태 배지에 스피너 표시 (`4360e6d`) |
+
 ### 커스텀 도메인 연결 시 (중요)
 
 `webmcp-front-en`에 도메인을 달면 **`SAAS_PUBLIC_URL`과 `CSRF_TRUSTED_ORIGINS`를 반드시
