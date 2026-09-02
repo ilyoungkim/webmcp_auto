@@ -1,7 +1,7 @@
 # PORTING.md — 다른 서버로 포팅하기 (136 배포판 기준)
 
 > WebMCP Auto 사일로(ko/en)를 **새로운 Linux 서버에 Docker로 이식**하는 절차.
-> 원본 검증环境: `192.168.31.136` (Fedora 39, Docker 27.3.1, Compose v2.21) —
+> 원본 검증 환경: `192.168.31.136` (Fedora 39, Docker 27.3.1, Compose v2.21) —
 > 이 문서의 명령은 해당 서버에서 실측·동작 확인을 마친 내용이다.
 
 ---
@@ -97,7 +97,7 @@ DOCKER_HOST=unix:///var/run/docker.sock docker compose -f docker-compose.silo.ym
 ```
 - 빌드: backend(python3.13 + node/terser), frontend(node/nuxt) — 수 분 소요
 - `docker-entrypoint.sh`가 자동 실행: `migrate` → `seed_catalogs` → `seed_admin` → `collectstatic` → gunicorn
-- **worker는 migrate 전에 뜨면 실패 합니다**: 로그 확인 후 `docker compose -f docker-compose.silo.yml restart worker-ko worker-en`
+- **worker는 migrate 전에 뜨면 실패합니다**: 로그 확인 후 `docker compose -f docker-compose.silo.yml restart worker-ko worker-en`
 
 ```bash
 # 헬스체크
@@ -171,7 +171,7 @@ echo | openssl s_client -connect 127.0.0.1:8443 -servername webmcp.duckdns.org 2
 |---|---|---|
 | `bind() to 0.0.0.0:8080 failed: Address already in use` | 호스트 nginx 기본 설정 또 다른 서비스 | nginx.conf 기본 서버 블록 주석 / 포트 변경 |
 | `failed to read dockerfile` | Dockerfile이 compose `context`에 없음 | compose와 같은 상대경로 위치에 Dockerfile 배치 |
-| `"/saas/widget-dist": not found` | `saas/widget-dist/`미존재(frontend/public 만 있음) | `saas/widget-dist/`로 복사 — Dockerfile COPY 경로 |
+| `"/saas/widget-dist": not found` | `saas/widget-dist/` 미존재 (frontend/public 만 있음) | `saas/widget-dist/`로 복사 — Dockerfile COPY 경로 |
 | 컨테이너 재시작 후 nginx 502 (`Host is unreachable`) | 정적 upstream의 시작 시 1회 resolve | resolver 기반 proxy_pass(적용됨) 또는 nginx restart |
 | 데이터 일부만 복원됨, 이후 PK 충돌 | 시퀀스 뒤처짐 | `setval(pg_get_serial_sequence(테이블,'id'), MAX(id))` — 테이블마다 |
 | 위젯 채팅 504 | Gemini 실시간 호출 지연 | 호스트 nginx `proxy_read_timeout 180s` 상향, 필요 시 백엔드 타임아웃 정책 조정 |
@@ -187,36 +187,40 @@ echo | openssl s_client -connect 127.0.0.1:8443 -servername webmcp.duckdns.org 2
 ## 8. Render Blueprint (클라우드 원클릭 포팅)
 
 > Linux 서버 대신 **Render**에 올린다면 repo 루트의 **`render.yaml`** (Blueprint)으로
-> 웹 2 + 워커 2 + DB 2를 한 번에 프로비저닝할 수 있다.
+> **EN 사일로(web 2 + worker 1 + DB 1, 총 4리소스)**를 한 번에 프로비저닝할 수 있다.
+> 2026-09-02 실배포로 전 경로가 검증됐다. ko+en 전체 8리소스 버전은
+> `render-full-silo.yaml`(보존용)을 `render.yaml`로 복원해 커밋하면 된다.
 
 ```bash
-# 구성 요약 (render.yaml)
-#   databases: webmcp-postgres-ko / webmcp-postgres-en  (Managed PG, plan basic-256mb)
+# 구성 요약 (render.yaml — 현재 EN 단독 버전)
+#   database: webmcp-db-en (Managed PG, plan 0.5c-1g, ipAllowList: [])
 #   services:
-#     webmcp-web-ko    (web,    Dockerfile.backend, healthCheck /api/health/)
-#     webmcp-worker-ko (worker, dockerCommand: run_pipeline_worker --interval 2.0)
-#     webmcp-web-en    / webmcp-worker-en (동일 구성의 en 사일로)
+#     webmcp-web-en    (web,    Dockerfile.backend, healthCheck /api/health/)
+#     webmcp-front-en  (web,    Dockerfile.frontend, healthCheck /)
+#     webmcp-worker-en (worker, dockerCommand: ./docker-worker-entrypoint.sh)
+#
+#   백엔드 참조는 Render 내부 네트워크: http://webmcp-web-en:10000 (빌드 타임 컴파일)
 ```
 
-**배포 절차**
+**배포 절차 (실측)**
 1. Render Dashboard → `New → Blueprint` → 이 저장소 선택 (render.yaml 자동 인식)
-2. `sync: false` 항목 입력 (GEMINI_API_KEY, OPENROUTER_API_KEY, SAAS_PUBLIC_URL, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS)
-3. 첫 배포 완료 후 헬스체크 `https://webmcp-ko.onrender.com/api/health/` 확인
+2. 생성 프롬프트에서 `sync: false` 항목 입력: `GEMINI_API_KEY`, `OPENROUTER_API_KEY`
+   (웹/워커 각각 — ⚠️ `envVarGroups` 안의 `sync: false`는 무시되므로 각 서비스 envVars에 직접 정의됨)
+3. **Deploy Blueprint** → 자동 프로비저닝 (0.5c-512mb × 3, PG 0.5c-1g)
+4. 배포 완료(3~5분) 후 헬스체크 `https://webmcp-front-en.onrender.com/api/health/` 확인
 
-**필수 코드 조정 (1줄)** — entrypoint가 0.0.0.0:8000 고정이므로 Render 포트와 맞추려면:
-```dockerfile
-# docker/Dockerfile.backend 의 CMD → 환경변수 PORT 지원
-# docker-entrypoint.sh 의 gunicorn bind 를 다음으로 교체 권장:
-#   --bind "0.0.0.0:${PORT:-8000}"
-```
+> **포트 불일치 조정 불필요** — Render는 `$PORT`(=10000)를 자동 주입하고
+> `docker-entrypoint.sh`가 `0.0.0.0:$PORT`로 바인딩한다. 구버전 문서의
+> "entrypoint 0.0.0.0:8000 고정 → PORT 지원 코드 조정" 항목은 이미 반영 완료.
 
-**요금 개요**
+**요금 개요 (현재 EN 단독 구성)**
 | 서비스 | 플랜 | 월 |
 |---|---|---|
-| Web ×2 (starter) | 512MB | $7 × 2 |
-| Worker ×2 (starter) | — | $7 × 2 |
-| PostgreSQL ×2 (basic-256mb) | | $6.90 × 2 |
+| Web ×2 (0.5c-512mb) | web-en + front-en | $7 × 2 |
+| Worker ×1 (0.5c-512mb) | worker-en | $7 |
+| PostgreSQL ×1 (0.5c-1g) | db-en | $6.90 |
 | **합계** | | **약 $28/mo** |
 
-- 개발 검증은 ko 1개(web+worker+db ≈ $14/mo)로 먼저 시작하는 것을 권장.
-- 프론트(Nuxt)를 Cloudflare Pages로 분리하면 비용·성능 모두 개선 가능.
+- 개발 검증은 web 1 + worker 1 + db 1(≈ $14/mo)로 먼저 시작하는 것을 권장.
+- Render 실측 함정(`dockerCommand` 체인 오판, `fromDatabase` 참조, envVarGroups 제약 등)
+  8건은 README "Render 포팅 시 실측 함정" 섹션과 `test-results.md` T-039~T-045 참조.
