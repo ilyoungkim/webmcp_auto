@@ -494,38 +494,38 @@ onMounted(async () => {
         <div v-if="supportLoading" class="muted">{{ t('common.loading') }}</div>
         <div v-else-if="supportItems.length === 0" class="muted">{{ t('admin.projects.supportEmpty') }}</div>
         <div v-else class="support-list">
-          <div v-for="t in supportItems" :key="t.id" class="support-item" :class="t.status">
-            <div class="support-head" @click="toggleSupport(t.id)">
-              <span class="support-badge" :class="t.status">{{ t.status === 'answered' ? t('admin.projects.answered') : t('admin.projects.pending') }}</span>
-              <span class="support-project">{{ t.projectName }}</span>
-              <span class="support-question">{{ t.question }}</span>
-              <span class="support-time">{{ fmtSupportTime(t.createdAt) }}</span>
-              <span v-if="t.status === 'pending'" class="support-answer-hint">✏️ {{ t('admin.projects.answerHint') }}</span>
+          <div v-for="s in supportItems" :key="s.id" class="support-item" :class="s.status">
+            <div class="support-head" @click="toggleSupport(s.id)">
+              <span class="support-badge" :class="s.status">{{ s.status === 'answered' ? t('admin.projects.answered') : t('admin.projects.pending') }}</span>
+              <span class="support-project">{{ s.projectName }}</span>
+              <span class="support-question">{{ s.question }}</span>
+              <span class="support-time">{{ fmtSupportTime(s.createdAt) }}</span>
+              <span v-if="s.status === 'pending'" class="support-answer-hint">✏️ {{ t('admin.projects.answerHint') }}</span>
             </div>
 
-            <div v-if="expandedSupport.has(t.id)" class="support-detail">
+            <div v-if="expandedSupport.has(s.id)" class="support-detail">
               <div class="support-q-full">
                 <span class="support-label">Q.</span>
-                <p>{{ t.question }}</p>
+                <p>{{ s.question }}</p>
               </div>
 
-              <div v-if="t.answer" class="support-a-full">
+              <div v-if="s.answer" class="support-a-full">
                 <span class="support-label">A.</span>
                 <div class="support-a-body">
-                  <p>{{ t.answer }}</p>
-                  <span v-if="t.answeredAt" class="support-time">{{ fmtSupportTime(t.answeredAt) }}</span>
+                  <p>{{ s.answer }}</p>
+                  <span v-if="s.answeredAt" class="support-time">{{ fmtSupportTime(s.answeredAt) }}</span>
                 </div>
               </div>
 
               <div class="support-answer-form">
                 <textarea
-                  v-model="answerDrafts[t.id]"
+                  v-model="answerDrafts[s.id]"
                   rows="3"
                   :placeholder="t('admin.projects.answerPlaceholder')"
                 ></textarea>
                 <div class="support-answer-actions">
-                  <button class="btn primary" :disabled="answering[t.id]" @click="submitAnswer(t)">
-                    {{ answering[t.id] ? t('admin.projects.answerSubmitting') : (t.answer ? t('admin.projects.answerEdit') : t('admin.projects.answerSubmit')) }}
+                  <button class="btn primary" :disabled="answering[s.id]" @click="submitAnswer(s)">
+                    {{ answering[s.id] ? t('admin.projects.answerSubmitting') : (s.answer ? t('admin.projects.answerEdit') : t('admin.projects.answerSubmit')) }}
                   </button>
                 </div>
               </div>
