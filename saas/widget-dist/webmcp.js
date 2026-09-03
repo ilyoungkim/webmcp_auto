@@ -60,6 +60,19 @@
     return askQuestion(question, memory);
   }
 
+  // Google WebMCP 보안 가이드의 도구 출력 문자 예산(1,500자) 준수용 클램프.
+  // 에이전트 가드레일 회피 — 긴 LLM 응답을 문장 경계에서 잘라 말줄임 처리한다.
+  var MAX_TOOL_OUTPUT = 1500;
+  function clampToolOutput(text) {
+    var s = String(text || '');
+    if (s.length <= MAX_TOOL_OUTPUT) return s;
+    var cut = s.slice(0, MAX_TOOL_OUTPUT - 1);
+    // 마지막 문장 경계(마침표/물음표/느낌표/줄바꿈)에서 자르되, 너무 짧아지면 그대로 유지
+    var last = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('!'), cut.lastIndexOf('?'), cut.lastIndexOf('。'), cut.lastIndexOf('！'), cut.lastIndexOf('？'), cut.lastIndexOf('\n'));
+    if (last > MAX_TOOL_OUTPUT * 0.5) cut = cut.slice(0, last + 1);
+    return cut.replace(/\s+$/, '') + '…';
+  }
+
   window.WebMCP = Object.assign(window.WebMCP || {}, {
     askQuestion: askQuestion,
     callGeminiViaProxy: callGeminiViaProxy,
@@ -118,8 +131,8 @@
             inputSchema: { type: 'object', properties: {} },
             annotations: { readOnlyHint: true },
             execute: function () {
-              // 도구 실행 = 서버(system_prompt 부착) 프록시 호출 → AI 답변 텍스트 반환
-              return askQuestion(question).catch(function () {
+              // 도구 실행 = 서버(system_prompt 부착) 프록시 호출 → AI 답변 텍스트 반환 (1,500자 클램프)
+              return askQuestion(question).then(clampToolOutput).catch(function () {
                 return '';
               });
             },
@@ -143,7 +156,7 @@
             execute: function (args) {
               var q = (args && args.question) || '';
               if (!q) return '';
-              return askQuestion(q).catch(function () {
+              return askQuestion(q).then(clampToolOutput).catch(function () {
                 return '';
               });
             },
@@ -161,11 +174,11 @@
               properties: { question: { type: 'string', description: 'The question to ask' } },
               required: ['question'],
             },
-            annotations: { readOnlyHint: true },
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
             execute: function (args) {
               var q = (args && args.question) || '';
               if (!q) return '';
-              return askQuestion(q).catch(function () {
+              return askQuestion(q).then(clampToolOutput).catch(function () {
                 return '';
               });
             },
