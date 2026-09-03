@@ -31,6 +31,52 @@ cd docker
 ./build.sh --run        # build + start ko(8080) + en(8081) + health check
 ```
 
+## How judges can test WebMCP tools
+
+This app exposes real WebMCP tools to browser AI agents. Every deployed widget
+registers site-specific tools the moment its script loads — no code changes
+needed on the target site.
+
+**1. Enable WebMCP in your browser (pick one):**
+
+- **ChatGPT desktop app** — open the live URL in the in-app browser (WebMCP
+  works out of the box), or
+- **Google Chrome 149+** — go to `chrome://flags/#enable-webmcp-testing`,
+  set to **Enabled**, and restart Chrome.
+
+**2. Open a widget-installed page and let the agent discover the tools:**
+
+- Visit https://webmcp-front-en.onrender.com/ and sign up (or use the
+  credentials provided in the Testing Instructions field of the submission form).
+- Create a project by pasting any URL (e.g. a clinic or business site) — the
+  pipeline crawls the site, generates Q&A, and builds the widget automatically.
+- Open the project's **Install** page and load the demo site shown there (the
+  page that embeds `<script src=".../embed/<publicId>.js">`).
+
+**3. Verify tool registration & execution:**
+
+- In Chrome, open **DevTools → Application → WebMCP** (or install the
+  [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
+  extension) on the demo site — you will see the registered tools:
+  - `get_<menu>` tools — one per quick-menu question (read-only)
+  - `ask_site_ai` — free-form site question tool (read-only)
+- Ask the agent (ChatGPT sidebar / Chrome Gemini / Inspector extension)
+  something like *"Ask this site what services it offers"* — the agent will
+  discover and execute `ask_site_ai` and return an answer grounded in the
+  site's crawled knowledge.
+- Tool outputs are clamped to 1,500 chars (Google WebMCP security budget),
+  annotated `readOnlyHint`, and `untrustedContentHint` marks LLM-generated
+  content as untrusted.
+
+**4. Human + agent side by side:** the same knowledge base serves the chat
+widget (for human visitors) and the registered tools (for agents) — one
+grounded answer source, two consumers. That is the core WebMCP experience of
+this project.
+
+> Implementation: [`saas/widget-dist/webmcp.js`](saas/widget-dist/webmcp.js)
+> (`registerModelTools()` — `document.modelContext.registerTool()` with polling
+> fallback for non-supporting browsers).
+
 For the Render cloud deployment (Blueprint IaC), LLM configuration, multi-tenant
 security model, and the full troubleshooting FAQ, see the detailed Korean
 documentation below.
