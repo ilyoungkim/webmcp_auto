@@ -16,7 +16,7 @@
 > **2026-08-30 최신: 크롤러 WAF 폴백 → 프로필/결제(엔터프라이즈 요금) → 관리자 사일로 다국어 → ko DB 복구 · 도커 사일로 정합성 개선** (§0.10).
 > **2026-08-30(2): LAN 원격 접속 허용 → SECURE_COOKIES 스위치 → 갤럭시 음성입력 대응 → ALLOWED_HOSTS 자기 IP 자동 탐지** (§0.11 §0.12).
 > **2026-09-07: 2계층 지식 구조 → 페이지별 추가 지식 → 위젯 config 재생성 → CSRF 자기 IP 자동 추가 → Q&A 캐시 임계값 상향 → 자유 질문 키워드 페이지 검색 → 키워드 YAML 외부화·언어별 분리** (§0.13).
-> **2026-09-08: admin/projects Preview 버튼 → 계정 Enable/Disable → 회원가입 코드(SignupCode)** (§0.14).
+> **2026-09-08: admin/projects Preview 버튼 → 계정 Enable/Disable → 회원가입 코드(SignupCode) → 빠른메뉴 편집 fix(필수 메뉴 누락·전화번호 누락) → admin 빠른메뉴 편집 초기화** (§0.14 §0.15).
 
 ### 0.1 마일스톤 완료 현황
 
@@ -48,6 +48,9 @@
 | 추가(2026-09-08) | **admin/projects Preview 버튼** — 프로젝트 카드에 미리보기 링크 추가 | ✅ 완료 |
 | 추가(2026-09-08) | **admin/projects 계정 Enable/Disable** — 계정 활성/비활성 토글, 자기 자신 비활성화 차단 | ✅ 완료 |
 | 추가(2026-09-08) | **회원가입 코드(SignupCode)** — 가입 코드 필수 입력, DB 테이블, ko/en 사일로 제한, 기본 코드 OneAir1234 | ✅ 완료 |
+| 추가(2026-09-08) | **빠른메뉴 질문 편집 시 필수 메뉴 누락 fix** — `project_menus_regenerate`에 필수 메뉴("AI비서란?") 포함 → 5개 생성 | ✅ 완료 |
+| 추가(2026-09-08) | **연락처 답변 전화번호·예약 누락 fix** — `_remove_empty_email_section`이 이메일 줄만 제거, 전화번호·예약·주소 보존 | ✅ 완료 |
+| 추가(2026-09-08) | **admin 빠른메뉴 편집 초기화** — `POST /api/admin/projects/<pk>/reset-menus/`로 `menus_edited=False` 복원, 사용자가 다시 편집 가능 | ✅ 완료 |
 
 ### 0.2 실데이터 증거 (`saas/backend/db.sqlite3`)
 
@@ -97,6 +100,7 @@
 | 관리자 | 사용자(role/plan/active), 사용량 집계, 챗 오류 신고(new/read/resolved), 프로젝트(검색/Q&A 재생성/토글/삭제), 고객센터 답변 | `apps/proxy/admin_urls.py` + `pages/admin/*.vue` |
 | 관리자 | **계정 Enable/Disable** — 계정 선택(pay-row)에 상태 배지 + 활성/비활성 토글, **자기 자신 비활성화 차단**(세션 즉시 무효화 방지), `isSelf` 플래그 | `apps/proxy/admin_urls.py` + `pages/admin/projects.vue` |
 | 관리자 | **프로젝트 Preview 버튼** — 프로젝트 카드에 미리보기 링크 | `pages/admin/projects.vue` |
+| 관리자 | **빠른메뉴 편집 초기화** — `POST /api/admin/projects/<pk>/reset-menus/`로 `menus_edited=False` 복원, 사용자가 다시 질문 편집 가능 | `admin_project_reset_menus` + `pages/admin/projects.vue` |
 | 관리자 | **테넌트(프로젝트)별 Gemini 설정** — API 키/모델을 프로젝트 단위로 지정(비우면 전역 `.env` 사용), **테스트 후 적용**(실제 호출로 검증 성공 시에만 저장), OpenRouter는 전역 `.env`로만 관리 | `admin_project_llm` + `admin_project_llm_test` + `pages/admin/projects.vue` |
 | 프로젝트 | **수정 시 이름/URL 변경 금지** — 도메인 유형·위젯 테마만 변경 가능(백엔드에서도 name/url 무시) | `apps/projects/views.py` + `pages/projects/[id].vue` |
 | 프로젝트 | **프로젝트 생성 한도 안내(최대 5개)** — 대시보드(내 프로젝트 목록)에 표시 | `pages/dashboard.vue` |
@@ -497,6 +501,37 @@ Hopkins Medicine처럼 robots.txt에 다른 호스트 sitemap(`profiles.xxx.org`
 #### 0.14.5 커밋 이력 (2026-09-08)
 
 `399db5b` 회원가입 코드(SignupCode) 기능 추가 (ko/en 136 배포·브라우저 검증 완료)
+
+---
+
+### 0.15 빠른메뉴 편집 fix + 편집 초기화 (2026-09-08)
+
+#### 0.15.1 질문 편집 시 필수 메뉴 누락 fix
+
+- **증상**: 빠른메뉴 질문 편집 후 재생성하면 4개 질문만 생성 — "AI비서란?" 필수 메뉴가 빠짐
+- **원인**: `project_menus_regenerate`가 `menus`를 `is_required=False`로만 필터링
+- **수정**: `menus = QuickMenu.objects.filter(domain_type=..., enabled=True)`로 **필수 메뉴 포함** — `regenerate_qna`가 is_required면 DB 공통 답변 사용, `build_widget`도 필수 메뉴 포함
+- `project_menus`(편집 조회)는 여전히 `is_required=False` 유지(편집 불가)
+- **검증**: ko Openpromp Library(id 2) regenerate_qna → **5개 생성**(블로그소개/카테고리/최신글/연락처/AI비서란?)
+
+#### 0.15.2 연락처 답변 전화번호·예약 누락 fix
+
+- **증상**: 연락처 빠른메뉴 답변에서 전화번호·예약 정보가 누락
+- **원인**: `_remove_empty_email_section`이 유효 이메일 없을 때 '이메일' 섹션 시작 후 **다음 섹션 마커까지 통째로 제거**해 전화번호·예약·주소가 함께 잘림
+- **수정**: **'이메일' 단어가 있는 줄만 제거**하고, 전화번호·예약·상담·주소·카카오·채널 등 실질 정보가 섞인 줄은 보존
+- **검증**: 이메일+전화/예약/주소 시나리오에서 전화·예약·주소 보존, 이메일만 있는 경우 이메일 줄만 제거
+
+#### 0.15.3 admin 빠른메뉴 편집 초기화
+
+- **요청**: 일반 사용자가 빠른메뉴를 수정한 뒤, 어드민이 초기화해서 다시 수정 가능하게 하는 기능
+- **백엔드**: `admin_project_reset_menus` — `POST /api/admin/projects/<pk>/reset-menus/`로 `menus_edited=False` 복원 (관리자 전용, `_require_admin`)
+- **프론트**: `admin/projects.vue`의 `.project-actions` 맨 앞에 "빠른메뉴 편집 초기화" 버튼 + `resetMenus()` 함수 + `resettingMenus` 상태
+- **i18n**: admin.projects.resetMenus/resetMenusConfirm/resetMenusDone/resetMenusFailed (ko/en)
+- **검증**: en/ko 136 배포·브라우저 확인 (버튼 표시 + API 200 `{"ok":true,"menusEdited":false}`)
+
+#### 0.15.4 커밋 이력 (2026-09-08)
+
+`182e211` 빠른메뉴 질문 편집 시 필수 메뉴 누락 + 연락처 전화번호·예약 누락 fix
 
 ---
 

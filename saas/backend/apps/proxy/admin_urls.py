@@ -254,6 +254,27 @@ def admin_project_regenerate(request, pk):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def admin_project_reset_menus(request, pk):
+    """빠른메뉴 질문 편집 1회 제한 초기화 (관리자 전용).
+
+    일반 사용자가 빠른메뉴 질문을 편집하면 `menus_edited=True`가 되어
+    더 이상 편집할 수 없다. 관리자가 이 엔드포인트를 호출하면
+    `menus_edited=False`로 되돌려 사용자가 다시 편집할 수 있게 한다.
+    """
+    _require_admin(request)
+    from apps.projects.models import Project
+
+    p = Project.objects.filter(pk=pk).first()
+    if p is None:
+        raise ValidationError(msg('project.notFoundShort'))
+
+    p.menus_edited = False
+    p.save(update_fields=['menus_edited', 'updated_at'])
+    return Response({'ok': True, 'menusEdited': p.menus_edited})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def admin_project_toggle(request, pk):
     """프로젝트 사용중지/사용재개 토글 (관리자 전용)."""
     _require_admin(request)
@@ -449,6 +470,7 @@ urlpatterns = [
     path('chat-errors/<int:pk>/', chat_error_patch),
     path('projects/', admin_projects),
     path('projects/<int:pk>/regenerate/', admin_project_regenerate),
+    path('projects/<int:pk>/reset-menus/', admin_project_reset_menus),
     path('projects/<int:pk>/toggle/', admin_project_toggle),
     path('projects/<int:pk>/llm/', admin_project_llm),
     path('projects/<int:pk>/llm/test/', admin_project_llm_test),

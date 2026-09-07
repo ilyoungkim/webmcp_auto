@@ -280,6 +280,23 @@ async function regenerate(p: Project) {
   }
 }
 
+// ── 빠른메뉴 질문 편집 1회 제한 초기화 (관리자 전용) ──────────
+const resettingMenus = ref<Record<number, boolean>>({})
+
+async function resetMenus(p: Project) {
+  if (!confirm(t('admin.projects.resetMenusConfirm', { name: p.name }))) return
+  message.value = ''
+  resettingMenus.value[p.id] = true
+  try {
+    const res = await useApi(`/api/admin/projects/${p.id}/reset-menus/`, { method: 'POST' })
+    message.value = t('admin.projects.resetMenusDone', { name: p.name })
+  } catch (e: any) {
+    message.value = e?.data?.detail || t('admin.projects.resetMenusFailed')
+  } finally {
+    resettingMenus.value[p.id] = false
+  }
+}
+
 async function toggleEnabled(p: Project) {
   const action = p.enabled ? t('admin.projects.disable') : t('admin.projects.enable')
   if (!confirm(t('admin.projects.toggleConfirm', { name: p.name, action }))) return
@@ -482,6 +499,9 @@ onMounted(async () => {
             </span>
           </div>
           <div class="project-actions">
+            <button class="btn" :disabled="resettingMenus[p.id]" @click="resetMenus(p)">
+              {{ resettingMenus[p.id] ? t('admin.projects.processing') : t('admin.projects.resetMenus') }}
+            </button>
             <NuxtLink :to="`/preview/${p.id}`" class="btn">{{ t('admin.projects.preview') }}</NuxtLink>
             <button class="btn primary" :disabled="regenerating[p.id]" @click="regenerate(p)">
               {{ regenerating[p.id] ? t('admin.projects.regenerating') : t('admin.projects.regenerate') }}

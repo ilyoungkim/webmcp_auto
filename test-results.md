@@ -526,6 +526,25 @@
 - **해결**: v-for 변수를 `t` → `s`로 변경(15곳 일괄)
 - **교훈**: useSilo의 `t`를 쓰는 템플릿에서 v-for 변수명으로 `t` 사용 금지. "고객센터 질문이 있는 계정"에서만 발생해 재현이 까다로웠음
 
+### T-046. 회원가입 코드(SignupCode) — ko/en 배포·브라우저 검증 (커밋 399db5b)
+- **구현**: `SignupCode` 모델(code unique max_length=10, lang ''|ko|en, max_uses/used_count, expires_at) + 마이그레이션 `0005`에 기본 코드 `OneAir1234` 시드(양쪽 사일로 허용, 무제한)
+- **검증(ko 8443)**: 잘못된 코드 `Wrong123` → "가입 코드가 올바르지 않습니다" 400 거부 / 올바른 코드 `OneAir1234` → 가입 성공·대시보드 이동·`used_count` 1 증가
+- **검증(en 8444)**: 동일하게 가입 성공 확인. 테스트 계정 정리 후 `used_count` 0 복원
+- **함정 2건**: ① 기본 코드가 10자리라 `code` 필드 max_length=8이면 시드 DataError → max_length=10으로 ② 시리얼라이저 max_length=8이면 "글자 수 8 이하 확인" 400 → 10으로
+
+### T-047. 빠른메뉴 질문 편집 시 필수 메뉴 누락 + 연락처 전화번호·예약 누락 fix (커밋 182e211)
+- **증상 1**: 질문 편집 후 재생성하면 4개만 생성 — "AI비서란?" 필수 메뉴 빠짐
+- **원인 1**: `project_menus_regenerate`가 `menus`를 `is_required=False`로만 필터링
+- **해결 1**: `menus` 필터에서 `is_required=False` 제거 → 필수 메뉴 포함. `regenerate_qna`가 is_required면 DB 공통 답변 사용, `build_widget`도 포함. 검증: ko Openpromp Library(id 2) → **5개 생성**
+- **증상 2**: 연락처 답변에서 전화번호·예약 정보 누락
+- **원인 2**: `_remove_empty_email_section`이 '이메일' 섹션 시작 후 다음 섹션 마커까지 통째로 제거
+- **해결 2**: '이메일' 단어가 있는 줄만 제거, 전화번호·예약·상담·주소·카카오·채널 등 실질 정보 줄은 보존. 검증: 이메일+전화/예약/주소 시나리오에서 전화·예약·주소 보존
+
+### T-048. admin 빠른메뉴 편집 초기화 — ko/en 배포·브라우저 검증
+- **구현**: `admin_project_reset_menus` — `POST /api/admin/projects/<pk>/reset-menus/`로 `menus_edited=False` 복원 (관리자 전용). 프론트 `.project-actions` 맨 앞에 "빠른메뉴 편집 초기화" 버튼 + i18n ko/en
+- **검증(en 8444)**: 4개 프로젝트 모두 "Reset Quick Menu Edit" 버튼 표시 / API 직접 호출 → 200 `{"ok":true,"menusEdited":false}`
+- **검증(ko 8443)**: 3개 프로젝트 모두 "빠른메뉴 편집 초기화" 버튼 표시 / ko 헬스 200, en 헬스 200
+
 ### Render 배포 최종 상태
 - 리소스: `webmcp-web-en`(Django) / `webmcp-front-en`(Nuxt) / `webmcp-worker-en`(파이프라인) / `webmcp-db-en`(PG 0.5c-1g) — 모두 0.5c-512mb
 - 접속: `https://webmcp-front-en.onrender.com` (콘솔) / 백엔드 프록시 `/api/**`는 Nuxt routeRules → 내부 `http://webmcp-web-en:10000`
