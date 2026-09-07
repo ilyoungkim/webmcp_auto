@@ -9,6 +9,8 @@ interface User {
   monthlyPrice: number | null; monthlyCurrency: string
   billingCompany: string
   defaultCurrency: string; defaultPrice: number
+  active: boolean
+  isSelf?: boolean
 }
 interface Project {
   id: number
@@ -136,6 +138,39 @@ async function savePaying(u: User) {
     }
   } finally {
     paySaving.value = false
+  }
+}
+
+// ── 계정 Enable/Disable (is_active 토글) ────────────────────
+const togglingUser = ref<Record<number, boolean>>({})
+const userToggleMsg = ref<Record<number, string>>({})
+
+async function toggleUserActive(u: User) {
+  if (!u) return
+  const action = u.active ? t('admin.projects.disable') : t('admin.projects.enable')
+  if (!confirm(t('admin.projects.userToggleConfirm', { email: u.email, action }))) return
+  togglingUser.value = { ...togglingUser.value, [u.id]: true }
+  userToggleMsg.value = { ...userToggleMsg.value, [u.id]: '' }
+  try {
+    const res = await useApi(`/api/admin/users/${u.id}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: { active: !u.active },
+    })
+    await loadUsers()
+    userToggleMsg.value = {
+      ...userToggleMsg.value,
+      [u.id]: res.active
+        ? t('admin.projects.userEnabled', { email: u.email })
+        : t('admin.projects.userDisabled', { email: u.email }),
+    }
+  } catch (e: any) {
+    userToggleMsg.value = {
+      ...userToggleMsg.value,
+      [u.id]: e?.data?.detail || t('admin.projects.userToggleFailed'),
+    }
+  } finally {
+    togglingUser.value = { ...togglingUser.value, [u.id]: false }
   }
 }
 
@@ -384,7 +419,15 @@ onMounted(async () => {
           <span class="pay-email">{{ selectedUser.email }}{{ selectedUser.role === 'admin' ? ' ' + t('admin.projects.admin') : '' }}</span>
           <span class="pay-price" :class="{ enterprise: selectedUser.monthlyPrice !== null }">{{ userPriceLabel(selectedUser) }}</span>
           <span class="pay-phone muted">{{ [selectedUser.phone1, selectedUser.phone2].filter(Boolean).join(' · ') || t('admin.projects.noPhone') }}</span>
+          <span class="badge" :class="selectedUser.active ? 'active' : 'stopped'">
+            {{ selectedUser.active ? t('admin.projects.enabled') : t('admin.projects.disabled') }}
+          </span>
+          <span v-if="selectedUser.isSelf" class="muted self-note">{{ t('admin.projects.selfNote') }}</span>
+          <button v-else class="btn" :disabled="togglingUser[selectedUser.id]" @click="toggleUserActive(selectedUser)">
+            {{ togglingUser[selectedUser.id] ? t('admin.projects.processing') : (selectedUser.active ? t('admin.projects.disable') : t('admin.projects.enable')) }}
+          </button>
         </div>
+        <p v-if="userToggleMsg[selectedUser.id]" class="msg-line">{{ userToggleMsg[selectedUser.id] }}</p>
 
         <div class="pay-form">
           <div class="pay-form-grid">
@@ -439,6 +482,7 @@ onMounted(async () => {
             </span>
           </div>
           <div class="project-actions">
+            <NuxtLink :to="`/preview/${p.id}`" class="btn">{{ t('admin.projects.preview') }}</NuxtLink>
             <button class="btn primary" :disabled="regenerating[p.id]" @click="regenerate(p)">
               {{ regenerating[p.id] ? t('admin.projects.regenerating') : t('admin.projects.regenerate') }}
             </button>
@@ -594,6 +638,8 @@ onMounted(async () => {
 .badge.completed { background: #ecfdf5; color: #047857; }
 .badge.failed { background: #fef2f2; color: #b91c1c; }
 .badge.stopped { background: #f3f4f6; color: #6b7280; }
+.badge.active { background: #ecfdf5; color: #047857; }
+.self-note { font-size: 12px; color: #6b7280; }
 .project-actions { flex-shrink: 0; display: flex; gap: 6px; align-items: center; }
 .btn.danger { color: #b91c1c; border-color: #fca5a5; }
 .project-card.disabled { background: #f9fafb; opacity: 0.75; }

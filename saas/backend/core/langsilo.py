@@ -148,6 +148,7 @@ MESSAGES = {
     'proxy.errorMessageRequired': {'ko': 'errorMessage 필요', 'en': 'errorMessage is required'},
     # ── 관리자 ──
     'admin.userNotFound': {'ko': '사용자 없음', 'en': 'User not found'},
+    'admin.cannotDisableSelf': {'ko': '현재 로그인된 관리자 계정은 비활성화할 수 없습니다.', 'en': 'You cannot disable your own (currently logged-in) account.'},
     'admin.priceMustBeNumber': {'ko': '결제 금액은 숫자여야 합니다.', 'en': 'The billing amount must be a number.'},
     'admin.reportNotFound': {'ko': '신고 없음', 'en': 'Report not found'},
     'admin.qnaNotFound': {'ko': 'Q&A 없음', 'en': 'Q&A not found'},

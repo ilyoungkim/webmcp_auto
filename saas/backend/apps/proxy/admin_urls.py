@@ -40,6 +40,7 @@ def users(request):
             'monthlyPrice': float(u.monthly_price) if u.monthly_price is not None else None,
             'monthlyCurrency': u.monthly_currency or '',
             'billingCompany': u.billing_company,
+            'isSelf': u.pk == request.user.pk,
             # 사일로 기본가 참고용
             'defaultCurrency': currency,
             'defaultPrice': float(price),
@@ -59,7 +60,12 @@ def user_patch(request, pk):
         if field in request.data:
             setattr(u, field, request.data[field])
     if 'active' in request.data:
-        u.is_active = bool(request.data['active'])
+        new_active = bool(request.data['active'])
+        # 관리자가 자기 자신을 비활성화하면 세션이 즉시 무효화되어
+        # 더 이상 관리 화면을 쓸 수 없게 된다 → 차단.
+        if u.pk == request.user.pk and u.is_active and not new_active:
+            raise PermissionDenied(msg('admin.cannotDisableSelf'))
+        u.is_active = new_active
     if 'allowedIps' in request.data:
         u.allowed_ips = (request.data['allowedIps'] or '').strip()
     # 프로필 연락처 (admin이 대신 수정 가능)
