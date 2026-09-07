@@ -191,8 +191,37 @@ def health(request):
 def ready(request):
     from django.conf import settings as s
     ok = bool(getattr(s, 'GEMINI_API_KEY', ''))
+    payload = {'ready': ok, 'geminiKey': ok}
+    # 위젯 config 정합성 — 현재 SAAS_PUBLIC_URL과 박제된 assetBase가 다르면
+    # 기존 위젯 재생성(rebuild_widgets)이 필요하다는 경고를 함께 반환한다.
+    # (config는 생성 시점 스냅샷이라 주소 변경 후 자동 갱신되지 않음)
+    try:
+        from apps.projects.models import Project
+        base = (getattr(s, 'SAAS_PUBLIC_URL', '') or '').rstrip('/')
+        stale: list[str] = []
+        legacy = 0
+        for p in Project.objects.filter(status='completed'):
+            w = Widget.current(p)
+            if w is None:
+                continue
+            try:
+                cfg = w.public_config()
+            except Exception:  # noqa: BLE001 — 깨진 config는 stale로 취급
+                stale.append(p.public_id)
+                continue
+            if not cfg.get('pageAnswerEndpoint') or not isinstance(cfg.get('names'), dict):
+                legacy += 1
+                continue
+            asset = (cfg.get('assetBase') or '').rstrip('/')
+            if base and asset and not asset.startswith(base):
+                stale.append(p.public_id)
+        payload['widgetBase'] = base
+        payload['staleWidgets'] = stale
+        payload['legacyWidgets'] = legacy
+    except Exception:  # noqa: BLE001 — 정합성 검사는 ready 판정에 영향 없음
+        pass
     return HttpResponse(
-        json.dumps({'ready': ok, 'geminiKey': ok}),
+        json.dumps(payload),
         content_type='application/json', status=200 if ok else 503,
     )
 

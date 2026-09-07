@@ -173,7 +173,38 @@ def project_rerun(request, pk):
     return Response({'ok': True})
 
 
-@api_view(['GET'])
+@api_view(['PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def project_page_knowledge(request, pk, page_id):
+    """Tier 2 페이지별 관리자 추가 지식 편집.
+
+    PUT/PATCH body: {extraMd} — 크롤 원문에 이어 답변 컨텍스트로 주입된다.
+      (사이트에 없거나 크롤이 놓친 최신 정보: 이벤트·가격·예약 규정 등)
+    DELETE — 추가 지식만 제거 (크롤 원문은 유지).
+    저장은 즉시 반영되도록 위젯 config(pages 목록)를 재빌드하지 않아도 된다 —
+    page-answer 엔드포인트가 호출 시점에 DB를 읽기 때문.
+    """
+    from apps.pipeline.models import PageKnowledge
+
+    p = _get_owned(request, pk)
+    pk_row = PageKnowledge.objects.filter(project=p, id=page_id).first()
+    if pk_row is None:
+        raise ValidationError(msg('common.notFound'))
+
+    if request.method == 'DELETE':
+        pk_row.extra_md = ''
+        pk_row.save(update_fields=['extra_md'])
+        return Response({'ok': True})
+
+    extra = (request.data.get('extraMd') or '').strip()
+    if len(extra) > 8000:
+        raise ValidationError(msg('project.extraTooLong'))
+    pk_row.extra_md = extra
+    pk_row.save(update_fields=['extra_md'])
+    return Response({'ok': True, 'id': pk_row.id, 'extraMd': pk_row.extra_md})
+
+
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def project_menus(request, pk):
     """빠른메뉴 목록과 현재 질문/답변을 조회 (편집용)."""

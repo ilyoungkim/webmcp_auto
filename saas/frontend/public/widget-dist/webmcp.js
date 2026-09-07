@@ -1,6 +1,13 @@
 // ============================================================================
-// webmcp.js — WebMCP Auto SaaS 통신 계층 (v2.1) + Model Context 도구 등록
+// webmcp.js — WebMCP Auto SaaS 통신 계층 (v2.2) + Model Context 도구 등록
 // ============================================================================
+// 2계층 지식 구조 (v2.2):
+//   - Tier 1: 빠른메뉴(중요 정보) = 개별 WebMCP 도구. 도구명/설명은 서버가
+//     config.names[*].names[0] / description 으로 결정해 전달한다
+//     (예: get_contact_information). JS 는 이를 그대로 사용한다.
+//   - Tier 2: 나머지 전체 페이지 = get_page_answer(page, question) 도구로
+//     페이지별 지식 검색 (config.pages 목록 노출, /api/chat/page-answer/ 호출).
+//   - 자유 질문: ask_site_ai (항상 제공) — 기존과 동일.
 // 계약 변경 (SaaS 플랫폼):
 //   - body는 {question, publicId} 만 전송. 시스템 프롬프트는 서버가 부착.
 //   - publicId는 window.WebMCPConfig.publicId 에서 읽음.
@@ -13,7 +20,7 @@
 (function () {
   'use strict';
 
-  // 위젯은 같은 오리진에서 서빋되므로 상대경로로 호출한다.
+  // 위젯은 같은 오리진에서 서idak되므로 상대경로로 호출한다.
   // (proxyEndpoint 가 절대 URL(localhost 등)이면 127.0.0.1 접속 시 CORS 로 차단됨)
   var PROXY_ENDPOINT = '/api/chat/';
 
@@ -60,6 +67,46 @@
     return askQuestion(question, memory);
   }
 
+  // Tier 2 — 페이지별 지식 검색: {publicId, page, question} → /api/chat/page-answer/
+  function pageAnswerEndpoint() {
+    var ep = (window.WebMCPConfig && window.WebMCPConfig.pageAnswerEndpoint) || '';
+    if (!ep) return '/api/chat/page-answer/';
+    try {
+      // 절대 URL이면 path 부분만 추출해 동일 오리진 상대경로로 호출 (CORS 방지)
+      var u = new URL(ep, window.location.href);
+      return u.pathname + (u.search || '');
+    } catch (_) {
+      return ep;
+    }
+  }
+
+  async function askPageAnswer(page, question) {
+    var res = await fetch(pageAnswerEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ page: page || '', question: question || '', publicId: publicId() }),
+    });
+    if (!res.ok) {
+      var errText = '';
+      try { errText = await res.text(); } catch (_) {}
+      var friendly = errText;
+      try {
+        var parsed = JSON.parse(errText);
+        if (parsed && typeof parsed.error === 'string' && parsed.error) friendly = parsed.error;
+      } catch (_) {}
+      throw new Error('프록시 오류 (' + res.status + '): ' + friendly);
+    }
+    var data = await res.json();
+    if (typeof data.text === 'string' && data.text) return data.text;
+    var text = (data && data.candidates && data.candidates[0]
+      && data.candidates[0].content && data.candidates[0].content.parts
+      ? data.candidates[0].content.parts.map(function (p) { return p.text || ''; }).join('')
+      : '');
+    if (!text) throw new Error('프록시 응답이 비어 있습니다.');
+    return text;
+  }
+
   // Google WebMCP 보안 가이드의 도구 출력 문자 예산(1,500자) 준수용 클램프.
   // 에이전트 가드레일 회피 — 긴 LLM 응답을 문장 경계에서 잘라 말줄임 처리한다.
   var MAX_TOOL_OUTPUT = 1500;
@@ -75,6 +122,7 @@
 
   window.WebMCP = Object.assign(window.WebMCP || {}, {
     askQuestion: askQuestion,
+    askPageAnswer: askPageAnswer,
     callGeminiViaProxy: callGeminiViaProxy,
     proxyEndpoint: PROXY_ENDPOINT,
     registerModelTools: registerModelTools,   // 디버깅/수동 재등록용 노출
@@ -115,11 +163,17 @@
         var question = (m.question || '').trim();
         if (!question) return;
         var toolName = '';
-        // 후보 순서: names[0] → 라벨 → config 키(m0/m1…) — 유니크 + 비어있지 않아야 채택
-        var candidates = [m.names && m.names[0], m.label, 'menu_' + key].filter(Boolean);
-        for (var i = 0; i < candidates.length; i++) {
-          var cand = ('get_' + slug(String(candidates[i]))).replace(/_+$/, '');
-          if (cand.length > 4 && !usedNames[cand]) { toolName = cand; break; }   // 'get_' 이상 유효
+        // 1순위: 서버가 결정한 Tier 1 표준 도구명 (get_contact_information 등)
+        var serverName = (m.names && m.names[0]) || '';
+        if (serverName && /^[a-z][a-z0-9_]{3,63}$/i.test(serverName) && !usedNames[serverName]) {
+          toolName = serverName;
+        } else {
+          // 후보 순서: names[0] → 라벨 → config 키(m0/m1…) — 유니크 + 비어있지 않아야 채택
+          var candidates = [serverName, m.label, 'menu_' + key].filter(Boolean);
+          for (var i = 0; i < candidates.length; i++) {
+            var cand = ('get_' + slug(String(candidates[i]))).replace(/_+$/, '');
+            if (cand.length > 4 && !usedNames[cand]) { toolName = cand; break; }   // 'get_' 이상 유효
+          }
         }
         if (!toolName) toolName = 'get_menu_' + Object.keys(usedNames).length;   // 최후 폴백
         toolName = toolName.slice(0, 40).replace(/_+$/, '');
@@ -127,7 +181,7 @@
         try {
           mc.registerTool({
             name: toolName,
-            description: question,
+            description: (m.description && String(m.description).trim()) || question,
             inputSchema: { type: 'object', properties: {} },
             annotations: { readOnlyHint: true },
             execute: function () {

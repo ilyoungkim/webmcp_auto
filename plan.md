@@ -27,7 +27,7 @@
 | M4 데이터 플레인 | chat·embed·preview·Origin 화이트리스트 | ✅ 완료 |
 | M5 문서 | 랜딩·매뉴얼(manual) | ✅ 완료 |
 | M6 3유형 시나리오+쿼터 | 병원/법률/회사 외 **25종 도메인** + 429 쿼터 | ✅ 완료 |
-| M7 (도커 운영) | **PostgreSQL 18 도커 전환 완료** — docker/ (compose·backup·restore·로그 로테이션·운영 배포 문서 DEPLOY_PORUDCTION.md) | ✅ 완료 |
+| M7 (도커 운영) | **PostgreSQL 18 도커 전환 완료** — docker/ (compose·backup·restore·로그 로테이션·운영 배포 문서 DEPLOY_PRODUCTION.md) | ✅ 완료 |
 | 추가(2026-08-29) | **테넌트별 Gemini 설정(테스트 후 적용)**, 프로젝트 수정 시 이름/URL 변경 금지, 프로젝트 5개 한도 안내, 이용약관 아코디언 | ✅ 완료 |
 | 추가(2026-08-29) | **"AI비서란?" 필수 메뉴**(DB 공통 답변, 편집 불가), 위젯 AI 로고 아이콘, 음성 입력, 답변 생성 중 입력 잠금, 로그아웃 세션 확실 삭제, 전 페이지 noindex·robots.txt·llms.txt | ✅ 완료 |
 | 추가(2026-08-29) | **보안 강화** — 브루트포스 방어(IP+이메일 5회 실패 15분 잠금), IP 화이트리스트(루프백·사설망 안전장치), 설치 가이드 Step3(설정 변경) 삭제 | ✅ 완료 |
@@ -1070,7 +1070,7 @@ docker compose -f docker-compose.silo.yml up -d --build
 - 수동 실행: `docker compose -f docker-compose.silo.yml exec backend-en python manage.py seed_catalogs --langs en`
 - 언어 접미사 LLM env는 `saas/backend/.env`에 설정 (`GEMINI_API_KEY_EN`, `OPENROUTER_MODEL_EN` 등 — 없으면 전역 폴백)
 - 콘솔 SSR 언어는 `NUXT_PUBLIC_SILO_LANG`(ko/en) env로 확정
-- 운영 배포·백업·복원·로그 절차는 **`DEPLOY_PORUDCTION.md`** 참조 (§12 다국어 사일로 섹션 포함)
+- 운영 배포·백업·복원·로그 절차는 **`DEPLOY_PRODUCTION.md`** 참조 (§12 다국어 사일로 섹션 포함)
 - **136 서버(운영) 배포 완료(2026-08-31)**: `~/webmcp_auto/{saas, docker, ssl}` 구조.
   Docker 포트 18080/18081(wiki-engine 8080 충돌 회피), 호스트 nginx 8443/8444 TLS 종료,
   `webmcp.duckdns.org` 공인 인증서(acme.sh DNS-01, 자동갱신 구성).

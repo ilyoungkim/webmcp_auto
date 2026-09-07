@@ -49,7 +49,60 @@ const sitemapItems = ref<SitemapItem[]>([])
 const selectedUrls = ref<string[]>([])
 const loadingUrls = ref(false)
 const submittingRerun = ref(false)
+const rerunError = ref('')
 let timer: any
+
+// ── 페이지별 추가 지식 (Tier 2 강화) ─────────────────────────
+const extraOpen = reactive<Record<number, boolean>>({})
+const extraDraft = reactive<Record<number, string>>({})
+const extraSaving = reactive<Record<number, boolean>>({})
+const extraSaved = reactive<Record<number, boolean>>({})
+
+// sourceUrls 항목에 대응하는 PageKnowledge 행 찾기 (url 정규화 비교 → title 순)
+function pageRow(u: any): any | null {
+  const pages = project.value?.pages || []
+  if (!pages.length) return null
+  const norm = (s: string) => String(s || '').replace(/\/+$/, '').toLowerCase()
+  const target = norm(u.url)
+  if (!target) return null
+  return pages.find((pg: any) => norm(pg.url) === target)
+    || pages.find((pg: any) => u.title && pg.title && pg.title === u.title)
+    || null
+}
+
+function toggleExtra(u: any) {
+  const row = pageRow(u)
+  if (!row) return
+  if (!(row.id in extraDraft)) extraDraft[row.id] = row.extraMd || ''
+  extraOpen[row.id] = !extraOpen[row.id]
+}
+
+async function saveExtra(u: any) {
+  const row = pageRow(u)
+  if (!row) return
+  extraSaving[row.id] = true
+  extraSaved[row.id] = false
+  try {
+    await useApi(`/api/projects/${id}/pages/${row.id}/`, {
+      method: 'PUT',
+      body: { extraMd: extraDraft[row.id] || '' },
+    })
+    row.extraMd = extraDraft[row.id] || ''
+    extraSaved[row.id] = true
+    setTimeout(() => { extraSaved[row.id] = false }, 3000)
+  } finally {
+    extraSaving[row.id] = false
+  }
+}
+
+async function removeExtra(u: any) {
+  const row = pageRow(u)
+  if (!row) return
+  if (!confirm(t('proj.extra.remove') + '?')) return
+  await useApi(`/api/projects/${id}/pages/${row.id}/`, { method: 'DELETE' })
+  row.extraMd = ''
+  extraDraft[row.id] = ''
+}
 
 // 고객센터 Q&A 게시판 상태
 const supportItems = ref<any[]>([])
@@ -153,6 +206,7 @@ async function saveEdit() {
 async function openRerunModal() {
   rerunModalOpen.value = true
   loadingUrls.value = true
+  rerunError.value = ''
   sitemapItems.value = []
   selectedUrls.value = []
   try {
@@ -200,6 +254,7 @@ async function submitRerun() {
     return
   }
   submittingRerun.value = true
+  rerunError.value = ''
   try {
     await useApi(`/api/projects/${id}/rerun/`, {
       method: 'POST',
@@ -208,6 +263,8 @@ async function submitRerun() {
     rerunModalOpen.value = false
     await load()
     timer = setInterval(load, 1500)
+  } catch (e: any) {
+    rerunError.value = e?.data?.detail || e?.message || '재생성 요청에 실패했습니다.'
   } finally {
     submittingRerun.value = false
   }
@@ -307,13 +364,13 @@ onUnmounted(() => clearInterval(timer))
       <label class="theme-edit-label">{{ t('proj.edit.theme') }}
         <div class="theme-cards">
           <button
-            v-for="t in themes" :key="t.code" type="button"
-            class="theme-card" :class="{ active: editForm.theme === t.code }"
-            :style="{ '--primary': t.primary, '--bg': t.bg }"
-            @click="editForm.theme = t.code"
+            v-for="th in themes" :key="th.code" type="button"
+            class="theme-card" :class="{ active: editForm.theme === th.code }"
+            :style="{ '--primary': th.primary, '--bg': th.bg }"
+            @click="editForm.theme = th.code"
           >
             <span class="theme-swatch"></span>
-            <b>{{ t.label }}</b>
+            <b>{{ th.label }}</b>
           </button>
         </div>
       </label>
@@ -336,6 +393,30 @@ onUnmounted(() => clearInterval(timer))
             <div class="source-content">
               <span v-if="u.title" class="source-title">{{ u.title }}</span>
               <a :href="u.url || u" target="_blank" rel="noopener noreferrer" class="source-link">{{ u.url || u }}</a>
+            </div>
+            <!-- 페이지별 추가 지식 (관리자 입력 → AI 답변 컨텍스트 강화) -->
+            <div v-if="pageRow(u)" class="extra-knowledge">
+              <button type="button" class="extra-toggle" @click="toggleExtra(u)">
+                ➕ {{ t('proj.extra.toggle') }}
+                <span v-if="pageRow(u).extraMd" class="extra-badge">{{ t('proj.extra.hasExtra') }}</span>
+              </button>
+              <div v-show="extraOpen[pageRow(u).id]" class="extra-body">
+                <p class="note">{{ t('proj.extra.note') }}</p>
+                <textarea
+                  v-model="extraDraft[pageRow(u).id]"
+                  class="extra-textarea" rows="5"
+                  :placeholder="t('proj.extra.placeholder')"
+                ></textarea>
+                <div class="extra-actions">
+                  <button class="btn primary small" :disabled="extraSaving[pageRow(u).id]" @click="saveExtra(u)">
+                    {{ extraSaving[pageRow(u).id] ? t('proj.extra.saving') : t('proj.extra.save') }}
+                  </button>
+                  <button v-if="pageRow(u).extraMd" class="btn danger small" @click="removeExtra(u)">
+                    {{ t('proj.extra.remove') }}
+                  </button>
+                  <span v-if="extraSaved[pageRow(u).id]" class="extra-saved">{{ t('proj.extra.saved') }}</span>
+                </div>
+              </div>
             </div>
           </li>
         </ul>
@@ -454,17 +535,17 @@ onUnmounted(() => clearInterval(timer))
       <div v-if="supportLoading" class="support-loading">{{ t('common.loading') }}</div>
       <div v-else-if="supportItems.length === 0" class="support-empty">{{ t('proj.support.empty') }}</div>
       <div v-else class="support-list">
-        <div v-for="t in supportItems" :key="t.id" class="support-item" :class="{ answered: t.status === 'answered' }">
+        <div v-for="s in supportItems" :key="s.id" class="support-item" :class="{ answered: s.status === 'answered' }">
           <div class="support-q">
-            <span class="support-badge" :class="t.status">{{ t.status === 'answered' ? t('proj.support.answered') : t('proj.support.pending') }}</span>
-            <span class="support-question">{{ t.question }}</span>
-            <span class="support-time">{{ fmtSupportTime(t.createdAt) }}</span>
+            <span class="support-badge" :class="s.status">{{ s.status === 'answered' ? t('proj.support.answered') : t('proj.support.pending') }}</span>
+            <span class="support-question">{{ s.question }}</span>
+            <span class="support-time">{{ fmtSupportTime(s.createdAt) }}</span>
           </div>
-          <div v-if="t.answer" class="support-a">
+          <div v-if="s.answer" class="support-a">
             <span class="support-a-label">A.</span>
             <div class="support-a-body">
-              <p>{{ t.answer }}</p>
-              <span v-if="t.answeredAt" class="support-time">{{ fmtSupportTime(t.answeredAt) }}</span>
+              <p>{{ s.answer }}</p>
+              <span v-if="s.answeredAt" class="support-time">{{ fmtSupportTime(s.answeredAt) }}</span>
             </div>
           </div>
         </div>
@@ -786,10 +867,11 @@ onUnmounted(() => clearInterval(timer))
 
         <footer class="modal-footer">
           <button class="btn" @click="rerunModalOpen = false">{{ t('proj.edit.cancel') }}</button>
-          <button class="btn primary" :disabled="submittingRerun || selectedUrls.length === 0" @click="submitRerun">
+          <button class="btn primary" :disabled="submittingRerun || selectedUrls.length === 0" @click="submitRerun" :title="selectedUrls.length === 0 ? t('new.err.minPages') : ''">
             {{ submittingRerun ? t('proj.rerun.requesting') : t('proj.rerun.start', { n: selectedUrls.length }) }}
           </button>
         </footer>
+        <p v-if="rerunError" class="err modal-error">{{ rerunError }}</p>
       </div>
     </div>
   </main>
@@ -843,6 +925,19 @@ pre { background: #f3f4f6; padding: 12px; border-radius: 8px; overflow-x: auto; 
 .source-title { font-weight: 600; color: #1f2937; font-family: inherit; }
 .source-link { color: #0e7490; text-decoration: none; word-break: break-all; font-family: monospace; font-size: 12px; }
 .source-link:hover { text-decoration: underline; }
+
+/* 페이지별 추가 지식 (Tier 2 강화) */
+.extra-knowledge { flex: 1; min-width: 0; margin-top: 2px; }
+.extra-toggle { background: none; border: none; padding: 0; cursor: pointer; font-size: 12px; color: #0e7490; font-family: inherit; }
+.extra-toggle:hover { text-decoration: underline; }
+.extra-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; }
+.extra-body { margin-top: 6px; padding: 10px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+.extra-body .note { margin-bottom: 6px; }
+.extra-textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; line-height: 1.6; resize: vertical; }
+.extra-textarea:focus { outline: none; border-color: #0e7490; box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.15); }
+.extra-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.extra-actions .btn.small { padding: 6px 12px; font-size: 12px; }
+.extra-saved { font-size: 12px; color: #047857; }
 
 /* 실패한 페이지 카드 */
 .failed-card { margin-top: 14px; padding: 12px 14px; border: 1px solid #fca5a5; border-radius: 8px; background: #fef2f2; }
@@ -909,6 +1004,7 @@ pre { background: #f3f4f6; padding: 12px; border-radius: 8px; overflow-x: auto; 
 .url-title { font-weight: 600; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .url-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; color: #6b7280; font-size: 11px; }
 .modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px; }
+.modal-error { margin: 0; padding: 8px 20px 12px 20px; font-size: 13px; }
 
 /* 고객센터 Q&A 게시판 */
 .support-section { margin-top: 32px; padding-top: 24px; border-top: 2px solid #e5e7eb; }

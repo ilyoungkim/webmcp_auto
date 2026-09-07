@@ -228,6 +228,22 @@ else:
     if '127.0.0.1' in SAAS_PUBLIC_URL:
         CSRF_TRUSTED_ORIGINS.append('http://localhost:53300')
 
+# 서버 자기 IP의 사일로 포트 변형을 자동 추가 — DHCP로 Mac/서버 IP가 바뀌어도
+# CSRF_TRUSTED_ORIGINS 수동 갱신 없이 콘솔 POST(로그인·재생성 등)가 동작한다.
+# (2026-09-07 실측: 192.168.31.248 누락으로 8444 콘솔에서 CSRF Failed 403 발생)
+if env('ALLOW_SELF_IP', 'true').lower() == 'true':
+    try:
+        _csrf_ports = ('8080', '8081', '18080', '18081', '8443', '8444')
+        _csrf_auto = []
+        for _ip in _detect_host_ips():
+            for _port in _csrf_ports:
+                _scheme = 'https' if _port in ('8443', '8444') else 'http'
+                _csrf_auto.append(f'{_scheme}://{_ip}:{_port}')
+        if _csrf_auto:
+            CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + _csrf_auto))
+    except Exception:  # noqa: BLE001 — 자동 추가 실패해도 기존 목록 유지
+        pass
+
 PLANS = {
     'free':  {'max_projects': 5,   'monthly_chat': 200,   'per_minute': 10, 'concurrent_jobs': 1},
     'pro':   {'max_projects': 5,   'monthly_chat': 5000,  'per_minute': 60, 'concurrent_jobs': 2},

@@ -5,4 +5,5 @@ from . import views
 urlpatterns = [
     path('', views.chat),
     path('report/', views.chat_error_report),
+    path('page-answer/', views.page_answer),
 ]

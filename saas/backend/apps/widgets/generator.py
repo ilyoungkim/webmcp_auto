@@ -109,30 +109,62 @@ def build_widget(project, menus, markdown: str, qna_rows=None) -> Widget:
     summary = _site_summary(project, markdown)
     system_prompt = _system_prompt(project, summary)
 
-    # 최신 생성 질문 매핑 (menu_label → question)
+    # 최신 생성 질문 매핑 (menu_label → question) 및 Tier 1 도구명 매핑
     latest_questions: dict[str, str] = {}
+    tool_names: dict[str, str] = {}
     if qna_rows:
         for row in qna_rows:
             if getattr(row, 'menu_label', None) and getattr(row, 'question', None):
                 latest_questions[row.menu_label] = row.question
+            if getattr(row, 'menu_label', None) and getattr(row, 'tool_name', ''):
+                tool_names[row.menu_label] = row.tool_name
+
+    # qna_rows 가 없는 경로(테마 재빌드 등)에서도 도구명을 결정할 수 있도록 사전 계산
+    from core.tooltypes import is_core_tool, tool_for_menu
+    dt = getattr(project, 'domain_type', None)
+    category = (getattr(dt, 'category', '') or getattr(dt, 'code', '') or '')
+    project_lang = getattr(project, 'lang', '') or 'ko'
+
+    names_map: dict[str, dict] = {}
+    used: set[str] = set()
+    for i, m in enumerate(menus):
+        tname, tdesc = tool_for_menu(m.label, project_lang, category)
+        tname = tool_names.get(m.label, '') or tname
+        while tname in used:   # 라벨 중복 시 접미로 유니크 보장
+            tname = f'{tname}_{i}'
+        used.add(tname)
+        names_map[f'm{i}'] = {
+            'names': [tname], 'label': m.label,
+            'question': latest_questions.get(m.label, m.question),
+            'description': tdesc,
+            'tier': 'core' if is_core_tool(tname) else 'menu',
+        }
+
+    # Tier 2 — get_page_answer(page, question) 용 페이지 목록 (url + title)
+    pages: list[dict] = []
+    try:
+        from apps.pipeline.models import PageKnowledge
+        pages = [
+            {'page': pk.url, 'title': pk.title or ''}
+            for pk in PageKnowledge.objects.filter(project=project).order_by('id')[:30]
+        ]
+    except Exception:  # noqa: BLE001 — 테이블 미마이그레이션 등에도 위젯 생성은 계속
+        pass
 
     config = {
         'publicId': project.public_id,
         'siteNs': project.public_id,
-        'lang': getattr(project, 'lang', '') or 'ko',  # 언어 사일로 → 위젯 UI 언어
+        'lang': project_lang,  # 언어 사일로 → 위젯 UI 언어
         'debug': False,
-        'title': f'{project.name} AI Assistant' if (getattr(project, 'lang', '') or 'ko') == 'en'
+        'title': f'{project.name} AI Assistant' if project_lang == 'en'
                  else f'{project.name} AI 비서',
         'widgetVersion': (Widget.current(project).version + 1) if Widget.current(project) else 1,
         'assetBase': f'{settings.SAAS_PUBLIC_URL.rstrip("/")}/widget-dist/',
         'proxyEndpoint': f'{settings.SAAS_PUBLIC_URL.rstrip("/")}/api/chat/',
+        'pageAnswerEndpoint': f'{settings.SAAS_PUBLIC_URL.rstrip("/")}/api/chat/page-answer/',
         'theme': get_theme(project.theme),
-        'names': {
-            f'm{i}': {
-                'names': ['get_info'], 'label': m.label,
-                'question': latest_questions.get(m.label, m.question),
-            } for i, m in enumerate(menus)
-        },
+        'names': names_map,
+        'pages': pages,
         'items': [],
     }
 

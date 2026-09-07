@@ -26,12 +26,27 @@ class ProjectDetailSerializer(ProjectListSerializer):
     installSnippet = serializers.SerializerMethodField()
     sourceUrls = serializers.SerializerMethodField()
     failedUrls = serializers.SerializerMethodField()
+    pages = serializers.SerializerMethodField()
 
     class Meta(ProjectListSerializer.Meta):
-        fields = ProjectListSerializer.Meta.fields + ['installSnippet', 'errorMessage', 'sourceUrls', 'failedUrls']
+        fields = ProjectListSerializer.Meta.fields + ['installSnippet', 'errorMessage', 'sourceUrls', 'failedUrls', 'pages']
         read_only_fields = fields
 
     errorMessage = serializers.CharField(source='error')
+
+    def get_pages(self, obj):
+        """Tier 2 페이지 지식 목록 — 관리자 추가 지식(extraMd) 편집용."""
+        from apps.pipeline.models import PageKnowledge
+        return [
+            {
+                'id': pk.id,
+                'url': pk.url,
+                'title': pk.title or '',
+                'charCount': pk.char_count,
+                'extraMd': pk.extra_md or '',
+            }
+            for pk in PageKnowledge.objects.filter(project=obj).order_by('id')
+        ]
 
     def get_installSnippet(self, obj):
         base = self.context.get('public_url', '').rstrip('/')

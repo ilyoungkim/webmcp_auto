@@ -17,9 +17,10 @@
 | Accounts | Sign-up, login, password change (forced change included), free/pro/admin plans, session fully cleared on logout |
 | Projects | URL → crawl → LLM Q&A → widget build, fully automated (max 5 projects) |
 | Quick menu | One-time question editing, answer regeneration from saved sources, mandatory "What is an AI assistant?" menu |
+| **Extra knowledge** | Per crawled page, staff add up-to-date info (events, prices, booking rules) → injected instantly into chat & page-search answers |
 | Widget | 5 themes, preview, `bundle.zip` install package, voice input, input lock while generating |
-| **WebMCP** | Widget registers site-specific tools via `document.modelContext.registerTool()` — quick-menu tools + free-form Q&A tool for Chrome AI agents |
-| Data plane | `/embed/<publicId>.js` loader, `/api/chat/` real-time chat, Origin allowlist, quotas |
+| **WebMCP** | Widget registers site-specific tools via `document.modelContext.registerTool()` — **2-tier**: Tier 1 core-info tools (`get_contact_information`, `get_opening_hours`, …) + Tier 2 page-search `get_page_answer(page, question)` + free-form `ask_site_ai` |
+| Data plane | `/embed/<publicId>.js` loader, `/api/chat/` real-time chat, `/api/chat/page-answer/` per-page search, Origin allowlist, quotas |
 | Multilingual silos | **ko/en fully separated** — per-language DB, containers, LLM engines, catalogs, widget/console UI |
 | Cloud | **Render Blueprint (EN silo live)** + Docker Compose (self-hosted ko/en) |
 
@@ -57,13 +58,22 @@ needed on the target site.
 
 - In Chrome, open **DevTools → Application → WebMCP** (or install the
   [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
-  extension) on the demo site — you will see the registered tools:
-  - `get_<menu>` tools — one per quick-menu question (read-only)
-  - `ask_site_ai` — free-form site question tool (read-only)
+  extension) on the demo site — you will see the registered tools (2-tier):
+  - **Tier 1 (core info)** — `get_contact_information`, `get_opening_hours`,
+    `get_reservation_method`, … one standard-named tool per key quick-menu
+    question (read-only)
+  - **Tier 2 (page search)** — `get_page_answer(page, question)` — searches any
+    crawled page of the site (read-only)
+  - `ask_site_ai` — free-form site question tool using the whole-site summary
+    (read-only, always present)
 - Ask the agent (ChatGPT sidebar / Chrome Gemini / Inspector extension)
   something like *"Ask this site what services it offers"* — the agent will
-  discover and execute `ask_site_ai` and return an answer grounded in the
-  site's crawled knowledge.
+  discover and execute `ask_site_ai` or `get_page_answer` and return an answer
+  grounded in the site's crawled knowledge.
+- **Admin-curated extra knowledge:** in the console each crawled page has an
+  "Add extra knowledge" field — paste up-to-date info (events, pricing,
+  booking rules) and it is injected instantly into both `ask_site_ai` and
+  `get_page_answer` answers as fresh context (takes precedence over crawled text).
 - Tool outputs are clamped to 1,500 chars (Google WebMCP security budget),
   annotated `readOnlyHint`, and `untrustedContentHint` marks LLM-generated
   content as untrusted.
@@ -76,6 +86,91 @@ this project.
 > Implementation: [`saas/widget-dist/webmcp.js`](saas/widget-dist/webmcp.js)
 > (`registerModelTools()` — `document.modelContext.registerTool()` with polling
 > fallback for non-supporting browsers).
+
+## Why this use case is a perfect fit for WebMCP
+
+WebMCP's core promise is that **a website itself becomes the tool provider** — any
+page can expose structured tools to browser AI agents via `document.modelContext`.
+The hard part of that promise is supply: most sites ship zero tools, so agents can
+only guess from raw DOM text.
+
+WebMCP Auto exists to solve exactly that supply problem:
+
+- **Mass onboarding pipeline** — paste a URL and the platform crawls the site,
+  generates grounded Q&A with an LLM, and builds a widget whose script automatically
+  registers site-specific tools. No MCP server, no backend code, no deployment on
+  the site owner's side — one `<script>` tag makes any business site agent-ready.
+- **Domain-driven tools, not generic ones** — a catalog of 27 domain types
+  (hospitals, law firms, retail, …) maps each site to meaningful quick-menu questions
+  that become real registered tools (`get_<menu>`), plus a free-form `ask_site_ai`
+  tool for anything else.
+- **Two-tier knowledge (Tier 1 + Tier 2)** — frequently used core info
+  (contact, hours, booking) is exposed as individually named tools
+  (`get_contact_information`, `get_opening_hours`, `get_reservation_method`, …,
+  `tier: 'core'`), and every other crawled page is searchable via a
+  `get_page_answer(page, question)` tool. Free-form questions always get
+  `ask_site_ai`.
+- **Admin-curated freshness** — per-page "extra knowledge" textareas let staff
+  add up-to-date info that is injected into both chat and page-search answers
+  instantly, so agent answers never go stale when the site changes.
+- **Grounded answers** — every tool call is answered from the site's own crawled
+  knowledge base, so agents get the same trusted content that human visitors see.
+- **Multi-tenant by design** — one SaaS pipeline can onboard hundreds of sites, each
+  becoming an independent read-only MCP tool provider. That is exactly the scale
+  story WebMCP needs to go mainstream.
+
+## How it creates a better user experience
+
+- **One knowledge base, two consumers.** Human visitors chat with the widget; AI
+  agents call the registered tools. Both read the same grounded, up-to-date answers —
+  what the site tells people never diverges from what it tells agents.
+- **Agents stop guessing.** Instead of scraping unreliable DOM text, agents get
+  structured, site-verified answers — every tool is annotated `readOnlyHint`
+  (no side effects), `untrustedContentHint` (LLM-generated output is marked
+  untrusted), and clamped to 1,500 chars per the WebMCP security budget.
+- **Human-first widget UX** — voice input, input locking while generating, 5 themes,
+  and a mandatory "What is an AI assistant?" menu make the same knowledge
+  approachable for non-technical visitors.
+
+## What was previously hard or impossible — now done together
+
+- **Before:** making a site agent-ready meant engineering an MCP server yourself —
+  schemas, hosting, deployment. Clinic owners, small businesses, and non-developers
+  simply couldn't do it, so AI agents answered about those sites by guessing from
+  page text (often wrong or outdated).
+- **Now:** a site owner (non-developer) pastes a URL, waits ~5 minutes while the
+  pipeline crawls → generates Q&A → builds the widget, and installs it. Their site
+  becomes a real tool provider that ChatGPT desktop or Chrome AI agents can discover
+  and call — no developer involvement required.
+- **Staff stay in control:** staff regenerate or edit answers from saved sources in
+  the console, and add **fresh per-page extra knowledge** (events, prices, booking
+  rules) that instantly reaches chat and page-search answers — humans curate the
+  knowledge, agents consume it. The mandatory
+  "What is an AI assistant?" menu even explains to visitors and agents how the
+  system works.
+
+## How WebMCP is implemented (brief)
+
+- [`saas/widget-dist/webmcp.js`](saas/widget-dist/webmcp.js) — when the widget
+  script loads, `registerModelTools()` calls `document.modelContext.registerTool()`
+  to register a two-tier tool set:
+  - **Tier 1**: one read-only tool per quick-menu question, using server-chosen
+    standard names (`get_contact_information`, `get_opening_hours`, …) + description
+    and a `tier` flag (`core`/`menu`) — from `core/tooltypes.py`.
+  - **Tier 2**: `get_page_answer(page, question)` — searches any crawled page;
+    the page list (URLs/titles) is embedded in the tool description.
+  - Free-form **`ask_site_ai`** is always registered (whole-site summary).
+- Tier 1/free-form `execute()` reuses `/api/chat/`; Tier 2 uses
+  `/api/chat/page-answer/`. Both share one server pipeline (crawled sources → LLM
+  with system prompt → grounded answer).
+- **Per-page extra knowledge** (admin `PageKnowledge.extra_md`) is appended to the
+  `page-answer` context and, for free questions, collected into the prompt
+  (`_extra_knowledge_context`, ≤ 6,000 chars) as freshly-curated, higher-priority
+  context.
+- Non-supporting browsers fall back to polling (~3 s) and then skip gracefully;
+  `window.WebMCP.registerModelTools` is exposed for debugging.
+- Security: `readOnlyHint` on every tool, `untrustedContentHint` on LLM-generated
+  output, 1,500-char output clamp.
 
 For the Render cloud deployment (Blueprint IaC), LLM configuration, multi-tenant
 security model, and the full troubleshooting FAQ, see the detailed Korean
@@ -105,13 +200,90 @@ documentation below.
 | 프로젝트 | URL 입력 → 크롤 → LLM Q&A → 위젯 생성 자동화, **최대 5개** 생성(대시보드 안내) |
 | 프로젝트 수정 | **이름/URL 변경 금지**, 도메인 유형·위젯 테마만 변경 가능 |
 | 빠른메뉴 | 질문 편집 **1회 제한**, 저장된 소스로 답변 재생성, **"AI비서란?" 필수 메뉴(편집 불가)** |
+| **2계층 지식(WebMCP)** | **Tier 1** 중요 정보(연락처·영업시간·예약)는 표준 도구명(`get_contact_information` 등)으로 개별 등록, **Tier 2** 나머지는 페이지 단위 `get_page_answer(page, question)` 도구로 검색, 자유 질문 `ask_site_ai` 항상 제공 |
+| **페이지별 추가 지식** | 관리자가 크롤된 페이지마다 **새 textarea로 최신 정보**(이벤트·가격·예약 규정) 입력 → **저장 즉시** 자유 질문·페이지 검색 답변에 반영 |
 | 위젯 | 5종 테마, 미리보기, `bundle.zip` 설치 번들(난독화), **AI 로고 아이콘**, **음성 입력(두 줄 버튼)**, **답변 생성 중 입력 잠금** |
-| 데이터 플레인 | `/embed/<publicId>.js` 로더, `/api/chat/` 실시간 채팅, Origin 화이트리스트, 쿼터 |
+| 데이터 플레인 | `/embed/<publicId>.js` 로더, `/api/chat/` 실시간 채팅, `/api/chat/page-answer/` 페이지별 검색, Origin 화이트리스트, 쿼터 |
 | 관리자 | 사용자·프로젝트·고객센터 관리, **테넌트별 Gemini 설정(테스트 후 적용)** |
 | 고객센터 | Q&A 게시판(질문 2000자, 10개/페이지) |
 | 이용약관 | 프로젝트 페이지 하단 "읽어볼 내용" 아코디언(이용약관/AI 이용고지/개인정보처리방침/프로그램 사용동의) |
 | SEO | **전 페이지 noindex·nofollow**, `robots.txt` 전체 접근 금지, `llms.txt` 제공 |
 | 다국어 사일로 | **ko/en 완전 분리** — 언어별 DB·컨테이너·LLM 엔진·카탈로그·위젯UI·콘솔UI 독립 실행 |
+
+## 이 프로젝트가 WebMCP에 적합한 이유
+
+WebMCP의 핵심 약속은 **웹사이트 자체가 도구 제공자가 된다**는 것 — 모든 페이지가
+`document.modelContext`를 통해 브라우저 AI 에이전트에 구조화된 도구를 노출할 수
+있습니다. 그 약속의 어려운 부분은 공급입니다. 대부분의 사이트는 도구를 하나도
+등록하지 않아 에이전트가 DOM 텍스트를 추측할 수밖에 없습니다.
+
+WebMCP Auto는 정확히 그 공급 문제를 풀기 위해 존재합니다:
+
+- **대량 온보딩 파이프라인** — URL만 붙여넣으면 플랫폼이 사이트를 크롤하고, LLM으로
+  근거 있는 Q&A를 생성하고, 사이트 전용 도구를 자동 등록하는 위젯을 만듭니다.
+  사이트 소유자에게는 MCP 서버·백엔드 코드·배포가 전혀 필요 없습니다 — `<script>`
+  한 줄만으로 어떤 비즈니스 사이트든 에이전트 대응 사이트가 됩니다.
+- **도메인 기반 도구** — 27종 도메인 카탈로그(병원, 법률, 소매 등)가 사이트별 의미 있는
+  빠른메뉴 질문을 실제 등록 도구로 매핑하고, 그 외 자유 질문은 `ask_site_ai` 도구로 처리합니다.
+- **2계층 지식 구조 (Tier 1 + Tier 2)** — 자주 쓰는 핵심 정보(연락처·영업시간·예약 방법)는
+  서버가 결정한 **표준 도구명**(`get_contact_information`, `get_opening_hours`,
+  `get_reservation_method` 등)으로 개별 도구로 노출하고(`tier: core`), 빠른메뉴에 없는 나머지
+  전체 페이지는 **`get_page_answer(page, question)`** 도구로 크롤된 페이지 단위로 검색합니다.
+- **근거 있는 답변** — 모든 도구 호출은 사이트 자체 크롤 지식 베이스에서 답변하므로,
+  에이전트는 사람 방문자가 보는 것과 동일한 신뢰 콘텐츠를 얻습니다.
+- **페이지별 추가 지식** — 콘솔에서 크롤된 각 페이지에 관리자가 최신 정보(이벤트·가격·예약
+  규정 등)를 추가하면, 저장 즉시 자유 질문(`/api/chat/`)과 페이지 검색(`/api/chat/page-answer/`)
+  답변의 컨텍스트로 함께 주입됩니다(크롤 원문보다 최신 정보로 우선).
+- **멀티테넌트 설계** — 하나의 SaaS 파이프라인이 수백 개 사이트를 각각 독립된
+  읽기 전용 MCP 도구 제공자로 온보딩할 수 있습니다. WebMCP 생태계가 주류가 되기 위해
+  필요한 확장성이 바로 이것입니다.
+
+## 더 나은 사용자 경험
+
+- **하나의 지식 베이스, 두 소비자.** 사람 방문자는 위젯으로 채팅하고, AI 에이전트는
+  등록된 도구를 호출합니다. 둘 다 동일한 근거 기반 최신 답변을 읽습니다 — 사이트가
+  사람에게 말하는 것과 에이전트에게 말하는 것이 어긋나지 않습니다.
+- **에이전트가 더 이상 추측하지 않습니다.** 신뢰하기 어려운 DOM 텍스트를 긁는 대신
+  구조화된 사이트 검증 답변을 받습니다 — 모든 도구는 `readOnlyHint`(부작용 없음),
+  `untrustedContentHint`(LLM 생성 출력은 비신뢰 표시), 1,500자 출력 클램프(WebMCP
+  보안 예산)를 갖춥니다.
+- **사람 중심 위젯 UX** — 음성 입력, 답변 생성 중 입력 잠금, 5종 테마, 필수
+  "AI비서란?" 메뉴로 비전문 방문자도 같은 지식을 쉽게 사용합니다.
+
+## 이전엔 어렵거나 불가능했던 일을 함께 해내기
+
+- **이전:** 사이트를 에이전트 대응으로 만들려면 MCP 서버를 직접 만들어야 했습니다 —
+  스키마, 호스팅, 배포까지. 병원·소규모 사업장 등 비개발자는 불가능했고, AI 에이전트는
+  페이지 텍스트로 추측한 부정확·구식 답변만 내놓을 수 있었습니다.
+- **이제:** 사이트 소유자(비개발자)가 URL을 붙여넣고 크롤 → Q&A 생성 → 위젯 빌드
+  파이프라인이 완료되기를 ~5분만 기다린 뒤 위젯을 설치하면, ChatGPT 데스크톱이나
+  Chrome AI 에이전트가 발견하고 호출하는 실제 도구 제공자가 됩니다. 개발자 개입이
+  필요 없습니다.
+- **담당자가 주도권을 유지합니다:** 담당자는 콘솔에서 저장된 소스 기반으로 답변을
+  재생성·편집합니다 — 사람이 지식을 큐레이션하고, 에이전트가 소비합니다. 필수 메뉴
+  "AI비서란?"은 방문자와 에이전트 모두에게 시스템이 어떻게 동작하는지 알려줍니다.
+
+## WebMCP 구현 개요
+
+- [`saas/widget-dist/webmcp.js`](saas/widget-dist/webmcp.js) — 위젯 스크립트 로드 시
+  `registerModelTools()`가 `document.modelContext.registerTool()`을 호출해 2계층 도구를 등록합니다.
+  - **Tier 1** — 빠른메뉴(중요 정보)는 서버가 결정한 표준 도구명
+    (`get_contact_information`, `get_opening_hours`, `get_reservation_method` 등)과 설명
+    (`description`)을 그대로 사용하고, `tier: 'core'`/`'menu'`로 구분합니다.
+    (`core/tooltypes.py` 사전 + 카테고리·라벨 자동 슬러그 명명)
+  - **Tier 2** — 크롤된 개별 페이지를 `get_page_answer(page, question)` 도구로 노출합니다.
+    config의 `pages` 목록(URL·제목)이 도구 설명에 포함되어 에이전트가 페이지를 선택해 검색합니다.
+  - 자유 질문 **`ask_site_ai`** 는 항상 등록됩니다(전체 사이트 요약 기반).
+- 도구 `execute()`는 `/api/chat/`(자유 질문·Tier 1)와 `/api/chat/page-answer/`(Tier 2 페이지 검색)
+  프록시 엔드포인트를 사용합니다. 에이전트와 사람 채팅 위젯이 하나의 서버 파이프라인
+  (크롤 소스 → 시스템 프롬프트 LLM → 근거 답변)을 공유합니다.
+- **페이지별 추가 지식** — 각 크롤 페이지(PageKnowledge)에 저장된 관리자 입력(`extra_md`)은
+  `page-answer` 컨텍스트에 포함되고, 자유 질문 시에도 저장된 추가 지식들을 모아
+  (`_extra_knowledge_context`, 총 6,000자 상한) 주입됩니다. 크롤 원문보다 최신 정보로 우선 답변합니다.
+- 미지원 브라우저는 폴링 폴백(약 3초) 후 조용히 건너뛰며, 디버깅용으로
+  `window.WebMCP.registerModelTools`를 노출합니다.
+- 보안: 모든 도구에 `readOnlyHint`, LLM 생성 출력에 `untrustedContentHint`,
+  1,500자 출력 클램프.
 
 ## LLM 구성
 
@@ -494,7 +666,7 @@ volumes:
 | **nginx Docker DNS resolver** | 정적 upstream 시작 시 1회 resolve → 컨테이너 재시작 IP 변경 시 502 발생. `resolver 127.0.0.11 valid=10s` + 변수 proxy_pass로 근본 방지 (T-033) | `9a57701` |
 
 > **운영 전환 시 참고**: 위값들을 도메인/https로 변경하는 체크리스트는
-> [`plan.md`](plan.md) §0.11.7 및 [`DEPLOY_PORUDCTION.md`](DEPLOY_PORUDCTION.md) §5.1 참조.
+> [`plan.md`](plan.md) §0.11.7 및 [`DEPLOY_PRODUCTION.md`](DEPLOY_PRODUCTION.md) §5.1 참조.
 
 ## 로컬 개발 (SQLite)
 
@@ -534,5 +706,5 @@ ko/en 사일로는 **동일 코드베이스**에서 `WEBMCP_LANG` env로 언어�
 
 - [`plan.md`](plan.md) — 전체 설계·구현 현황·API 스펙
 - [`docker/HOWTO.md`](docker/HOWTO.md) — Docker 설치·운영·백업
-- [`DEPLOY_PORUDCTION.md`](DEPLOY_PORUDCTION.md) — 프로덕션 배포
+- [`DEPLOY_PRODUCTION.md`](DEPLOY_PRODUCTION.md) — 프로덕션 배포
 - [`PORTING.md`](PORTING.md) — **다른 서버로 포팅 가이드** (136 배포판 기준 전체 절차·트러블슈팅 FAQ)

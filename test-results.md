@@ -386,7 +386,7 @@
 | `4536bb2` | test-results.md 최초 생성 (T-001~T-025) |
 | `597b095` | LAN(192.168.x.x) 원격 접속 허용 — 8080/8081, DB 로컬 전용 유지 |
 | `0eccdd0` | test-results.md T-026 LAN 접속 테스트 추가 |
-| `2eb18e9` | DEPLOY_PORUDCTION.md §5.1 LAN 접속 절차 문서화 |
+| `2eb18e9` | DEPLOY_PRODUCTION.md §5.1 LAN 접속 절차 문서화 |
 | `07e19df` | SECURE_COOKIES 스위치 — LAN http 로그인 쿠키 폐기 문제 수정 |
 | `8ab4abf` | test-results.md T-027 추가 |
 | `6eb0ee0` | 위젯 에셋 no-cache — 모바일 캐시 방지 (갤럭시 런처 미표출 해결) |

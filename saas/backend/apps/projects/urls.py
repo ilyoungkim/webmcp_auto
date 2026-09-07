@@ -9,6 +9,7 @@ urlpatterns = [
     path('projects/<int:pk>/status/', views.project_status),
     path('projects/<int:pk>/sitemap-urls/', views.project_sitemap_urls),
     path('projects/<int:pk>/rerun/', views.project_rerun),
+    path('projects/<int:pk>/pages/<int:page_id>/', views.project_page_knowledge),
     path('projects/<int:pk>/menus/', views.project_menus),
     path('projects/<int:pk>/menus/regenerate/', views.project_menus_regenerate),
     path('projects/<int:pk>/origins/', views.project_origins),

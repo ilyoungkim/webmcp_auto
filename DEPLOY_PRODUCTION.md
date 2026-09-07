@@ -658,3 +658,322 @@ nginx -s stop  -c ~/webmcp_auto/webmcp_silo_https.conf   # 정지
 > 이 구성을 **다른 서버에 동일하게 이식**하는 전체 절차(사전 요건/소스 확보/
 > 포트 계획/SSL 발급/검증 체크리스트/트러블슈팅 FAQ)는
 > **[`PORTING.md`](PORTING.md)** 참조 — 136 배포판 기준 실측 문서.
+
+---
+
+# 배포 가이드 — 개발기(136) / 운영기(Render)
+
+> 이 문서는 **개발기(136 서버)** 와 **운영기(Render)** 두 환경의 배포 절차를
+> 명확히 구분해 기술한다. 소스는 동일하지만 **포트·도메인·HTTPS·DB** 구성이 다르므로
+> 각 환경의 섹션을 따로 따른다.
+
+```mermaid
+flowchart LR
+    subgraph DEV[개발기 — 136 서버]
+        D1[136 호스트 nginx<br/>HTTPS 8443/8444<br/>webmcp.duckdns.org]
+        D2[Docker 사일로<br/>18080/18081]
+    end
+    subgraph PROD[운영기 — Render]
+        P1[Render HTTPS<br/>:443<br/>webmcp-front-ko/en.onrender.com]
+        P2[Render Web Service<br/>Dockerfile.backend/frontend]
+    end
+    U[사용자] --> D1 --> D2
+    U --> P1 --> P2
+```
+
+---
+
+## 14. 개발기 배포 — 136 서버 (192.168.31.136)
+
+> **환경**: Fedora 39, Docker 27.3.1, Compose v2.21, 사용자 `tensun`
+> **접속**: `https://webmcp.duckdns.org:8443` (ko) / `:8444` (en)
+> **특징**: 8080은 wiki-engine이 점유 → 사일로는 **18080/18081** 고정.
+> DB 볼륨(`docker_postgres_data_ko/en`)·SSL·`webmcp_silo_https.conf`는 **유지**된다.
+
+### 14.1 소스 전송 (Mac → 136)
+
+로컬 구조(`saas/`, `docker/`)와 서버 구조(`~/webmcp_auto/saas/`, `~/webmcp_auto/docker/`)가
+**동일한 하위 경로**이므로, 각 소스를 해당 대상 하위 디렉토리로 전송한다.
+
+> ⚠️ **rsync 주의**: `saas/ docker/`를 대상 `~/webmcp_auto/`로 한 번에 지정하면
+> 0개 파일만 전송된다(경로 매핑 불일치). 반드시 **소스별로 대상 하위 경로를 지정**한다.
+> 또한 `-e "ssh -o BatchMode=yes"`를 붙여야 rsync가 정상 동작한다.
+
+```bash
+# 제외 목록 (시크릿·빌드 산출물·로컬 전용)
+cat > /tmp/rsync-excludes.txt <<'EOF'
+.git/
+node_modules/
+.venv/
+__pycache__/
+.output/
+.nuxt/
+crawled/
+db.sqlite3
+backups/
+logs/
+screenshot/
+*.pyc
+.DS_Store
+.env
+EOF
+
+cd /Users/ilyoungkim/Projects/webMCP_Auto
+# saas/ → 서버 saas/ , docker/ → 서버 docker/  (각각 대상 하위 경로 지정)
+rsync -az -e "ssh -o BatchMode=yes" --exclude-from=/tmp/rsync-excludes.txt \
+  saas/  tensun@192.168.31.136:/home/tensun/webmcp_auto/saas/
+rsync -az -e "ssh -o BatchMode=yes" --exclude-from=/tmp/rsync-excludes.txt \
+  docker/ tensun@192.168.31.136:/home/tensun/webmcp_auto/docker/
+```
+
+> `.env`는 제외되므로 서버의 `~/webmcp_auto/saas/backend/.env`가 그대로 유지된다.
+
+### 14.2 compose 파일을 136 서버용으로 치환 (필수)
+
+로컬 `docker-compose.silo.yml`은 로컬용(8080/8081, localhost)이다. **전송 후 반드시**
+서버에서 136용으로 치환한다. (이 값들은 위젯 config의 `assetBase`/`proxyEndpoint`에 박제된다)
+
+```bash
+ssh tensun@192.168.31.136
+cd ~/webmcp_auto/docker
+cp docker-compose.silo.yml docker-compose.silo.yml.bak
+
+sed -i \
+  -e 's|SAAS_PUBLIC_URL: http://localhost:8080|SAAS_PUBLIC_URL: https://webmcp.duckdns.org:8443|g' \
+  -e 's|SAAS_PUBLIC_URL: http://localhost:8081|SAAS_PUBLIC_URL: https://webmcp.duckdns.org:8444|g' \
+  -e 's|ports: \["8080:80"\]|ports: ["18080:80"]|g' \
+  -e 's|ports: \["8081:80"\]|ports: ["18081:80"]|g' \
+  -e 's|ALLOWED_HOSTS: "127.0.0.1,localhost,backend,192.168.0.5,192.168.0.2,100.97.114.127"|ALLOWED_HOSTS: "127.0.0.1,localhost,backend,webmcp.duckdns.org"|' \
+  docker-compose.silo.yml
+
+# 검증
+DOCKER_HOST=unix:///var/run/docker.sock docker compose -f docker-compose.silo.yml config --quiet && echo OK
+```
+
+### 14.3 재빌드·재기동
+
+```bash
+cd ~/webmcp_auto/docker
+DOCKER_HOST=unix:///var/run/docker.sock docker compose -f docker-compose.silo.yml up -d --build
+```
+
+- `docker-entrypoint.sh`가 자동 실행: `migrate` → `seed_catalogs` → `seed_admin` → `collectstatic` → gunicorn
+- 새 마이그레이션(예: `pipeline.0004/0005`)이 있으면 자동 적용된다.
+- worker가 migrate 전에 뜨면 실패할 수 있다 → 로그 확인 후 `restart worker-ko worker-en`
+
+### 14.4 HTTPS 리버스 프록시 nginx (8443/8444)
+
+`~/webmcp_auto/webmcp_silo_https.conf`가 8443→18080(ko), 8444→18081(en)로 프록시한다.
+**sudo 불필요** (1024 초과 포트 + pid/tmp를 홈에 배치). 컨테이너 재기동 후 nginx가
+꺼져 있으면 시작한다.
+
+```bash
+# 시작 (이미 떠 있으면 "address already in use" — 그땐 reload만)
+nginx -c ~/webmcp_auto/webmcp_silo_https.conf
+# 설정 변경 후
+nginx -s reload -c ~/webmcp_auto/webmcp_silo_https.conf
+# 정지
+nginx -s stop -c ~/webmcp_auto/webmcp_silo_https.conf
+```
+
+> ⚠️ 136에는 **기존 443 nginx**(`/etc/nginx/webmcp_https_standalone.conf`, → 8001)가
+> 별도로 떠 있다. `webmcp_silo_https.conf`는 8443/8444만 리슨하므로 충돌하지 않는다.
+> 443 nginx는 건드리지 않는다.
+
+### 14.5 헬스체크
+
+```bash
+# 컨테이너 10개 전부 Up 확인
+DOCKER_HOST=unix:///var/run/docker.sock docker ps --format '{{.Names}} {{.Status}}' | grep webmcp
+
+# 내부 HTTP
+curl -s http://127.0.0.1:18080/health/    # {"status":"ok"}
+curl -s http://127.0.0.1:18081/health/
+
+# 외부 HTTPS (nginx 경유)
+curl -sk https://webmcp.duckdns.org:8443/health/   # {"status":"ok"}
+curl -sk https://webmcp.duckdns.org:8444/health/
+curl -sk -o /dev/null -w "HTTP %{http_code}\n" https://webmcp.duckdns.org:8443/  # 200
+```
+
+> 방금 재기동 직후 backend가 아직 준비 안 되면 502가 잠깐 나올 수 있다. 몇 초 후 재시도.
+
+### 14.6 기존 프로젝트 위젯 재생성 (필수 — 코드 변경 시)
+
+> ⚠️ **2026-09-07 실측**: 소스·이미지를 최신으로 재배포해도 **기존 프로젝트의 위젯
+> config는 재생성 전까지 구버전 구조를 유지**한다. 새 기능(`pageAnswerEndpoint`,
+> `pages`, 새 `names` 구조, `get_page_answer` 도구)이 위젯에 반영되지 않는다.
+> **반드시 위젯을 재생성해야 한다.**
+
+`SAAS_PUBLIC_URL`이 바뀌면 기존 프로젝트의 위젯 config에 **옛 주소가 박제**되어 있다.
+콘솔 `/admin/projects` → 각 프로젝트 **"Q&A 재생성"** 또는
+`POST /api/admin/projects/<id>/regenerate/` 로 위젯을 재빌드한다(§4.1.2).
+
+**Q&A 재생성 없이 위젯 config만 새 구조로 갱신**하려면 `rebuild_widgets`
+관리 명령을 사용한다 (LLM 호출 없이 빠름):
+
+```bash
+# ko 사일로 (en은 webmcp-en-backend)
+DOCKER_HOST=unix:///var/run/docker.sock docker exec webmcp-ko-backend python manage.py rebuild_widgets
+DOCKER_HOST=unix:///var/run/docker.sock docker exec webmcp-en-backend python manage.py rebuild_widgets
+# 옵션: --lang ko|en, --project <id>, --with-pages (PageKnowledge 복원 포함)
+```
+
+**위젯 정합성 사전 점검** — `/ready/`가 현재 `SAAS_PUBLIC_URL`과 박제된
+`assetBase` 불일치(`staleWidgets`), 구버전 구조(`legacyWidgets`)를 보고한다:
+
+```bash
+curl -sk https://webmcp.duckdns.org:8443/ready/
+# {"ready": true, ..., "staleWidgets": [], "legacyWidgets": 0} — 정상
+# stale/legacy가 비어 있지 않으면 rebuild_widgets 실행
+```
+
+**`pages`(페이지 목록)가 0이면** `PageKnowledge`가 없기 때문이다. 기존 프로젝트는
+새 코드로 재크롤링되지 않았으므로 `SiteContent.markdown`에서 페이지를 분할해
+`PageKnowledge`를 생성한 뒤 위젯을 재생성한다:
+
+```bash
+DOCKER_HOST=unix:///var/run/docker.sock docker exec webmcp-ko-backend python manage.py shell -c "
+from apps.projects.models import Project
+from apps.pipeline.models import SiteContent
+from apps.pipeline.runner import _save_page_knowledge
+for p in Project.objects.all():
+    sc = SiteContent.objects.filter(project=p).first()
+    if sc and sc.markdown:
+        _save_page_knowledge(p, sc.markdown, {})
+        print(p.id, p.name, 'PageKnowledge:', __import__('apps.pipeline.models', fromlist=['PageKnowledge']).PageKnowledge.objects.filter(project=p).count())
+"
+# 그 다음 위젯 재생성 (위 build_widget 명령 재실행)
+```
+
+### 14.6.1 nginx Origin 헤더 덮어쓰기 함정 (위젯 채팅 403)
+
+> ⚠️ **2026-09-07 실측**: `webmcp_silo_https.conf`에
+> `proxy_set_header Origin https://$host:8443;`(8444도 동일)가 있으면,
+> **들어오는 브라우저 Origin을 강제로 덮어써** 위젯 채팅/페이지답변의
+> Origin 화이트리스트 검증이 실패한다. 위젯이 고객 사이트(`https://고객도메인`)에서
+> 호출해도 백엔드가 받는 Origin은 `https://webmcp.duckdns.org:8443`이 되어
+> `Domain not allowed` 403이 난다.
+
+**해결**: `webmcp_silo_https.conf`에서 `proxy_set_header Origin ...` 두 줄을 제거한다.
+실제 브라우저 Origin을 그대로 전달해야 화이트리스트 검증이 동작한다.
+
+```bash
+ssh tensun@192.168.31.136
+cd ~/webmcp_auto
+sed -i '/proxy_set_header Origin https:\/\/\$host:8443;/d; /proxy_set_header Origin https:\/\/\$host:8444;/d' webmcp_silo_https.conf
+nginx -t -c ~/webmcp_auto/webmcp_silo_https.conf   # syntax ok
+nginx -s reload -c ~/webmcp_auto/webmcp_silo_https.conf
+```
+
+**검증** (Origin 헤더를 달고 호출):
+```bash
+curl -sk -X POST https://webmcp.duckdns.org:8443/api/chat/page-answer/ \
+  -H "Content-Type: application/json" -H "Origin: https://openpromptlib.com" \
+  -d '{"publicId":"<publicId>","page":"https://openpromptlib.com/","question":"이 사이트는 무엇인가요?"}'
+# → {"candidates":[...]} 정상. "Domain not allowed"가 나오면 Origin 헤더 문제
+```
+
+### 14.7 개발기 배포 체크리스트
+
+- [ ] rsync로 `saas/`·`docker/`를 각각 대상 하위 경로로 전송
+- [ ] compose를 136용으로 치환 (18080/18081, `https://webmcp.duckdns.org:8443/8444`, ALLOWED_HOSTS, **CSRF_TRUSTED_ORIGINS에 duckdns 주소 포함** — 없으면 콘솔 로그인·POST 요청 시 `CSRF Failed` 403)
+- [ ] `docker compose up -d --build` 로 10개 컨테이너 Up
+- [ ] `webmcp_silo_https.conf` nginx가 8443/8444 리슨
+- [ ] `webmcp_silo_https.conf`에 `proxy_set_header Origin` **없음** (있으면 제거)
+- [ ] `curl -sk https://webmcp.duckdns.org:8443/health/` → `{"status":"ok"}`
+- [ ] **기존 프로젝트 위젯 재생성** — `pageAnswerEndpoint`/`pages`/새 `names` 반영 확인
+- [ ] `PageKnowledge` 생성 후 위젯 재생성 (pages가 0이면)
+- [ ] `curl -sk .../api/chat/page-answer/` (Origin 헤더) → `{"candidates":[...]}`
+
+---
+
+## 15. 운영기 배포 — Render
+
+> **환경**: Render Web Service (Docker), ko/en 각각 별도 서비스
+> **접속**: `https://webmcp-front-ko.onrender.com` (ko) / `https://webmcp-front-en.onrender.com` (en)
+> **특징**: Render가 HTTPS(:443)와 도메인을 자동 제공. DB는 Render PostgreSQL 또는 외부 DB.
+> 소스는 GitHub 저장소에서 자동 배포된다.
+
+### 15.1 Render 서비스 구성
+
+| 서비스 | Dockerfile | 헬스체크 | 비고 |
+|---|---|---|---|
+| `webmcp-back-ko` | `Dockerfile.backend` | `/api/health/` | ko 백엔드 + worker |
+| `webmcp-front-ko` | `Dockerfile.frontend` | `/` | ko 콘솔 |
+| `webmcp-back-en` | `Dockerfile.backend` | `/api/health/` | en 백엔드 + worker |
+| `webmcp-front-en` | `Dockerfile.frontend` | `/` | en 콘솔 |
+
+> Render는 **GitHub 저장소의 커밋/푸시**를 감지해 자동 배포한다. 로컬에서 직접
+> 파일을 올리는 방식이 아니라, **커밋 → 푸시 → Render 자동 배포** 순서를 따른다.
+
+### 15.2 배포 절차
+
+```bash
+# 1) 변경사항 커밋·푸시 (Render가 자동 감지)
+git add -A
+git commit -m "feat: ..."
+git push origin main
+
+# 2) Render 대시보드에서 배포 상태 확인
+#    https://dashboard.render.com → 각 서비스 → Events 탭
+#    "Deploy successful" 확인
+
+# 3) 헬스체크
+curl -s https://webmcp-front-ko.onrender.com/api/health/   # {"status":"ok"}
+curl -s https://webmcp-front-en.onrender.com/api/health/
+```
+
+### 15.3 Render 환경변수 (대시보드 → Environment)
+
+| 변수 | ko | en |
+|---|---|---|
+| `DJANGO_DEBUG` | `false` | `false` |
+| `DJANGO_SECRET_KEY` | 운영용 랜덤 키 | 운영용 랜덤 키 |
+| `ALLOWED_HOSTS` | `webmcp-front-ko.onrender.com,backend` | `webmcp-front-en.onrender.com,backend` |
+| `SAAS_PUBLIC_URL` | `https://webmcp-front-ko.onrender.com` | `https://webmcp-front-en.onrender.com` |
+| `CSRF_TRUSTED_ORIGINS` | `https://webmcp-front-ko.onrender.com` | `https://webmcp-front-en.onrender.com` |
+| `GEMINI_API_KEY` | 실제 키 | 실제 키 (또는 `_EN`) |
+| `OPENROUTER_API_KEY` | 실제 키 | 실제 키 (또는 `_EN`) |
+| `ADMIN_SEED_EMAIL` | 관리자 이메일 | 관리자 이메일 |
+| `ADMIN_SEED_PASSWORD` | 강력한 초기 비밀번호 | 강력한 초기 비밀번호 |
+| `DATABASE_URL` | Render PostgreSQL | Render PostgreSQL |
+
+> `SAAS_PUBLIC_URL`은 위젯 config의 `assetBase`/`proxyEndpoint`에 박제되므로
+> **반드시 각 사일로의 실제 Render 도메인**이어야 한다(§4.1).
+
+### 15.4 Render 배포 주의사항
+
+- **DB 마이그레이션**: Render 시작 명령에 `migrate`가 포함되도록 `docker-entrypoint.sh` 사용.
+  새 마이그레이션 추가 시 자동 적용된다.
+- **worker 기동 순서**: backend의 migrate 완료 전에 worker가 뜨면 실패할 수 있다.
+  Render에서 worker를 별도 프로세스로 띄우거나, backend readiness 후 시작하도록 조정.
+- **정적 파일**: `collectstatic`이 자동 실행되도록 entrypoint에 포함. Render 디스크는
+  휘발성이므로 업로드 파일은 Render Disk 또는 외부 스토리지 사용.
+- **HTTPS**: Render가 자동 제공하므로 별도 인증서 설정 불필요. `SECURE_PROXY_SSL_HEADER`
+  및 `X-Forwarded-Proto` 처리는 §6 참조.
+- **기존 프로젝트 위젯**: `SAAS_PUBLIC_URL` 변경 시 위젯 재생성 필요(§4.1.2).
+
+### 15.5 운영기 배포 체크리스트
+
+- [ ] GitHub에 커밋·푸시 완료
+- [ ] Render 대시보드에서 ko/en 각 서비스 "Deploy successful"
+- [ ] `curl https://webmcp-front-ko.onrender.com/api/health/` → `{"status":"ok"}`
+- [ ] `SAAS_PUBLIC_URL`이 각 Render 도메인으로 설정됨
+- [ ] DB 마이그레이션·collectstatic 자동 실행 확인
+- [ ] 기존 프로젝트 위젯 재생성 (필요 시)
+
+---
+
+## 16. 개발기 vs 운영기 비교 요약
+
+| 항목 | 개발기 (136) | 운영기 (Render) |
+|---|---|---|
+| 배포 방식 | rsync로 소스 직접 전송 | GitHub 커밋·푸시 → 자동 배포 |
+| HTTPS | 호스트 nginx 8443/8444 (Let's Encrypt) | Render :443 자동 |
+| 도메인 | `webmcp.duckdns.org:8443/8444` | `webmcp-front-ko/en.onrender.com` |
+| 포트 | 18080/18081 (8080은 wiki-engine) | Render 기본 |
+| DB | Docker 볼륨 (`docker_postgres_data_ko/en`) | Render PostgreSQL |
+| SSL 인증서 | acme.sh + DuckDNS (DNS-01) | Render 자동 |
+| 위젯 assetBase | `https://webmcp.duckdns.org:8443/8444` | `https://webmcp-front-ko/en.onrender.com` |
+| sudo | 불필요 (nginx 1024+ 포트) | 불필요 |

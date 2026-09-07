@@ -14,7 +14,7 @@ from core.llm import GeminiError, ask_openrouter, resolve_openrouter_model
 from core.origins import validate_crawl_url
 
 from .crawler import crawl_many
-from .models import GeneratedQnA, PipelineJob, SiteContent
+from .models import GeneratedQnA, PageKnowledge, PipelineJob, SiteContent
 
 
 def run_job(job: PipelineJob) -> None:
@@ -53,6 +53,13 @@ def run_job(job: PipelineJob) -> None:
             failed_urls=failed_items,
         )
         _save_markdown_file(project, data['markdown'])
+
+        # 1.5) Tier 2 — 페이지별 지식 저장: 결합 마크다운을 '## [페이지] {url}' 헤더로 분할
+        project.progress = 28
+        project.status_message = '페이지별 지식 저장 중...'
+        project.save(update_fields=['progress', 'status_message', 'updated_at'])
+        PageKnowledge.objects.filter(project=project).delete()
+        _save_page_knowledge(project, data['markdown'], page_titles)
 
         # 2~4) 메뉴별 Q&A — 모든 메뉴를 한 번의 배치 호출로 생성 (개별 호출 제거)
         project.status, project.progress = 'generating', 30
@@ -272,6 +279,53 @@ def _strip_emoji(text: str) -> str:
     return _EMOJI_RE.sub('', text) if text else text
 
 
+_PAGE_HEADER_RE = re.compile(r'^## \[페이지\]\s*(\S+)\s*$', re.M)
+
+
+def _split_pages(markdown: str) -> list[tuple[str, str]]:
+    """결합 마크다운을 [(url, page_markdown), ...] 로 분할.
+
+    crawl_many 가 삽입한 '## [페이지] {url}' 헤더를 경계로 삼는다.
+    헤더가 없으면 전체를 ('', markdown) 단일 항목으로 본다.
+    """
+    matches = list(_PAGE_HEADER_RE.finditer(markdown or ''))
+    if not matches:
+        return [('', markdown or '')]
+    out: list[tuple[str, str]] = []
+    for i, m in enumerate(matches):
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(markdown)
+        body = markdown[start:end].strip()
+        if body:
+            out.append((m.group(1).strip(), body))
+    return out
+
+
+def _save_page_knowledge(project: Project, combined_markdown: str, page_titles: dict[str, str]) -> None:
+    """Tier 2 — 크롤된 개별 페이지 지식을 PageKnowledge 테이블에 저장.
+
+    실패해도 파이프라인은 계속한다 (전체 SiteContent.markdown 은 이미 저장됨).
+    """
+    try:
+        rows: list[PageKnowledge] = []
+        seen: set[str] = set()
+        for url, body in _split_pages(combined_markdown):
+            # 루트 URL 변형(유무 / trailing slash)을 같은 페이지로 본다
+            norm = (url or '').rstrip('/').lower() or '__nourl__'
+            if norm in seen:
+                continue
+            seen.add(norm)
+            rows.append(PageKnowledge(
+                project=project, url=url or project.url,
+                title=(page_titles or {}).get(url, '')[:255],
+                markdown=body, char_count=len(body),
+            ))
+        if rows:
+            PageKnowledge.objects.bulk_create(rows)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _save_markdown_file(project: Project, markdown: str) -> None:
     """크롤 결과를 backend/crawled/project_<id>.md 로 저장. 실패해도 파이프라인은 계속."""
     try:
@@ -334,10 +388,11 @@ def _batch_qna_prompt(markdown: str, project: Project, menus, questions_map: dic
             '- Never output HTML tags (especially <br>).\n'
             f'- Start each answer with "Hello. This is the AI assistant of {project.name}."\n\n'
             '【Contact guidance】\n'
-            '- Actively introduce real contact methods (phone, email, chat channel, booking links) found in the site content. Include markdown links as they appear.\n'
+            '- Actively introduce real contact methods (phone, email, chat channel, customer center, booking links) found in the site content.\n'
+            '- Include markdown links as they appear.\n'
             '- **Never fabricate**: do not invent emails, phone numbers, addresses, or prices not on the site.\n\n'
             '【Never use negative expressions】\n'
-            '- Never say "information is not available", "not provided", "not disclosed", "unknown". Guide positively with information that actually exists.\n\n'
+            '- Never say "not available", "not provided", "not disclosed", "unknown". Guide positively with information that actually exists.\n\n'
             f'{domain_hint}'
             f'[Site content]\n{markdown}'
         )
@@ -354,27 +409,14 @@ def _batch_qna_prompt(markdown: str, project: Project, menus, questions_map: dic
         '작성할 빠른메뉴 목록:\n'
         f'{menu_spec}\n\n'
         '【질문 생성 규칙】\n'
-        '- "어디서 확인할 수 있나요", "어디에 있나요"처럼 정보의 위치를 묻는 수동적 질문은 피하세요.\n'
-        '- 실제 정보 자체(연락처·전화번호·주소·서비스·내용 등)를 직접 묻는 **능동적** 질문을 만드세요.\n'
-        '- 사이트에 없는 정보를 묻지 말고, 실제 있는 정보만 대상으로 하세요.\n\n'
-        '【답변 형식】\n'
-        '- 표(table)는 절대 사용하지 마세요. 대신 **불릿 목록(- 항목)**으로 정리하세요.\n'
-        '- 여러 항목을 나열할 때는 각 항목을 **"- " 불릿**으로 시작하는 목록 형태로 작성하세요.\n'
-        '- 각 섹션은 **굵게 제목**으로 시작하고, 그 아래 불릿 목록으로 내용을 정리하세요.\n'
-        '- **이모지나 이모티콘을 절대 사용하지 마세요.**\n'
-        '- 문단·항목 사이는 빈 줄로 구분해 띄어쓰기·줄내림이 자연스럽게 읽히도록 하세요.\n'
-        '- HTML 태그(특히 <br>)를 절대 출력하지 마세요. 줄바꿈은 마크다운 빈 줄을 사용하세요.\n'
-        '- 각 답변은 "안녕하세요. {project.name} AI 비서입니다."로 시작하세요.\n\n'
-        '【연락·상담 방법 안내】\n'
-        '- 사이트 내용에서 전화번호·이메일·카카오톡 채널·고객센터·예약/상담 신청 링크를 찾아 실제 있는 정보를 적극 안내하세요.\n'
-        '- "카카오톡 상담", "카톡 예약", "고객센터", "무료 진단", "상담 예약" 문구가 있으면 그 이용 방법을 명확히 안내하세요.\n'
-        '- 연결 링크([텍스트](URL))가 있으면 그대로 포함하세요.\n'
-        '- **절대 지어내지 마세요**: 사이트에 없는 이메일·전화번호·주소·구체적 가격은 만들지 말고, 실제로 있는 연락 수단만 안내하세요.\n\n'
-        '【부정 표현 절대 금지】\n'
-        '- "정보가 없다", "제공되지 않습니다", "공개되지 않았습니다", "명시되어 있지 않습니다", "알 수 없습니다" 등 부정·소극 표현을 절대 출력하지 마세요.\n'
-        '- 항상 긍정적으로, 사이트에 실제로 있는 정보 중심으로 안내하세요.\n'
-        '- 전화번호·이메일이 따로 없어도 대체 연락 수단(카카오톡·채팅·예약폼 등)을 자신 있게 안내하세요.\n\n'
-        f'{domain_hint}'
+        '- "어디서 확인할 수 있나요", "어디에 있나요", "어떻게 찾을 수 있나요"처럼 '
+        '정보의 위치를 묻는 수동적 질문은 만들지 마세요.\n'
+        '- 대신 실제 정보 자체(연락처·전화번호·주소·서비스 내용·가격·인재 정보 등)를 '
+        '직접 묻는 **능동적** 질문을 하세요.\n'
+        '- 예: (연락처 메뉴) "연애의자격의 대표 전화번호와 상담 예약 방법, 사무실 위치는 무엇인가요?"\n'
+        '- 예: (의료진 메뉴) "담당 가능한 의사 선생님과 전문 분야와 진료 시간은 어떻게 되나요?"\n'
+        '- 사이트 내용에 없는 정보는 질문하지 말고, 실제 있는 정보만 묻도록 하세요.\n'
+        '- 설명이나 부연 없이 **질문 문장 하나만** 출력하세요.\n\n'
         f'[사이트 내용]\n{markdown}'
     )
 
@@ -436,7 +478,7 @@ def _answer_prompt(markdown: str, project: Project, menu, question: str) -> str:
             '- **Never fabricate**: do not invent emails, phone numbers, addresses, or prices not on the site.\n\n'
             '【Never use negative expressions】\n'
             '- Never say "not available", "not provided", "not disclosed", "unknown". Guide positively with information that actually exists.\n\n'
-            f'[Question] {question}\n\n[Site content]\n{markdown}'
+            f'{question}\n\n[Site content]\n{markdown}'
         )
     return (
         f'당신은 {project.name}의 AI 비서입니다. 아래 사이트 내용에 근거해서만 답하세요.\n'
@@ -556,6 +598,11 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
     parsed: dict[str, dict] = {}
     # 언어 사일로 — 프로젝트의 언어로 엔진/프롬프트 언어가 결정된다
     lang = getattr(project, 'lang', '') or 'ko'
+    # Tier 1 — 빠른메뉴(중요 정보)별 WebMCP 도구명/설명 사전
+    from core.tooltypes import tool_for_menu
+    dt = getattr(project, 'domain_type', None)
+    category = (getattr(dt, 'category', '') or getattr(dt, 'code', '') or '')
+    tool_names: dict[str, str] = {m.label: tool_for_menu(m.label, lang, category)[0] for m in menus}
     try:
         batch_text = ask_openrouter(
             _batch_qna_prompt(markdown, project, menus, questions_map),
@@ -574,6 +621,7 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
                 question=menu.question,
                 answer_md=menu.answer_md or _required_menu_answer(project),
                 model=resolve_openrouter_model(lang),
+                tool_name=tool_names.get(menu.label, ''),
             ))
             continue
 
@@ -611,6 +659,7 @@ def regenerate_qna(project: Project, markdown: str, menus, questions_map: dict[s
         qna_rows.append(GeneratedQnA(
             project=project, menu_label=menu.label,
             question=question, answer_md=answer, model=resolve_openrouter_model(lang),
+            tool_name=tool_names.get(menu.label, ''),
         ))
     return qna_rows
 

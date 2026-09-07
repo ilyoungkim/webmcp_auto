@@ -1,0 +1,200 @@
+# WebMCP Auto — 사일로 언어별 질문 키워드 설정
+# 자유 질문(_search_pages_by_keywords)의 키워드 추출 규칙을 언어별로 정의한다.
+# 코드 수정 없이 이 파일만 편집하면 키워드 동작을 바꿀 수 있다.
+#
+# 구조:
+#   <lang>:
+#     pattern: 키워드 추출 정규식 (re.findall에 전달)
+#     stopwords: 불용어 목록 (소문자 비교, 이 단어들은 키워드에서 제외)
+#     keepwords: 도메인 핵심어 — stopwords에 있어도 키워드로 유지할 단어
+#     max_keywords: 질문당 최대 키워드 수
+#
+# 주의:
+# - 문의·상담·예약·전화·번호·주소·위치·시간·비용·가격 및
+#   address·phone·price·hours·location 등은 불용어가 아니다.
+#   도메인 핵심 검색어이므로 keepwords에 두어 키워드로 유지한다.
+
+en:
+  pattern: "[A-Za-z]{3,}"
+  max_keywords: 6
+  stopwords:
+    - a
+    - an
+    - the
+    - and
+    - or
+    - but
+    - of
+    - to
+    - in
+    - on
+    - at
+    - for
+    - with
+    - by
+    - from
+    - as
+    - is
+    - are
+    - was
+    - were
+    - be
+    - been
+    - being
+    - do
+    - does
+    - did
+    - will
+    - would
+    - can
+    - could
+    - should
+    - may
+    - might
+    - must
+    - shall
+    - have
+    - has
+    - had
+    - having
+    - this
+    - that
+    - these
+    - those
+    - it
+    - its
+    - "it's"
+    - i
+    - you
+    - he
+    - she
+    - we
+    - they
+    - me
+    - him
+    - her
+    - us
+    - them
+    - my
+    - your
+    - his
+    - our
+    - their
+    - what
+    - which
+    - who
+    - whom
+    - whose
+    - when
+    - where
+    - why
+    - how
+    - many
+    - much
+    - more
+    - most
+    - other
+    - some
+    - such
+    - no
+    - not
+    - only
+    - own
+    - same
+    - so
+    - than
+    - too
+    - very
+    - just
+    - about
+    - into
+    - over
+    - after
+    - before
+    - between
+    - through
+    - during
+    - each
+    - few
+    - hello
+    - hi
+    - thanks
+    - thank
+    - please
+    - tell
+    - give
+    - show
+    - find
+    - get
+  keepwords:
+    - address
+    - phone
+    - price
+    - hours
+    - location
+    - booking
+    - contact
+
+ko:
+  pattern: "[가-힣]{2,}"
+  max_keywords: 6
+  stopwords:
+    - 이
+    - 그
+    - 저
+    - 것
+    - 거
+    - 게
+    - 건
+    - 를
+    - 을
+    - 가
+    - 이
+    - 에
+    - 게
+    - 에서
+    - 로
+    - 으로
+    - 와
+    - 과
+    - 하고
+    - 한
+    - 할
+    - 함
+    - 것들
+    - 수
+    - 있
+    - 없
+    - 네
+    - 요
+    - 죠
+    - 까
+    - 뭐
+    - 뭔
+    - 어떻게
+    - 어디
+    - 언제
+    - 누구
+    - 무엇
+    - 무슨
+    - 어떤
+    - 왜
+    - 해
+    - 주세요
+    - 알려
+    - 주세요
+    - 있나요
+    - 없나요
+    - 합니까
+    - 입니까
+  keepwords:
+    - 문의
+    - 상담
+    - 예약
+    - 전화
+    - 번호
+    - 주소
+    - 위치
+    - 시간
+    - 비용
+    - 가격

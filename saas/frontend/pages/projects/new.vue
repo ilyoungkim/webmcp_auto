@@ -174,13 +174,13 @@ async function submit() {
         <label class="theme-title">{{ t('new.field.theme') }}</label>
         <div class="theme-cards">
           <button
-            v-for="t in themes" :key="t.code" type="button"
-            class="theme-card" :class="{ active: theme === t.code }"
-            :style="{ '--primary': t.primary, '--bg': t.bg }"
-            @click="theme = t.code"
+            v-for="th in themes" :key="th.code" type="button"
+            class="theme-card" :class="{ active: theme === th.code }"
+            :style="{ '--primary': th.primary, '--bg': th.bg }"
+            @click="theme = th.code"
           >
             <span class="theme-swatch"></span>
-            <b>{{ t.label }}</b>
+            <b>{{ th.label }}</b>
           </button>
         </div>
       </div>

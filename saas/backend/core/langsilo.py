@@ -134,6 +134,7 @@ MESSAGES = {
     'project.originMinimum': {'ko': '최소 1개 Origin 은 유지해야 합니다.', 'en': 'At least one Origin must remain.'},
     'project.questionRequired': {'ko': '질문 내용을 입력해주세요.', 'en': 'Please enter a question.'},
     'project.questionTooLong': {'ko': '질문은 2000자 이내로 입력해주세요.', 'en': 'Questions must be 2000 characters or fewer.'},
+    'project.extraTooLong': {'ko': '추가 지식은 8000자 이내로 입력해주세요.', 'en': 'Extra knowledge must be 8000 characters or fewer.'},
     # ── 위젯 ──
     'widget.notFound': {'ko': '위젯 없음', 'en': 'Widget not found'},
     'widget.notGenerated': {'ko': '아직 생성된 위젯이 없습니다.', 'en': 'No widget has been generated yet.'},
