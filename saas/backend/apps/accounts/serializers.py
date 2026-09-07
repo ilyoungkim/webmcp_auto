@@ -10,6 +10,7 @@ class SignupSerializer(serializers.Serializer):
     email = serializers.EmailField(validators=[UniqueValidator(User.objects.all())])
     password = serializers.CharField(min_length=8, write_only=True)
     name = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
+    signupCode = serializers.CharField(max_length=10, write_only=True, required=False, allow_blank=True, default='')
 
 
 class PasswordChangeSerializer(serializers.Serializer):

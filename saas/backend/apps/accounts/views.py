@@ -76,11 +76,42 @@ def signup(request):
     s = SignupSerializer(data=request.data)
     s.is_valid(raise_exception=True)
     data = s.validated_data
+
+    # ── 가입 코드 검증 ────────────────────────────────────────
+    # 코드는 8자리 숫자+영문 대소문자 조합(대소문자 구별). 사일로(ko/en)별 사용 제한.
+    from django.conf import settings as dj_settings
+    from django.utils import timezone
+    from .models import SignupCode
+
+    code_value = (data.get('signupCode') or '').strip()
+    silo_lang = getattr(dj_settings, 'WEBMCP_LANG', 'ko')
+    if not code_value:
+        raise ValidationError({'signupCode': msg('signup.codeRequired')})
+    # 기본 가입 코드(OneAir1234)는 10자리로 예외 허용 — 그 외 코드는 8자리 필수
+    if code_value != 'OneAir1234' and len(code_value) != 8:
+        raise ValidationError({'signupCode': msg('signup.codeInvalid')})
+    try:
+        sc = SignupCode.objects.get(code=code_value)
+    except SignupCode.DoesNotExist:
+        raise ValidationError({'signupCode': msg('signup.codeNotFound')})
+    # 사일로 제한: 코드의 lang이 지정돼 있고 현재 사일로와 다르면 거부
+    if sc.lang and sc.lang != silo_lang:
+        raise ValidationError({'signupCode': msg('signup.codeWrongSilo')})
+    # 만료 확인
+    if sc.expires_at and sc.expires_at < timezone.now():
+        raise ValidationError({'signupCode': msg('signup.codeExpired')})
+    # 사용 횟수 제한
+    if sc.max_uses and sc.used_count >= sc.max_uses:
+        raise ValidationError({'signupCode': msg('signup.codeExhausted')})
+
     user = User.objects.create_user(
         email=data['email'], password=data['password'], name=data.get('name', '')
     )
+    # 코드 사용 횟수 증가
+    sc.used_count += 1
+    sc.save(update_fields=['used_count'])
     login(request, user)
-    logger.info('SIGNUP OK email=%s id=%s', data['email'], user.id)
+    logger.info('SIGNUP OK email=%s id=%s code=%s', data['email'], user.id, code_value)
     return Response(MeSerializer(user).data, status=201)
 
 

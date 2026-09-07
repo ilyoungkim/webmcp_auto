@@ -69,3 +69,26 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class SignupCode(models.Model):
+    """회원가입 초대 코드.
+
+    - code: 8자리, 숫자+영문 대소문자 조합 (대소문자 구별)
+    - lang: ''(양쪽 사일로 허용) | 'ko' | 'en' — 사일로별 사용 제한
+    - 사용 횟수 제한: max_uses(0=무제한) / used_count
+    - expires_at: 만료 시각 (null=무기한)
+    """
+    code = models.CharField('가입 코드', max_length=10, unique=True)
+    lang = models.CharField('사일로 제한', max_length=2, blank=True, default='')  # ''|ko|en
+    max_uses = models.PositiveIntegerField('최대 사용 횟수', default=0)  # 0=무제한
+    used_count = models.PositiveIntegerField('사용 횟수', default=0)
+    expires_at = models.DateTimeField('만료 시각', null=True, blank=True)
+    note = models.CharField('비고', max_length=128, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.code

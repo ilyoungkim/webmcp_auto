@@ -118,6 +118,13 @@ MESSAGES = {
     'auth.tooManyAttempts': {'ko': '로그인 시도 횟수를 초과했습니다. {seconds}초 후 다시 시도하세요.', 'en': 'Too many login attempts. Please try again in {seconds} seconds.'},
     'auth.postOnly': {'ko': 'POST 만 허용됩니다.', 'en': 'Only POST is allowed.'},
     'auth.passwordMismatch': {'ko': '현재 비밀번호가 다릅니다.', 'en': 'The current password is incorrect.'},
+    # ── 가입 코드 ──
+    'signup.codeRequired': {'ko': '가입 코드를 입력해 주세요.', 'en': 'Please enter the signup code.'},
+    'signup.codeInvalid': {'ko': '가입 코드는 8자리여야 합니다.', 'en': 'The signup code must be 8 characters.'},
+    'signup.codeNotFound': {'ko': '가입 코드가 올바르지 않습니다.', 'en': 'The signup code is invalid.'},
+    'signup.codeWrongSilo': {'ko': '이 가입 코드는 현재 사일로에서 사용할 수 없습니다.', 'en': 'This signup code cannot be used in the current silo.'},
+    'signup.codeExpired': {'ko': '만료된 가입 코드입니다.', 'en': 'This signup code has expired.'},
+    'signup.codeExhausted': {'ko': '사용 횟수를 모두 소진한 가입 코드입니다.', 'en': 'This signup code has reached its usage limit.'},
     # ── 프로젝트 ──
     'project.notFound': {'ko': '프로젝트를 찾을 수 없습니다.', 'en': 'Project not found.'},
     'project.notFoundShort': {'ko': '프로젝트 없음', 'en': 'Project not found'},

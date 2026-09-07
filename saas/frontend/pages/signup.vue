@@ -5,6 +5,7 @@ await useAsyncData('silo-info', async () => { await loadSilo(); return true })
 const email = ref('')
 const name = ref('')
 const password = ref('')
+const signupCode = ref('')
 const error = ref('')
 
 async function submit() {
@@ -12,7 +13,7 @@ async function submit() {
   try {
     await useApi('/api/auth/signup/', {
       method: 'POST',
-      body: { email: email.value, name: name.value, password: password.value },
+      body: { email: email.value, name: name.value, password: password.value, signupCode: signupCode.value },
     })
     navigateTo('/dashboard')
   } catch (e: any) {
@@ -29,6 +30,7 @@ async function submit() {
       <input v-model="email" type="email" :placeholder="t('login.email')" required />
       <input v-model="name" type="text" :placeholder="t('signup.name')" />
       <input v-model="password" type="password" :placeholder="t('signup.pwPlaceholder')" required minlength="8" />
+      <input v-model="signupCode" type="text" :placeholder="t('signup.codePlaceholder')" required maxlength="10" />
       <button type="submit">{{ t('signup.submit') }}</button>
       <p v-if="error" class="err">{{ error }}</p>
     </form>
