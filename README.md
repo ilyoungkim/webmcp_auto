@@ -14,13 +14,15 @@
 
 | Area | Features |
 |------|----------|
-| Accounts | Sign-up, login, password change (forced change included), free/pro/admin plans, session fully cleared on logout |
+| Accounts | Sign-up (with **signup code**), login, password change (forced change included), free/pro/admin plans, session fully cleared on logout |
+| **Signup code** | `SignupCode` table — 8-char (digits + letters, case-sensitive), **per-silo (ko/en) restriction**, usage limit, expiry. Default code `OneAir1234` (both silos) |
 | Projects | URL → crawl → LLM Q&A → widget build, fully automated (max 5 projects) |
 | Quick menu | One-time question editing, answer regeneration from saved sources, mandatory "What is an AI assistant?" menu |
 | **Extra knowledge** | Per crawled page, staff add up-to-date info (events, prices, booking rules) → injected instantly into chat & page-search answers |
 | Widget | 5 themes, preview, `bundle.zip` install package, voice input, input lock while generating |
 | **WebMCP** | Widget registers site-specific tools via `document.modelContext.registerTool()` — **2-tier**: Tier 1 core-info tools (`get_contact_information`, `get_opening_hours`, …) + Tier 2 page-search `get_page_answer(page, question)` + free-form `ask_site_ai` |
 | Data plane | `/embed/<publicId>.js` loader, `/api/chat/` real-time chat, `/api/chat/page-answer/` per-page search, Origin allowlist, quotas |
+| Admin | User/project/customer-center management, per-tenant Gemini settings, **account Enable/Disable** (self-disable blocked), **project Preview button** |
 | Multilingual silos | **ko/en fully separated** — per-language DB, containers, LLM engines, catalogs, widget/console UI |
 | Cloud | **Render Blueprint (EN silo live)** + Docker Compose (self-hosted ko/en) |
 
@@ -49,6 +51,8 @@ needed on the target site.
 
 - Visit https://webmcp-front-en.onrender.com/ and sign up (or use the
   credentials provided in the Testing Instructions field of the submission form).
+  Sign-up requires the **signup code** — the default code is `OneAir1234`
+  (valid in both ko/en silos).
 - Create a project by pasting any URL (e.g. a clinic or business site) — the
   pipeline crawls the site, generates Q&A, and builds the widget automatically.
 - Open the project's **Install** page and load the demo site shown there (the
@@ -196,7 +200,8 @@ documentation below.
 
 | 영역 | 기능 |
 |------|------|
-| 계정 | 가입·로그인·비밀번호 변경(강제변경 포함), 플랜(free/pro/admin), **로그아웃 시 세션 확실 삭제** |
+| 계정 | 가입(**가입 코드 필수**)·로그인·비밀번호 변경(강제변경 포함), 플랜(free/pro/admin), **로그아웃 시 세션 확실 삭제** |
+| **가입 코드** | `SignupCode` 테이블 — 8자리(숫자+영문 대소문자, 대소문자 구별), **ko/en 사일로별 사용 제한**, 사용 횟수 제한·만료. **기본 코드 `OneAir1234`**(양쪽 사일로 허용) |
 | 프로젝트 | URL 입력 → 크롤 → LLM Q&A → 위젯 생성 자동화, **최대 5개** 생성(대시보드 안내) |
 | 프로젝트 수정 | **이름/URL 변경 금지**, 도메인 유형·위젯 테마만 변경 가능 |
 | 빠른메뉴 | 질문 편집 **1회 제한**, 저장된 소스로 답변 재생성, **"AI비서란?" 필수 메뉴(편집 불가)** |
@@ -204,7 +209,7 @@ documentation below.
 | **페이지별 추가 지식** | 관리자가 크롤된 페이지마다 **새 textarea로 최신 정보**(이벤트·가격·예약 규정) 입력 → **저장 즉시** 자유 질문·페이지 검색 답변에 반영 |
 | 위젯 | 5종 테마, 미리보기, `bundle.zip` 설치 번들(난독화), **AI 로고 아이콘**, **음성 입력(두 줄 버튼)**, **답변 생성 중 입력 잠금** |
 | 데이터 플레인 | `/embed/<publicId>.js` 로더, `/api/chat/` 실시간 채팅, `/api/chat/page-answer/` 페이지별 검색, Origin 화이트리스트, 쿼터 |
-| 관리자 | 사용자·프로젝트·고객센터 관리, **테넌트별 Gemini 설정(테스트 후 적용)** |
+| 관리자 | 사용자·프로젝트·고객센터 관리, **테넌트별 Gemini 설정(테스트 후 적용)**, **계정 Enable/Disable(자기 자신 비활성화 차단)**, **프로젝트 Preview 버튼** |
 | 고객센터 | Q&A 게시판(질문 2000자, 10개/페이지) |
 | 이용약관 | 프로젝트 페이지 하단 "읽어볼 내용" 아코디언(이용약관/AI 이용고지/개인정보처리방침/프로그램 사용동의) |
 | SEO | **전 페이지 noindex·nofollow**, `robots.txt` 전체 접근 금지, `llms.txt` 제공 |

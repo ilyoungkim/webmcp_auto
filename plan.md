@@ -15,6 +15,8 @@
 > **2026-08-29~30: 보안 강화 → 다국어 사일로(ko/en) → 콘솔·Q&A 완전 영어화 · sitemap 수집 개선 · GitHub 퍼블리시 완료** (§0.9).
 > **2026-08-30 최신: 크롤러 WAF 폴백 → 프로필/결제(엔터프라이즈 요금) → 관리자 사일로 다국어 → ko DB 복구 · 도커 사일로 정합성 개선** (§0.10).
 > **2026-08-30(2): LAN 원격 접속 허용 → SECURE_COOKIES 스위치 → 갤럭시 음성입력 대응 → ALLOWED_HOSTS 자기 IP 자동 탐지** (§0.11 §0.12).
+> **2026-09-07: 2계층 지식 구조 → 페이지별 추가 지식 → 위젯 config 재생성 → CSRF 자기 IP 자동 추가 → Q&A 캐시 임계값 상향 → 자유 질문 키워드 페이지 검색 → 키워드 YAML 외부화·언어별 분리** (§0.13).
+> **2026-09-08: admin/projects Preview 버튼 → 계정 Enable/Disable → 회원가입 코드(SignupCode)** (§0.14).
 
 ### 0.1 마일스톤 완료 현황
 
@@ -36,6 +38,16 @@
 | 추가(2026-08-30) | **프로필 페이지(일반/관리자)** — 연락처 2개, 비밀번호 변경, 결제 정보(PayPal/Stripe 연동 전), 사이트 대표 연락처 관리(SiteSetting), **엔터프라이즈 결제금액**(0=기본요금) | ✅ 완료 |
 | 추가(2026-08-30) | **관리자 페이지 사일로 다국어** — /admin/projects·chat-errors에 useSilo 적용, "AI비서란?" 필수메뉴 en 분기 | ✅ 완료 |
 | 추가(2026-08-30) | **도커 사일로 정합성** — nginx-ko.conf 신설, ko DB 유실 복구(임시 컨테이너 pg_dump) | ✅ 완료 |
+| 추가(2026-09-07) | **2계층 지식 구조** — Tier 1 중요 정보(연락처·영업시간·예약)는 표준 도구명으로 개별 등록, Tier 2 나머지는 `get_page_answer(page, question)` 페이지 검색, 자유 질문 `ask_site_ai` 항상 제공 | ✅ 완료 |
+| 추가(2026-09-07) | **페이지별 추가 지식** — 크롤된 페이지마다 관리자가 textarea로 최신 정보 입력 → 저장 즉시 자유 질문·페이지 검색 답변에 반영 | ✅ 완료 |
+| 추가(2026-09-07) | **위젯 config 재생성 명령** — `rebuild_widgets`(Q&A 재생성 없이 config만 새 구조로), `/ready/`에 위젯 정합성 필드(widgetBase/staleWidgets/legacyWidgets) | ✅ 완료 |
+| 추가(2026-09-07) | **CSRF 자기 IP 자동 추가** — `_detect_host_ips()`의 각 IP에 사일로 포트 변형 자동 등록(DHCP IP 변경 대응) | ✅ 완료 |
+| 추가(2026-09-07) | **Q&A 캐시 임계값 상향** — 유사도 0.6→0.75, 최소 길이 15자, 완전 일치는 항상 캐시 | ✅ 완료 |
+| 추가(2026-09-07) | **자유 질문 키워드 페이지 검색** — 질문 키워드로 PageKnowledge 검색, 관련 페이지 원문 주입(주소 vs 전화번호 구분) | ✅ 완료 |
+| 추가(2026-09-07) | **키워드 YAML 외부화 + 언어별 분리** — `core/keywords.yaml`(편집·재사용), en/ko 불용어·규칙 분리 | ✅ 완료 |
+| 추가(2026-09-08) | **admin/projects Preview 버튼** — 프로젝트 카드에 미리보기 링크 추가 | ✅ 완료 |
+| 추가(2026-09-08) | **admin/projects 계정 Enable/Disable** — 계정 활성/비활성 토글, 자기 자신 비활성화 차단 | ✅ 완료 |
+| 추가(2026-09-08) | **회원가입 코드(SignupCode)** — 가입 코드 필수 입력, DB 테이블, ko/en 사일로 제한, 기본 코드 OneAir1234 | ✅ 완료 |
 
 ### 0.2 실데이터 증거 (`saas/backend/db.sqlite3`)
 
@@ -51,6 +63,7 @@
 | 영역 | 기능 | 구현 위치 |
 |------|------|----------|
 | 계정 | 가입(자동 로그인)·로그인(세션 로테이션)·로그아웃·비밀번호 변경(강제변경 포함) | `apps/accounts/views.py` + `login/signup.vue` |
+| 계정 | **가입 코드(SignupCode) 필수 입력** — 8자리(숫자+영문 대소문자, 대소문자 구별), ko/en 사일로 제한(`lang`), 사용 횟수 제한(`max_uses`/`used_count`), 만료(`expires_at`), **기본 코드 OneAir1234 시드**(양쪽 사일로 허용) | `apps/accounts/models.py` + `views.py` + `migrations/0005_signupcode.py` + `signup.vue` |
 | 계정 | CSRF 쿠키 사전 발급 (`/api/auth/csrf/`), SPA 마운트 시 발급 플러그인 | `apps/accounts` + `plugins/csrf.client.ts` |
 | 계정 | 관리자 시드(`seed_admin`, `must_change_password=True`) | `management/commands/seed_admin` |
 | 카탈로그 | 도메인 유형 25종(카테고리 5: 병원/법률/교육및상담/일반회사/기타) + 빠른메뉴 4개씩 시드·갱신 | `seed_catalogs` + `apps/catalogs` |
@@ -73,7 +86,8 @@
 | 파이프라인 | 위젯 생성(버전+1, `is_current` 교체, 테마/names/items, 공개 config+서버 system_prompt) | `apps/widgets/generator.py` |
 | 데이터 플레인 | `/embed/<publicId>.js` 호스팅 로더 + `/widget-dist/<path>` 정적 서빙 | `apps/widgets/views.py` |
 | 데이터 플레인 | `/preview/<id>/` 동일 오리진 데모 HTML(`xframe_options_exempt`) | `apps/widgets/views.py` + `pages/preview/[id].vue` |
-| 데이터 플레인 | `/api/chat/` — Origin 화이트리스트 또는 세션 소유자, 쿼터, **저장된 Q&A 유사도 매칭(≥0.6)**, Gemini 실시간, Gemini 응답 형태 유지, RequestLog | `apps/proxy/views.py` |
+| 데이터 플레인 | `/api/chat/` — Origin 화이트리스트 또는 세션 소유자, 쿼터, **저장된 Q&A 유사도 매칭(≥0.75, 최소 15자, 완전 일치 항상 캐시)**, **자유 질문 키워드 페이지 검색**(PageKnowledge 검색·관련 페이지 원문 주입), Gemini 실시간, Gemini 응답 형태 유지, RequestLog | `apps/proxy/views.py` |
+| 데이터 플레인 | `/api/chat/page-answer/` — **페이지별 검색**(url→title→icontains 매칭, `knowledge_text()` = 크롤 markdown + 관리자 추가 지식) | `apps/proxy/views.py` |
 | 데이터 플레인 | `/api/chat/report/` 오류 신고 저장(ChatErrorReport) | `apps/proxy/views.py` |
 | 위젯 | 위젯 JS 4종 **신규 계약 반영** — `{question, publicId, memory}`만 전송, 기억 키 `wmcpMemory:{publicId}` | `saas/widget-dist/` |
 | 위젯 | **AI 로고 런처**(테마 그라데이션 + "AI" 텍스트 + ✦), 헤더 AI 로고 박스 | `webmcp-widget.js` + `widget.css` |
@@ -81,6 +95,8 @@
 | 위젯 | **답변 생성 중 입력 잠금** — 입력창·음성·보내기·퀵메뉴 비활성화 | `webmcp-widget.js` + `widget.css` |
 | 위젯 | **"AI비서란?" 필수 메뉴** — 모든 도메인에 마지막 배치, DB 공통 답변(`answer_md`), 편집/삭제 불가(`is_required`) | `seed_catalogs` + `runner._required_menu_answer` |
 | 관리자 | 사용자(role/plan/active), 사용량 집계, 챗 오류 신고(new/read/resolved), 프로젝트(검색/Q&A 재생성/토글/삭제), 고객센터 답변 | `apps/proxy/admin_urls.py` + `pages/admin/*.vue` |
+| 관리자 | **계정 Enable/Disable** — 계정 선택(pay-row)에 상태 배지 + 활성/비활성 토글, **자기 자신 비활성화 차단**(세션 즉시 무효화 방지), `isSelf` 플래그 | `apps/proxy/admin_urls.py` + `pages/admin/projects.vue` |
+| 관리자 | **프로젝트 Preview 버튼** — 프로젝트 카드에 미리보기 링크 | `pages/admin/projects.vue` |
 | 관리자 | **테넌트(프로젝트)별 Gemini 설정** — API 키/모델을 프로젝트 단위로 지정(비우면 전역 `.env` 사용), **테스트 후 적용**(실제 호출로 검증 성공 시에만 저장), OpenRouter는 전역 `.env`로만 관리 | `admin_project_llm` + `admin_project_llm_test` + `pages/admin/projects.vue` |
 | 프로젝트 | **수정 시 이름/URL 변경 금지** — 도메인 유형·위젯 테마만 변경 가능(백엔드에서도 name/url 무시) | `apps/projects/views.py` + `pages/projects/[id].vue` |
 | 프로젝트 | **프로젝트 생성 한도 안내(최대 5개)** — 대시보드(내 프로젝트 목록)에 표시 | `pages/dashboard.vue` |
@@ -104,6 +120,7 @@
 | 위젯 계약 | body `{question, publicId, memory}`만 전송, 시스템 프롬프트는 서버 부착, 기억 `wmcpMemory:{publicId}` |
 | 언어 사일로 | `WEBMCP_LANG(S)` env, `core/langsilo.py`, `NUXT_PUBLIC_SILO_LANG`(콘솔 SSR), `_EN` 접미사 LLM env, en DB `webmcp_en`(8081) |
 | 인증 | Django 세션 + CSRF(`X-CSRFToken`), `SameSite=Lax`, `email` 로그인 커스텀 User |
+| 가입 코드 | `SignupCode` — code(unique, max_length=10), lang(''=양쪽|'ko'|'en'), max_uses(0=무제한)/used_count, expires_at. **기본 코드 OneAir1234**(10자리 예외 허용, 그 외 8자리 필수) |
 | 파이프라인 | `JOB_LOCK_MINUTES=15`, 폴링 간격 2.0s, 잠금 만료 시 재큐/실패 |
 | 게시판 | 질문 2000자 제한, 10개/페이지 |
 | 소스 재선택 | 최대 10개, 빠른메뉴 질문 편집 **1회 제한**(`menus_edited`) |
@@ -385,6 +402,101 @@ Hopkins Medicine처럼 robots.txt에 다른 호스트 sitemap(`profiles.xxx.org`
 #### 0.11.8 커밋 이력 (2026-08-30 후반)
 
 `597b095` LAN 허용 → `0eccdd0` test-results T-026 → `2eb18e9` 배포문서 §5.1 → `07e19df` SECURE_COOKIES → `ae8e3f9` 모바일 위젯 → `6eb0ee0` 위젯 no-cache → `0d50d3c` 음성입력 → `bfc49c9` 자기 IP 자동 탐지
+
+---
+
+### 0.12 2계층 지식 + 페이지별 추가 지식 (2026-09-07)
+
+#### 0.12.1 2계층 지식 구조 (WebMCP 도구)
+
+- **Tier 1 (중요 정보)**: 연락처·영업시간·예약 등 자주 묻는 핵심 정보는 표준 도구명으로 개별 등록
+  - `core/tooltypes.py` — `CORE_TOOL_DEFS`(ko/en 도구명 매핑), `_KEYWORD_TOOL_MAP`(영업시간→get_opening_hours 등), `tool_for_menu()`(사전→키워드→카테고리+slug 자동명), `is_core_tool()`
+- **Tier 2 (페이지 검색)**: 나머지 크롤 페이지는 `get_page_answer(page, question)` 도구로 검색
+- **자유 질문**: `ask_site_ai` 항상 등록
+- 위젯 config: `names[*].names=[tool_name]`, `tier(core/menu)`, `config.pages=[{page,title}]`, `pageAnswerEndpoint` 추가
+
+#### 0.12.2 페이지별 추가 지식 (PageKnowledge.extra_md)
+
+- `PageKnowledge` 모델에 `extra_md`(추가 지식) 필드 추가 — `knowledge_text()` = 크롤 markdown + `[관리자 제공 추가 정보]` 블록
+- `project_page_knowledge` 뷰: `PUT/DELETE /api/projects/<pk>/pages/<page_id>/` (extraMd, 8000자 제한)
+- 프론트 `[id].vue`: 소스 URL 목록 각 행에 "➕ 추가 지식 입력" 토글 + textarea + 저장/삭제
+- `_extra_knowledge_context`: 자유 질문 시 extra_md 있는 페이지 모아 주입(총 6000자 상한)
+- **저장 즉시** 자유 질문·페이지 검색 답변에 반영
+
+#### 0.12.3 위젯 config 재생성 + 정합성
+
+- `rebuild_widgets` 관리 명령 신설 — Q&A 재생성 없이 위젯 config만 새 구조로 갱신 (`--lang/--project/--with-pages`)
+- `/ready/`에 위젯 정합성 필드 추가: `widgetBase/staleWidgets/legacyWidgets` — SAAS_PUBLIC_URL 불일치·구버전 구조 사전 감지
+- **교훈**: 위젯 config는 생성 시점 스냅샷이라 코드 변경 후 반드시 재생성 필요
+
+#### 0.12.4 Q&A 캐시 임계값 + 키워드 검색
+
+- **캐시 임계값 상향**: `_QNA_SIM_THRESHOLD` 0.6→0.75, `_QNA_MIN_LEN`=15 미만은 캐시 제외, 완전 일치는 항상 캐시
+- **자유 질문 키워드 페이지 검색**: `_search_pages_by_keywords` — 질문 키워드로 PageKnowledge 검색, 관련 페이지 원문(최대 2개·4000자) 주입 (주소 vs 전화번호 구분)
+- **키워드 YAML 외부화**: `core/keywords.yaml`(언어별 pattern/stopwords/keepwords/max_keywords) + `core/keywords.py`(표준 라이브러리 미니 파서, `reload_keywords()`로 편집 반영)
+- **언어별 분리**: en/ko 불용어·규칙 분리 (en: 3자 이상 영단어, ko: 2자 이상 한글)
+
+#### 0.12.5 CSRF 자기 IP 자동 추가
+
+- `settings.py`에 CSRF_TRUSTED_ORIGINS 자기 IP 자동 확장 — `_detect_host_ips()`의 각 IP에 사일로 포트(8080/8081/18080/18081→http, 8443/8444→https) 변형 자동 추가
+- DHCP로 IP가 바뀌어도 수동 갱신 불필요
+
+#### 0.12.6 커밋 이력 (2026-09-07)
+
+`e6429b0` 2계층 지식+추가 지식+키워드+캐시+CSRF 등 (136 배포·검증 완료)
+
+---
+
+### 0.13 admin/projects Preview + 계정 Enable/Disable (2026-09-08)
+
+#### 0.13.1 Preview 버튼
+
+- `admin/projects.vue`의 `.project-actions` 맨 앞에 `<NuxtLink :to="/preview/${p.id}" class="btn">` 삽입
+- `useSilo.ts`에 `admin.projects.preview` 키(ko: 미리보기, en: Preview)
+
+#### 0.13.2 계정 Enable/Disable
+
+- 백엔드 `admin_urls.py`: users 응답에 `isSelf` 플래그, `user_patch`에 **자기 자신 비활성화 차단**(`u.pk==request.user.pk and u.is_active and not new_active → PermissionDenied('admin.cannotDisableSelf')`)
+- 프론트 `admin/projects.vue`: pay-row에 상태 배지(active/stopped) + Enable/Disable 토글 버튼 + `isSelf`면 버튼 숨기고 "(현재 로그인된 내 계정)" 표시
+- i18n 키: admin.projects.enabled/disabled/userToggleConfirm/userEnabled/userDisabled/userToggleFailed/selfNote (ko/en)
+- **교훈**: Django에서 is_active=False로 바꾸면 해당 사용자 세션이 즉시 죽어 403 — 관리자 본인 비활성화는 반드시 차단
+
+#### 0.13.3 커밋 이력 (2026-09-08)
+
+`f39e939` admin/projects 계정 Enable/Disable 기능 추가
+
+---
+
+### 0.14 회원가입 코드 (SignupCode, 2026-09-08)
+
+#### 0.14.1 모델
+
+- `apps/accounts/models.py`에 `SignupCode` 모델 신설:
+  - `code`: unique, **max_length=10** (기본 코드 OneAir1234가 10자리라 8로 하면 시드 DataError)
+  - `lang`: `''`(양쪽 허용) | `'ko'` | `'en'` — **사일로별 사용 제한**
+  - `max_uses`(0=무제한)/`used_count`: 사용 횟수 제한
+  - `expires_at`: 만료 시각, `note`: 비고
+- 마이그레이션 `0005_signupcode.py`에 **기본 코드 OneAir1234 시드**(lang='' 양쪽 허용, 무제한)
+
+#### 0.14.2 검증 로직 (signup 뷰)
+
+- 빈 값 → `codeRequired` / 8자리 아님(기본코드 OneAir1234는 10자리 예외) → `codeInvalid` / 미존재 → `codeNotFound`
+- 사일로 불일치 → `codeWrongSilo` / 만료 → `codeExpired` / 횟수 소진 → `codeExhausted`
+- 성공 시 `used_count` 증가
+
+#### 0.14.3 프론트
+
+- `signup.vue`에 가입 코드 입력 추가 (maxlength=10)
+- `useSilo.ts`에 `signup.codePlaceholder` 키(ko: 가입 코드 (8자리), en: Signup code (8 characters))
+
+#### 0.14.4 함정 2건
+
+1. 기본 코드 OneAir1234가 10자리라 `code` 필드 max_length=8이면 시드 DataError → **max_length=10으로** (모델+마이그레이션+시리얼라이저+프론트 maxlength 모두 10)
+2. 시리얼라이저 max_length=8이면 "글자 수 8 이하 확인" 400 → 10으로
+
+#### 0.14.5 커밋 이력 (2026-09-08)
+
+`399db5b` 회원가입 코드(SignupCode) 기능 추가 (ko/en 136 배포·브라우저 검증 완료)
 
 ---
 
