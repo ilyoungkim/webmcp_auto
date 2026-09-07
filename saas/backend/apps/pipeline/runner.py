@@ -204,7 +204,12 @@ _VALID_EMAIL_IN_TEXT_RE = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z
 
 
 def _remove_empty_email_section(text: str) -> str:
-    """이메일 섹션 제목 뒤에 실제 유효 이메일 값이 없으면 그 블록을 제거한다."""
+    """이메일 섹션 제목 뒤에 실제 유효 이메일 값이 없으면 그 블록을 제거한다.
+
+    주의: '이메일' 단어가 있는 줄만 제거하고, 같은 섹션에 함께 있는
+    **전화번호·예약·주소 등 다른 연락 정보는 반드시 보존**한다.
+    (기존엔 이메일 섹션 시작 후 다음 섹션 마커까지 통째로 지워 전화번호·예약이 누락됨)
+    """
     if not text:
         return text
     # 유효 이메일이 하나라도 있으면 전체를 유지 (이메일 안내가 유효)
@@ -212,21 +217,22 @@ def _remove_empty_email_section(text: str) -> str:
         return text
 
     # 유효 이메일이 전혀 없는 경우:
-    # '이메일' 단어가 있는 줄(이메일 섹션 제목/본문)을 제거
+    # '이메일' 단어가 있는 줄(이메일 섹션 제목/본문)만 제거하고,
+    # 전화번호·예약·주소 등 다른 정보 줄은 보존한다.
     lines = text.split('\n')
     keep: list[str] = []
-    skipping = False
     for ln in lines:
         s = ln.strip()
-        # 이메일 섹션 시작: '이메일' 포함 + 이모지/칼럼 표시
+        # 이메일 섹션 제목/본문 줄: '이메일' 포함 + 이모지/칼럼 표시 → 해당 줄만 제거
         if '이메일' in s and _EMAIL_SECTION_RE.search(s):
-            skipping = True
             continue
-        # 다른 섹션이 시작되면 건너뛰기 중단 (이메일 본문이 끝났다고 봄)
-        if skipping and s.startswith(('📞', '📍', '📅', '💡', '💼', '🗓️', '👤', '✉️', '📧', '→', '**', '#')):
-            skipping = False
-        if not skipping:
-            keep.append(ln)
+        # '이메일' 단어가 있는 일반 줄도, 실제 이메일 값이 없으면 제거
+        # (단, 전화번호·예약·주소 등 다른 정보가 섞인 줄은 보존)
+        if '이메일' in s and not _VALID_EMAIL_IN_TEXT_RE.search(s):
+            # 전화번호/예약/주소 등 실질 정보가 함께 있으면 보존
+            if not re.search(r'(전화|예약|상담|주소|카카오|채널|연락|☎|📞|📍|📅)', s):
+                continue
+        keep.append(ln)
     return '\n'.join(keep).strip()
 
 

@@ -250,7 +250,9 @@ def project_menus_regenerate(request, pk):
     if content is None or not content.markdown:
         raise ValidationError(msg('project.noSources'))
 
-    menus = list(QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True, is_required=False))
+    # 필수 메뉴("AI비서란?") 포함 — regenerate_qna가 is_required면 DB 공통 답변 사용,
+    # build_widget도 필수 메뉴를 위젯에 포함시켜야 한다. (편집 대상은 questions_map에서 제외)
+    menus = list(QuickMenu.objects.filter(domain_type=p.domain_type, enabled=True))
     if not menus:
         raise ValidationError(msg('project.noMenus'))
 
