@@ -17,6 +17,7 @@
 > **2026-08-30(2): LAN 원격 접속 허용 → SECURE_COOKIES 스위치 → 갤럭시 음성입력 대응 → ALLOWED_HOSTS 자기 IP 자동 탐지** (§0.11 §0.12).
 > **2026-09-07: 2계층 지식 구조 → 페이지별 추가 지식 → 위젯 config 재생성 → CSRF 자기 IP 자동 추가 → Q&A 캐시 임계값 상향 → 자유 질문 키워드 페이지 검색 → 키워드 YAML 외부화·언어별 분리** (§0.13).
 > **2026-09-08: admin/projects Preview 버튼 → 계정 Enable/Disable → 회원가입 코드(SignupCode) → 빠른메뉴 편집 fix(필수 메뉴 누락·전화번호 누락) → admin 빠른메뉴 편집 초기화** (§0.14 §0.15).
+> **2026-09-09: 빠른메뉴 답변 위젯 표시 잘림 fix** — 저장 Q&A에 `strip_instruction_echo` 재가공 금지 (§0.16).
 
 ### 0.1 마일스톤 완료 현황
 
@@ -532,6 +533,17 @@ Hopkins Medicine처럼 robots.txt에 다른 호스트 sitemap(`profiles.xxx.org`
 #### 0.15.4 커밋 이력 (2026-09-08)
 
 `182e211` 빠른메뉴 질문 편집 시 필수 메뉴 누락 + 연락처 전화번호·예약 누락 fix
+
+---
+
+### 0.16 빠른메뉴 답변 위젯 표시 잘림 fix (2026-09-09)
+
+- **증상**: 제니스코리아(ko) 연락처 빠른메뉴 답변이 DB에는 온전한데 위젯에서 **"영업 담당/이메일/전화/본사 주소" 앞부분이 잘리고 주소부터만 표시**
+- **원인**: `proxy/views.py` `chat()`에서 저장 Q&A 반환 시 `strip_instruction_echo(cached.answer_md) or cached.answer_md` 적용. `strip_instruction_echo`(→ `_trim_to_body`)는 **LLM 채팅 응답의 앞쪽 지시문 echo 제거용**인데, "한글 수 < 10자 or 줄 내 한글 비율 < 30%" 줄(`영업 담당`, `- **이메일:** sales@...`, `- **전화:** +82-...`, `- **본사 주소**`)을 지시문으로 오판해 건너뛰고, 한글이 충분한 주소 줄부터만 추출 → DB 답변을 잘라 표시
+- **수정**: `cleaned = cached.answer_md` — 저장된 빠른메뉴 Q&A 답변은 파이프라인 `_finalize_answer`로 이미 정제 완료이므로 **재가공 금지**. `strip_instruction_echo` import/용법은 실시간 채팅·페이지답변 경로(LLM 응답)에서 여전히 필요해 유지
+- **en 사일로(8444) 영향**: **문제 없음** — `strip_instruction_echo`의 안전장치(한글 <20자면 `''` 반환)로 en 답변(한글 0개)은 항상 `''` → 기존 `or cached.answer_md`로 원문 사용. ko 전용 문제였음
+- **검증**: ko 8443 curl `/api/chat/`(publicId `-MSU1LnbXTbk`, Origin `http://genisev.com`) → DB 저장값 전체 반환. en 8444 stanfordhealthcare(publicId `I8ajXCiGkDFx`) → 연락처 답변 전체 반환
+- **교훈**: 저장된 DB Q&A는 위젯 반환 시 재가공 금지. `strip_instruction_echo`/`_trim_to_body`는 LLM 실시간 채팅 응답 전용
 
 ---
 

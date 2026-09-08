@@ -545,6 +545,15 @@
 - **검증(en 8444)**: 4개 프로젝트 모두 "Reset Quick Menu Edit" 버튼 표시 / API 직접 호출 → 200 `{"ok":true,"menusEdited":false}`
 - **검증(ko 8443)**: 3개 프로젝트 모두 "빠른메뉴 편집 초기화" 버튼 표시 / ko 헬스 200, en 헬스 200
 
+### T-049. 빠른메뉴 답변 위젯 표시 잘림 fix
+
+- **증상**: 제니스코리아(ko, 프로젝트 id 4) 연락처 빠른메뉴 DB에는 완전한 답변이 있는데, 위젯에서 "영업 담당/이메일/전화/본사 주소" 앞부분이 잘리고 "[13646] 경기도 성남시..." 주소부터만 표시됨
+- **원인**: `proxy/views.py` `chat()`에서 저장된 Q&A 답변 반환 시 `clean`ed = `strip_instruction_echo(cached.answer_md) or cached.answer_md` 적용. `strip_instruction_echo`(→ `_trim_to_body`)는 **채팅 응답의 앞쪽 지시문 echo 제거용** 함수인데, "한글 <10자 or 한글 비율 <30%"인 줄("영업 담당", "이메일:", "전화:", "본사 주소" 헤더)을 지시문으로 오판해 건너뛰고 한글이 충분한 주소 줄부터만 반환 → DB 답변 잘림
+- **해결**: `cleaned = cached.answer_md` — 저장된 빠른메뉴 Q&A 답변은 파이프라인 `_finalize_answer`로 이미 정제 완료이므로 재가공 금지. `strip_instruction_echo` import는 실시간 채팅/페이지답변 경로에서 여전히 필요해 유지
+- **검증(ko 8443)**: 서버 curl `/api/chat/`(publicId `-MSU1LnbXTbk`, Origin `http://genisev.com`, 연락처 질문) → DB 저장값 전체(영업 담당/이메일/전화/본사주소/공장주소) 반환
+- **en 사일로(8444) 영향 확인**: **문제 없음**. `strip_instruction_echo`는 한글 <20자면 `''` 반환 안전장치가 있는데, en 답변은 한글 0개 → 항상 `''` → 기존 `or cached.answer_md`로 원문 사용. 즉 en은 원래부터 잘림이 없었고 ko 전용 문제였음. 검증: stanfordhealthcare(publicId `I8ajXCiGkDFx`) 위젯 API → 연락처 답변 전체 반환 확인
+- **교훈**: 저장된 DB Q&A는 위젯 반환 시 재가공 금지. `strip_instruction_echo`/`_trim_to_body`는 LLM 실시간 채팅 응답(지시문 echo 제거) 전용. 위젯 로그인 미리보기는 소유권 필요 → curl + Origin 헤더로 `/api/chat/` 직접 검증이 빠름
+
 ### Render 배포 최종 상태
 - 리소스: `webmcp-web-en`(Django) / `webmcp-front-en`(Nuxt) / `webmcp-worker-en`(파이프라인) / `webmcp-db-en`(PG 0.5c-1g) — 모두 0.5c-512mb
 - 접속: `https://webmcp-front-en.onrender.com` (콘솔) / 백엔드 프록시 `/api/**`는 Nuxt routeRules → 내부 `http://webmcp-web-en:10000`

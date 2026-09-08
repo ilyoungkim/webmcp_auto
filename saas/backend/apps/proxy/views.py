@@ -100,7 +100,10 @@ def chat(request):
     if cached:
         # AI가 생각하는 듯한 자연스러운 UX를 위해 짧은 지연 후 반환
         time.sleep(2)
-        cleaned = strip_instruction_echo(cached.answer_md) or cached.answer_md
+        # 저장된 Q&A 답변은 파이프라인에서 이미 _finalize_answer로 정제 완료된 상태다.
+        # 여기서 strip_instruction_echo(채팅 응답 전용)를 또 적용하면 한글이 적은 앞줄
+        # ("영업 담당/이메일/전화/본사 주소" 등 연락 정보 헤더)을 잘라버린다 → DB 값을 그대로.
+        cleaned = cached.answer_md
         record(project.user, project, 'chat')
         _log(request, 'ok', 'cached_qna', public_id)
         return _gemini_shape(cleaned)
