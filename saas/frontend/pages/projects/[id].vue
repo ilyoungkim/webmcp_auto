@@ -435,30 +435,27 @@ onUnmounted(() => clearInterval(timer))
       </div>
 
       <!-- 설치 및 사용 방법 (아코디언, 닫힌 상태) — 사일로 언어별 전환 -->
-      <InstallGuideEn v-if="isEn" :project-id="id" />
+      <InstallGuideEn v-if="isEn" :project-id="id" :public-id="project?.publicId" :snippet="snippet" />
       <details v-else class="install-accordion">
         <summary>📦 설치 및 사용 방법</summary>
         <div class="install-body">
-          <p class="note">아래 <b>5개 파일</b>을 홈페이지 서버에 업로드하고, 설치할 페이지의 <code>&lt;/body&gt;</code> 직전에 스크립트를 추가하면 AI 비서 위젯이 표시됩니다.</p>
+          <p class="note">아래 <b>스크립트 한 줄</b>을 설치할 페이지의 <code>&lt;/body&gt;</code> 직전에 붙여넣으면 AI 비서 위젯이 표시됩니다. 파일 업로드가 필요 없어 워드프레스 등 보안이 강한 호스팅에서도 바로 사용할 수 있습니다.</p>
 
-          <h3>1단계: 파일 업로드 (호스팅 서버)</h3>
+          <h3>1단계: 설치 코드 복사</h3>
           <ol class="install-steps">
-            <li><b>⬇ 다운로드</b> 버튼으로 <code>bundle.zip</code>을 받아 압축을 해제합니다.</li>
-            <li>FTP/SFTP 또는 호스팅 파일 관리자로 홈페이지 루트(<code>public_html</code>, <code>www</code>, <code>html</code>)에 <b>5개 파일</b>을 모두 업로드합니다.</li>
-            <li>업로드 후 브라우저에서 <code>https://도메인/webmcp-config.js</code>에 접근해 설정 내용이 보이는지 확인합니다.</li>
+            <li>아래 코드를 <b>복사</b>합니다.</li>
+            <li>홈페이지 관리자 도구 또는 HTML 에디터로 설치할 페이지의 HTML 소스를 엽니다.</li>
+            <li><code>&lt;/body&gt;</code> 태그 <b>직전</b>에 붙여넣고 저장합니다.</li>
           </ol>
+          <pre><code>{{ snippet }}</code></pre>
+          <p class="note">🔑 이 프로젝트의 고유 ID(public_id): <code>{{ project?.publicId }}</code></p>
 
-          <h3>2단계: HTML 편집 (위젯 삽입)</h3>
-          <ol class="install-steps">
-            <li>홈페이지 관리자 도구 또는 HTML 에디터로 해당 페이지의 HTML 소스를 엽니다.</li>
-            <li><code>&lt;/body&gt;</code> 태그 <b>직전</b>에 아래 코드를 붙여넣습니다.</li>
-          </ol>
-          <pre><code>&lt;!-- WebMCP AI 위젯 --&gt;
-&lt;script src="webmcp-config.js"&gt;&lt;/script&gt;
-&lt;script src="webmcp.js"&gt;&lt;/script&gt;
-&lt;link rel="stylesheet" href="widget.css" /&gt;
-&lt;script src="widget.js"&gt;&lt;/script&gt;</code></pre>
-          <p class="note">💡 파일을 하위 폴더(예: <code>/widget/</code>)에 업로드했다면 <code>src</code> 경로를 <code>widget/webmcp-config.js</code>처럼 해당 경로로 수정하세요.</p>
+          <h3>워드프레스 설치 방법</h3>
+          <ul class="install-steps">
+            <li><b>커스텀 HTML 블록</b>: 글/페이지 편집기에서 "Custom HTML" 블록을 추가해 위 코드를 붙여넣습니다.</li>
+            <li><b>WPCode / Insert Headers and Footers 플러그인</b>: 플러그인 설치 후 Header/Footer에 위 코드를 붙여넣으면 사이트 전체에 적용됩니다.</li>
+            <li><b>테마 편집기</b>: 외모 → 테마 파일 편집기 → <code>footer.php</code>에 붙여넣습니다.</li>
+          </ul>
 
           <h3>사용 방법</h3>
           <ul class="install-steps">
@@ -468,9 +465,13 @@ onUnmounted(() => clearInterval(timer))
             <li>⚙️ 동작 방식에서 AI 비서의 안내 및 주의사항을 확인할 수 있습니다.</li>
           </ul>
 
-          <div class="install-download">
-            <a :href="`/api/projects/${id}/download/bundle.zip`" class="btn primary">⬇ 다운로드 (bundle.zip)</a>
-          </div>
+          <details class="install-advanced">
+            <summary>📦 고급: 자체 호스팅 번들 (bundle.zip)</summary>
+            <p class="note">파일을 직접 서버에 올려 관리하고 싶다면 아래 번들을 사용하세요. (일반적인 경우 위 1줄 설치를 권장합니다.)</p>
+            <div class="install-download">
+              <a :href="`/api/projects/${id}/download/bundle.zip`" class="btn primary">⬇ 다운로드 (bundle.zip)</a>
+            </div>
+          </details>
         </div>
       </details>
 

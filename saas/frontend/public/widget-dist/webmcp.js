@@ -20,16 +20,21 @@
 (function () {
   'use strict';
 
-  // 위젯은 같은 오리진에서 서idak되므로 상대경로로 호출한다.
-  // (proxyEndpoint 가 절대 URL(localhost 등)이면 127.0.0.1 접속 시 CORS 로 차단됨)
-  var PROXY_ENDPOINT = '/api/chat/';
+  // 위젯은 고객 사이트(다른 오리진)에 임베드되므로 config.proxyEndpoint(절대 URL)를
+  // 사용해 WebMCP 서버로 직접 호출한다. 서버가 CORS(Origin 화이트리스트)를 허용한다.
+  // proxyEndpoint 가 없으면(구버전 config) 상대경로로 폴백한다.
+  function proxyEndpoint() {
+    var ep = (window.WebMCPConfig && window.WebMCPConfig.proxyEndpoint) || '';
+    if (!ep) return '/api/chat/';
+    return ep;
+  }
 
   function publicId() {
     return (window.WebMCPConfig && (window.WebMCPConfig.publicId || window.WebMCPConfig.siteNs)) || '';
   }
 
   async function askQuestion(question, memory) {
-    var res = await fetch(PROXY_ENDPOINT, {
+    var res = await fetch(proxyEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -71,13 +76,7 @@
   function pageAnswerEndpoint() {
     var ep = (window.WebMCPConfig && window.WebMCPConfig.pageAnswerEndpoint) || '';
     if (!ep) return '/api/chat/page-answer/';
-    try {
-      // 절대 URL이면 path 부분만 추출해 동일 오리진 상대경로로 호출 (CORS 방지)
-      var u = new URL(ep, window.location.href);
-      return u.pathname + (u.search || '');
-    } catch (_) {
-      return ep;
-    }
+    return ep;  // 절대 URL 그대로 사용 (서버가 CORS 허용)
   }
 
   async function askPageAnswer(page, question) {
@@ -124,7 +123,7 @@
     askQuestion: askQuestion,
     askPageAnswer: askPageAnswer,
     callGeminiViaProxy: callGeminiViaProxy,
-    proxyEndpoint: PROXY_ENDPOINT,
+    proxyEndpoint: proxyEndpoint(),
     registerModelTools: registerModelTools,   // 디버깅/수동 재등록용 노출
   });
 

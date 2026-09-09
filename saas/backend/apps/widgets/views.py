@@ -243,10 +243,14 @@ def embed_js(request, public_id):
         f'  var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "{base}/widget-dist/widget.css";\n'
         f'  document.head.appendChild(l);\n'
         f'  var t = document.createElement("script"); t.src = "{base}/widget-dist/widget.js"; t.async = false;\n'
-        f'  document.body.appendChild(t);\n'
+        f'  // 스니펫이 <head> 에 삽입된 경우 document.body 가 아직 없어 appendChild 가\n'
+        f'  // TypeError 로 실패해 위젯이 로드되지 않는다. body 가 준비될 때까지 대기한다.\n'
+        f'  function loadWidget() {{ document.body.appendChild(t); }}\n'
+        f'  if (document.body) {{ loadWidget(); }}\n'
+        f'  else {{ document.addEventListener("DOMContentLoaded", loadWidget); }}\n'
         f'}})();\n'
     )
-    return HttpResponse(js, content_type='application/javascript')
+    return HttpResponse(js, content_type='application/javascript; charset=utf-8')
 
 
 def widget_asset(request, path):

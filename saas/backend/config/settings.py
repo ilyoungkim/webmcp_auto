@@ -91,6 +91,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 위젯 채팅 API CORS — 고객 사이트(다른 오리진) 임베드 지원.
+    # Origin 화이트리스트(TenantOrigin)에 등록된 오리진에만 허용한다.
+    'apps.proxy.middleware.WidgetCorsMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

@@ -571,10 +571,17 @@
     }
 
     // 2) 백엔드 헬스체크 (프록시가 실제 응답하는지)
-    //    위젯은 같은 오리진에서 서빙되므로 상대경로로 호출한다.
-    //    (proxyEndpoint 가 절대 URL(localhost 등)이면 127.0.0.1 접속 시 CORS 로 차단됨)
+    //    위젯은 고객 사이트(다른 오리진)에 임베드되므로 config.proxyEndpoint 의
+    //    origin 을 추출해 절대 URL 로 호출한다. (서버가 CORS 허용)
     try {
       var healthUrl = '/api/health/';
+      var ep = (window.WebMCPConfig && window.WebMCPConfig.proxyEndpoint) || '';
+      if (ep) {
+        try {
+          var u = new URL(ep, window.location.href);
+          healthUrl = u.origin + '/api/health/';
+        } catch (_) { /* origin 추출 실패 시 상대경로 폴백 */ }
+      }
       var res = await fetch(healthUrl, { method: 'GET' });
       if (!res.ok) {
         healthUrl = '/health/';

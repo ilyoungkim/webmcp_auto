@@ -1,32 +1,29 @@
 <script setup lang="ts">
 // 영어 사일로용 — 설치 및 사용 방법 안내
-const props = defineProps<{ projectId: string | number }>()
+const props = defineProps<{ projectId: string | number; publicId?: string; snippet?: string }>()
 </script>
 
 <template>
   <details class="install-accordion">
-    <summary>📦 Installation & Usage</summary>
+    <summary>📦 Installation &amp; Usage</summary>
     <div class="install-body">
-      <p class="note">Upload the <b>5 files</b> below to your website server and add the script right before <code>&lt;/body&gt;</code> of the page — the AI Assistant widget will appear.</p>
+      <p class="note">Paste the <b>single script line</b> below right before <code>&lt;/body&gt;</code> of the page — the AI Assistant widget will appear. No file upload is needed, so it works even on WordPress and other security-hardened hosts.</p>
 
-      <h3>Step 1: Upload files (hosting server)</h3>
+      <h3>Step 1: Copy the install code</h3>
       <ol class="install-steps">
-        <li>Download <code>bundle.zip</code> with the <b>⬇ Download</b> button and extract it.</li>
-        <li>Upload <b>all 5 files</b> to your website root (<code>public_html</code>, <code>www</code>, <code>html</code>) via FTP/SFTP or your hosting file manager.</li>
-        <li>After uploading, check that <code>https://your-domain/webmcp-config.js</code> opens in a browser and shows the settings.</li>
-      </ol>
-
-      <h3>Step 2: Edit HTML (insert widget)</h3>
-      <ol class="install-steps">
+        <li><b>Copy</b> the code below.</li>
         <li>Open the HTML source of the page with your site admin tool or an HTML editor.</li>
-        <li>Paste the code below <b>right before</b> the <code>&lt;/body&gt;</code> tag.</li>
+        <li>Paste it <b>right before</b> the <code>&lt;/body&gt;</code> tag and save.</li>
       </ol>
-      <pre><code>&lt;!-- WebMCP AI Assistant --&gt;
-&lt;script src="webmcp-config.js"&gt;&lt;/script&gt;
-&lt;script src="webmcp.js"&gt;&lt;/script&gt;
-&lt;link rel="stylesheet" href="widget.css" /&gt;
-&lt;script src="widget.js"&gt;&lt;/script&gt;</code></pre>
-      <p class="note">💡 If you uploaded the files to a sub-folder (e.g. <code>/widget/</code>), update the <code>src</code> paths like <code>widget/webmcp-config.js</code>.</p>
+      <pre><code>{{ snippet }}</code></pre>
+      <p class="note">🔑 This project's unique ID (public_id): <code>{{ publicId }}</code></p>
+
+      <h3>WordPress installation</h3>
+      <ul class="install-steps">
+        <li><b>Custom HTML block</b>: In the post/page editor, add a "Custom HTML" block and paste the code above.</li>
+        <li><b>WPCode / Insert Headers and Footers plugin</b>: Install the plugin and paste the code into Header/Footer to apply it site-wide.</li>
+        <li><b>Theme editor</b>: Appearance → Theme File Editor → paste into <code>footer.php</code>.</li>
+      </ul>
 
       <h3>How to use</h3>
       <ul class="install-steps">
@@ -36,9 +33,13 @@ const props = defineProps<{ projectId: string | number }>()
         <li>Check ⚙️ How it works for guidance and precautions about the AI assistant.</li>
       </ul>
 
-      <div class="install-download">
-        <a :href="`/api/projects/${projectId}/download/bundle.zip`" class="btn primary">⬇ Download (bundle.zip)</a>
-      </div>
+      <details class="install-advanced">
+        <summary>📦 Advanced: self-hosted bundle (bundle.zip)</summary>
+        <p class="note">If you prefer to upload and manage the files on your own server, use the bundle below. (For most cases, the one-line install above is recommended.)</p>
+        <div class="install-download">
+          <a :href="`/api/projects/${projectId}/download/bundle.zip`" class="btn primary">⬇ Download (bundle.zip)</a>
+        </div>
+      </details>
     </div>
   </details>
 </template>
