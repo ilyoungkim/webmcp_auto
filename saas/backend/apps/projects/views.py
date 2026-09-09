@@ -24,20 +24,36 @@ def _get_owned(request, pk) -> Project:
 
 
 def _register_origins(project: Project, url: str) -> None:
-    """URL의 오리진(+ www 변형)을 프로젝트 화이트리스트에 자동 등록.
+    """URL의 오리진 변형을 프로젝트 화이트리스트에 자동 등록.
 
-    - https://www.example.com → https://www.example.com + https://example.com 양쪽
-    - 위젯 설치 시 www 유무가 URL 입력 시점과 달라도 접속 가능하도록 403 방지
+    위젯 설치 시 실제 접속 오리진이 URL 입력 시점과 달라도 403이 나지 않도록
+    가능한 변형을 모두 등록한다:
+    - www 유무: https://www.example.com ↔ https://example.com
+    - http/https: 사이트가 HTTP→HTTPS 로 전환되면 오리진이 달라져 화이트리스트
+      불일치로 403 이 반복되던 문제의 근본 해소 (http/https 양쪽 모두 등록)
     """
     base = normalize_origin(url)
-    candidates = {base}
     parts = urlsplit(base)
     host = parts.hostname or ''
     suffix = f':{parts.port}' if parts.port else ''
+
+    # 호스트 변형 (www 유무)
+    hosts = {host}
     if host.startswith('www.'):
-        candidates.add(f"{parts.scheme}://{host[4:]}{suffix}")
+        hosts.add(host[4:])
     else:
-        candidates.add(f"{parts.scheme}://www.{host}{suffix}")
+        hosts.add(f'www.{host}')
+
+    # 스킴 변형 (http/https) — 포트가 명시된 경우(비표준 포트)는 스킴 변형을 만들지 않는다.
+    schemes = {parts.scheme}
+    if not parts.port:
+        schemes.add('https' if parts.scheme == 'http' else 'http')
+
+    candidates = set()
+    for s in schemes:
+        for h in hosts:
+            candidates.add(f'{s}://{h}{suffix}')
+
     for org in candidates:
         if org:
             TenantOrigin.objects.get_or_create(origin=org, defaults={'project': project})
