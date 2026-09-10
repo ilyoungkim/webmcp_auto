@@ -19,9 +19,9 @@
 | Projects | URL → crawl → LLM Q&A → widget build, fully automated (max 5 projects) |
 | Quick menu | One-time question editing (**admin can reset** to re-allow), answer regeneration from saved sources, mandatory "What is an AI assistant?" menu (**always included on regenerate**) |
 | **Extra knowledge** | Per crawled page, staff add up-to-date info (events, prices, booking rules) → injected instantly into chat & page-search answers |
-| Widget | 5 themes, preview, `bundle.zip` install package, voice input, input lock while generating |
+| Widget | 5 themes, preview, **one-line `<script>` install** (WordPress-ready), `bundle.zip` self-host package, voice input, input lock while generating |
 | **WebMCP** | Widget registers site-specific tools via `document.modelContext.registerTool()` — **2-tier**: Tier 1 core-info tools (`get_contact_information`, `get_opening_hours`, …) + Tier 2 page-search `get_page_answer(page, question)` + free-form `ask_site_ai` |
-| Data plane | `/embed/<publicId>.js` loader, `/api/chat/` real-time chat, `/api/chat/page-answer/` per-page search, Origin allowlist, quotas |
+| Data plane | `/embed/<publicId>.js` loader, `/api/chat/` real-time chat, `/api/chat/page-answer/` per-page search, **cross-origin CORS** (Origin allowlist), quotas |
 | Admin | User/project/customer-center management, per-tenant Gemini settings, **account Enable/Disable** (self-disable blocked), **project Preview button**, **quick-menu edit reset** (re-allow one-time question editing) |
 | Multilingual silos | **ko/en fully separated** — per-language DB, containers, LLM engines, catalogs, widget/console UI |
 | Cloud | **Render Blueprint (EN silo live)** + Docker Compose (self-hosted ko/en) |
@@ -207,8 +207,8 @@ documentation below.
 | 빠른메뉴 | 질문 편집 **1회 제한**(관리자가 **편집 초기화**로 재허용 가능), 저장된 소스로 답변 재생성, **"AI비서란?" 필수 메뉴(편집 불가·재생성 시 항상 포함)** |
 | **2계층 지식(WebMCP)** | **Tier 1** 중요 정보(연락처·영업시간·예약)는 표준 도구명(`get_contact_information` 등)으로 개별 등록, **Tier 2** 나머지는 페이지 단위 `get_page_answer(page, question)` 도구로 검색, 자유 질문 `ask_site_ai` 항상 제공 |
 | **페이지별 추가 지식** | 관리자가 크롤된 페이지마다 **새 textarea로 최신 정보**(이벤트·가격·예약 규정) 입력 → **저장 즉시** 자유 질문·페이지 검색 답변에 반영 |
-| 위젯 | 5종 테마, 미리보기, `bundle.zip` 설치 번들(난독화), **AI 로고 아이콘**, **음성 입력(두 줄 버튼)**, **답변 생성 중 입력 잠금** |
-| 데이터 플레인 | `/embed/<publicId>.js` 로더, `/api/chat/` 실시간 채팅, `/api/chat/page-answer/` 페이지별 검색, Origin 화이트리스트, 쿼터 |
+| 위젯 | 5종 테마, 미리보기, **1줄 `<script>` 설치**(워드프레스 대응), `bundle.zip` 자체호스팅 번들(난독화), **AI 로고 아이콘**, **음성 입력(두 줄 버튼)**, **답변 생성 중 입력 잠금** |
+| 데이터 플레인 | `/embed/<publicId>.js` 로더, `/api/chat/` 실시간 채팅, `/api/chat/page-answer/` 페이지별 검색, **크로스오리진 CORS**(Origin 화이트리스트), 쿼터 |
 | 관리자 | 사용자·프로젝트·고객센터 관리, **테넌트별 Gemini 설정(테스트 후 적용)**, **계정 Enable/Disable(자기 자신 비활성화 차단)**, **프로젝트 Preview 버튼**, **빠른메뉴 편집 초기화**(1회 제한 재허용) |
 | 고객센터 | Q&A 게시판(질문 2000자, 10개/페이지) |
 | 이용약관 | 프로젝트 페이지 하단 "읽어볼 내용" 아코디언(이용약관/AI 이용고지/개인정보처리방침/프로그램 사용동의) |
@@ -441,7 +441,8 @@ repo 루트의 `render.yaml`이 Blueprint(인프라 정의)이며, 2026-09-02 �
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | 워커 `not found` 무한 크래시 루프, job이 Queued 0% 멈춤 | `dockerCommand: sh -c "a && b"` 체인을 Render가 **파일명으로 오판** | 워커 entrypoint 스크립트로 분리 (`0e83bca`) |
-| 고객 사이트 위젯 채팅 403 | 설치 도메인이 Origin 화이트리스트에 없음 | 생성 시 www 양쪽 자동 등록 + **소유자 세션 시험 시 오리진 자동 학습** (`faec401`) |
+| 고객 사이트 위젯 채팅 403 | 설치 도메인이 Origin 화이트리스트에 없음 | 생성 시 www/비www + http/https **4가지 변형 자동 등록** + **소유자 세션 시험 시 오리진 자동 학습** (`faec401`, `862f716`) |
+| 고객 사이트 위젯 런처는 뜨는데 채팅/상태배지 404 | `webmcp.js`가 `/api/chat/` 상대경로 하드코딩 → 고객 도메인 기준으로 해석 | `config.proxyEndpoint` 절대 URL 사용 + 위젯 API CORS 미들웨어 (`27e7efa`) |
 | admin@local 로그인 401 | `ADMIN_SEED_PASSWORD` 미설정 → 시드 생략 (401=계정 부재, 403=IP 차단) | 웹 서비스 Shell에서 `seed_admin` 실행 |
 | admin/projects 특정 계정 선택 시 화면 공백 | 고객센터 목록 `v-for="t"`가 **번역 함수 `t()`를 가림** | v-for 변수 `s`로 변경 (`d4fc8e1`) |
 | "Queued 0% / 30% 멈춤"처럼 보임 | Q&A 배치(OpenRouter)가 3~5분 정상 소요 | 상태 배지에 스피너 표시 (`4360e6d`) |

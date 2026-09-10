@@ -211,10 +211,10 @@ IP 주소로도 동작은 가능하지만 **도메인 + HTTPS를 권장**한다(
 | 상황 | 결과 | 대응 |
 |---|---|---|
 | 접속 `127.0.0.1:8080`, CSRF origin에 미등록 | 로그인 403 | `CSRF_TRUSTED_ORIGINS`에 `http://127.0.0.1:8080` 포함 확인 |
-| 위젯 chat/health를 절대 URL로 호출 | CORS 차단 | 이미 **상대경로**(`/api/chat/`, `/api/health/`) 사용으로 해결됨 |
+| 위젯 chat/health를 절대 URL로 호출 | CORS 차단 | **`WidgetCorsMiddleware`가 위젯 API 경로에 CORS 적용** (Origin 화이트리스트 기반, 커밋 27e7efa) |
 | `SAAS_PUBLIC_URL`과 실제 접속 도메인 불일치 | 위젯 정적 자산 404/차단 | `assetBase`는 절대 URL이므로 운영 도메인으로 통일 |
 
-> 로컬/운영 모두에서 위젯 통신은 상대경로 기반이므로 개발 환경에서는 origin 불일치 문제가 없다. 다만 1줄 임베드 방식은 `assetBase`가 SaaS 호스트를 가리켜야 하므로 운영 도메인 설정이 필수다.
+> 위젯 통신은 `config.proxyEndpoint`(절대 URL)를 우선 사용하고, 없으면 상대경로로 폴백한다(커밋 27e7efa). 고객 사이트(다른 오리진) 임베드 시에는 절대 URL + CORS가 필수이므로, `SAAS_PUBLIC_URL`이 운영 도메인을 가리켜야 한다. Origin 화이트리스트는 생성 시 **www/비www + http/https 4가지 변형**이 자동 등록된다(커밋 862f716).
 
 ### 4.1.4 요약
 
@@ -470,7 +470,7 @@ docker/backups/logs/logs_YYYYMMDD_HHMMSS/
 | 포트 8080이 외부에 노출 | compose `"8080:80"` | `"127.0.0.1:8080:80"` 사용, 외부 nginx만 프록시 |
 | 설치 코드가 `localhost:8080`으로 생성 | `SAAS_PUBLIC_URL`이 개발 값 | 실제 `https://도메인`으로 변경 후 위젯 재생성 |
 | `SAAS_PUBLIC_URL` 변경 후에도 위젯이 옛 주소 사용 | config는 **생성 시점에 박제**됨 | 콘솔에서 "Q&A 재생성"으로 위젯 재빌드 + 고객 번들 재다운로드(§4.1.2) |
-| 채팅은 되는데 위젯이 "연결 안 됨" 표시 | config 절대 URL과 접속 오리진 불일치(CORS) | 이미 상대경로(`/api/health/`)로 해결됨. 재발 시 위젯 재빌드 |
+| 채팅은 되는데 위젯이 "연결 안 됨" 표시 | config 절대 URL과 접속 오리진 불일치(CORS) | `WidgetCorsMiddleware`가 위젯 API 경로에 CORS 적용(Origin 화이트리스트 기반, 커밋 27e7efa). 재발 시 위젯 재빌드 |
 | 음성 입력 버튼이 동작하지 않음 | HTTP 환경(Web Speech API 제한) | `SAAS_PUBLIC_URL`을 **HTTPS** 도메인으로 설정 |
 | Docker 이미지/볼륨이 프로젝트 폴더에 없음 | Docker daemon이 전용 저장소에서 관리 | 정상 동작. 중요 데이터는 `pg_dump` 기반 `backup.sh`로 백업 |
 | PostgreSQL 18이 시작되지 않음 | 구 경로 `/var/lib/postgresql/data` 마운트 | PostgreSQL 18+는 `/var/lib/postgresql` 마운트 |

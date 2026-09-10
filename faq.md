@@ -128,6 +128,26 @@ docker start webmcp-ko-worker
 
 **해결**: 수정 시 **양쪽 모두 cp 동기화** 필수.
 
+### Q. 고객 사이트에 위젯을 임베드했는데 런처는 뜨는데 채팅/상태배지가 404
+
+**원인**: `webmcp.js`가 `PROXY_ENDPOINT='/api/chat/'` **상대경로를 하드코딩** → 고객 도메인 기준으로 해석돼 `고객도메인/api/chat/` 404. `webmcp-widget.js` 헬스체크도 `/api/health/` 상대경로라 동일 문제. 서버가 CORS 미지원(OPTIONS 405, ACAO 헤더 없음)도 원인.
+
+**해결** (커밋 27e7efa):
+1. `webmcp.js`에 `proxyEndpoint()` 함수 신설 — `config.proxyEndpoint`(절대 URL) 우선, 없으면 상대경로 폴백. `pageAnswerEndpoint()`도 절대 URL 사용.
+2. `webmcp-widget.js` 헬스체크는 `proxyEndpoint`의 origin을 추출해 `/api/health/` 절대 URL 호출.
+3. `apps/proxy/middleware.py` 신설 — `WidgetCorsMiddleware`가 `/api/chat/`, `/api/chat/page-answer/`, `/api/chat/report/`, `/api/health/`, `/health/` 경로에만 CORS 적용. Origin 화이트리스트(TenantOrigin)에 등록된 오리진만 허용, `Access-Control-Allow-Origin` echo + `Allow-Credentials: true`(세션 쿠키용, `*` 불가). OPTIONS preflight 200 처리.
+
+**주의**: CORS는 chat 뿐 아니라 **health 경로도 필요**(헬스체크도 크로스오리진). 위젯 소스 수정 시 `saas/widget-dist` + `saas/frontend/public/widget-dist` 양쪽 cp 동기화 필수.
+
+### Q. 고객 사이트가 HTTP→HTTPS로 바뀌면 위젯 채팅이 403 반복돼요
+
+**원인**: Origin 화이트리스트에 등록된 오리진이 `http://` 또는 `https://` 한쪽뿐이라, 사이트가 프로토콜을 전환하면 origin 불일치로 403이 반복됨.
+
+**해결** (커밋 862f716):
+1. `_register_origins()`가 **www/비www + http/https 4가지 변형**을 자동 등록.
+2. `backfill_origins` 관리 명령 신설 — 기존 프로젝트 화이트리스트 일괄 보강: `python manage.py backfill_origins`.
+3. `proxy/middleware.py`에서 화이트리스트 선검사 제거(닭-달걀 문제) — CORS 헤더는 항상 origin echo, 보안 검증은 뷰가 담당.
+
 ---
 
 ## 6. 빠른메뉴 / 가입 코드
@@ -275,7 +295,8 @@ curl -X POST https://<front>/api/chat/ -H "Origin: https://고객도메인" \
 **해결**:
 1. 자동: 소유자/관리자 세션으로 그 사이트에서 채팅 1회 → **오리진 자동 학습 등록** (커밋 faec401)
 2. 수동: 콘솔 프로젝트 상세에서 오리진 추가, 또는 `POST /api/projects/<id>/origins/` {"origin":"https://..."}
-- 프로젝트 생성 시 www/비www 양쪽은 자동 등록됨
+- 프로젝트 생성 시 **www/비www + http/https 4가지 변형**이 자동 등록됨 (커밋 862f716)
+- 기존 프로젝트 일괄 보강: `python manage.py backfill_origins`
 
 ---
 

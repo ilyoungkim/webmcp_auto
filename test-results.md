@@ -1,6 +1,6 @@
 # WebMCP Auto — 테스트 결과 기록 (test-results.md)
 
-> 2026-08-28 ~ 2026-09-02까지 수행된 테스트를 시간 순으로 기록한다.
+> 2026-08-28 ~ 2026-09-10까지 수행된 테스트를 시간 순으로 기록한다.
 > 각 항목은 **날짜 / 대상 / 방법 / 결과** 순으로 정리한다.
 
 ---
@@ -553,6 +553,25 @@
 - **검증(ko 8443)**: 서버 curl `/api/chat/`(publicId `-MSU1LnbXTbk`, Origin `http://genisev.com`, 연락처 질문) → DB 저장값 전체(영업 담당/이메일/전화/본사주소/공장주소) 반환
 - **en 사일로(8444) 영향 확인**: **문제 없음**. `strip_instruction_echo`는 한글 <20자면 `''` 반환 안전장치가 있는데, en 답변은 한글 0개 → 항상 `''` → 기존 `or cached.answer_md`로 원문 사용. 즉 en은 원래부터 잘림이 없었고 ko 전용 문제였음. 검증: stanfordhealthcare(publicId `I8ajXCiGkDFx`) 위젯 API → 연락처 답변 전체 반환 확인
 - **교훈**: 저장된 DB Q&A는 위젯 반환 시 재가공 금지. `strip_instruction_echo`/`_trim_to_body`는 LLM 실시간 채팅 응답(지시문 echo 제거) 전용. 위젯 로그인 미리보기는 소유권 필요 → curl + Origin 헤더로 `/api/chat/` 직접 검증이 빠름
+
+### T-050. 위젯 고객사이트 임베드 크로스오리진 fix (커밋 27e7efa)
+- **증상**: 위젯을 고객 사이트(다른 오리진, 예 genisev.com)에 임베드하면 런처는 뜨지만 채팅/상태배지가 404
+- **원인 2가지**:
+  1. `webmcp.js`가 `PROXY_ENDPOINT='/api/chat/'` **상대경로 하드코딩** → 고객 도메인 기준으로 해석돼 `genisev.com/api/chat/` 404. `webmcp-widget.js` 헬스체크도 `/api/health/` 상대경로 동일 문제
+  2. 서버가 CORS 미지원(OPTIONS 405, ACAO 헤더 없음)
+- **해결**:
+  1. `webmcp.js`에 `proxyEndpoint()` 함수 신설 — `config.proxyEndpoint`(절대 URL) 우선, 없으면 상대경로 폴백. `pageAnswerEndpoint()`도 절대 URL 사용. `webmcp-widget.js` 헬스체크는 `proxyEndpoint`의 origin 추출해 `/api/health/` 절대 URL 호출
+  2. `apps/proxy/middleware.py` 신설 — `WidgetCorsMiddleware`가 `/api/chat/`, `/api/chat/page-answer/`, `/api/chat/report/`, `/api/health/`, `/health/` 경로에만 CORS 적용. Origin 화이트리스트(TenantOrigin)에 등록된 오리진만 허용, `Access-Control-Allow-Origin` echo + `Allow-Credentials: true`(세션 쿠키용, `*` 불가). OPTIONS preflight 200 처리. settings.py MIDDLEWARE 맨 끝에 등록
+- **부가 fix**: `embed_js` charset=utf-8(한글 깨짐), `<head>` 삽입 시 body 대기 로직. 설치 안내를 bundle.zip → **1줄 임베드 방식**으로 개편 + public_id 직접 노출 + **워드프레스 설치법 추가**
+- **배포 함정**: ① `docker compose cp` 소스 경로는 compose 파일 위치 기준 → 절대경로 필수 ② `restart`만으론 반영 안 됨(이미지 COPY본 사용) → `cp`로 컨테이너 내부 직접 복사 ③ CORS는 chat 뿐 아니라 health 경로도 필요(헬스체크도 크로스오리진)
+
+### T-051. Origin 화이트리스트 http/https 자동 등록 — CORS/403 반복 근본 해소 (커밋 862f716)
+- **증상**: 고객 사이트가 HTTP→HTTPS로 전환되면 origin 불일치로 위젯 채팅 403이 반복
+- **원인**: Origin 화이트리스트에 `http://` 또는 `https://` 한쪽만 등록되어 프로토콜 전환 시 불일치
+- **해결**:
+  1. `_register_origins()`가 **www/비www + http/https 4가지 변형** 자동 등록
+  2. `backfill_origins` 관리 명령 신설 — 기존 프로젝트 화이트리스트 일괄 보강 (`python manage.py backfill_origins`)
+  3. `proxy/middleware.py`에서 화이트리스트 선검사 제거(닭-달걀 문제) — CORS 헤더는 항상 origin echo, 보안 검증은 뷰가 담당
 
 ### Render 배포 최종 상태
 - 리소스: `webmcp-web-en`(Django) / `webmcp-front-en`(Nuxt) / `webmcp-worker-en`(파이프라인) / `webmcp-db-en`(PG 0.5c-1g) — 모두 0.5c-512mb

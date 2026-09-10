@@ -121,7 +121,7 @@
 | 테마 | 5종 — `blue_sky`(#0284c7) · `red_orange`(#dc2626) · `white_snow`(#334155) · `banana_pink`(#db2777) · `black_neon`(#22d3ee) |
 | 크롤 | sitemap 상위 30개 탐색 → 소스 선택 최대 10개, 페이지당 30k자, 재시도 3회 |
 | Q&A | 배치 생성(temperature 0.3, `max_tokens` 16384), 파싱 실패 메뉴 개별 재시도, 정제 파이프라인 적용 |
-| 채팅 | `max_tokens` 1024 · timeout 30s · 저장 Q&A 유사도 ≥0.6 매칭(2초 지연) · Gemini 응답 형태 유지 |
+| 채팅 | `max_tokens` 1024 · timeout 30s · 저장 Q&A 유사도 ≥0.75 매칭(2초 지연) · Gemini 응답 형태 유지 |
 | 위젯 계약 | body `{question, publicId, memory}`만 전송, 시스템 프롬프트는 서버 부착, 기억 `wmcpMemory:{publicId}` |
 | 언어 사일로 | `WEBMCP_LANG(S)` env, `core/langsilo.py`, `NUXT_PUBLIC_SILO_LANG`(콘솔 SSR), `_EN` 접미사 LLM env, en DB `webmcp_en`(8081) |
 | 인증 | Django 세션 + CSRF(`X-CSRFToken`), `SameSite=Lax`, `email` 로그인 커스텀 User |
@@ -210,11 +210,11 @@ flowchart TB
 ### 0.8 그 외 고려된 사항 (반영/결정 사항)
 
 - **답변 품질**: 모델 지시문 echo·반복 출력 제거, 불량 링크·HTML·이메일 난독화·이모지 정제, 부정표현 금지 프롬프트, 병원은 예약 수단 우선 안내
-- **비용 절감**: 저장된 Q&A 유사도(≥0.6) 매칭으로 Gemini 호출 절약, Q&A 배치 생성으로 호출 수 절약
-- **보안**: SSRF 가드(`core/origins.validate_crawl_url`), Origin 화이트리스트, `public_id`만 외부 노출, 시스템 프롬프트/Gemini 키 비노출, 쿼터 429, `/api/chat/`는 `csrf_exempt`+Origin 검사
+- **비용 절감**: 저장된 Q&A 유사도(≥0.75) 매칭으로 Gemini 호출 절약, Q&A 배치 생성으로 호출 수 절약
+- **보안**: SSRF 가드(`core/origins.validate_crawl_url`), Origin 화이트리스트, `public_id`만 외부 노출, 시스템 프롬프트/Gemini 키 비노출, 쿼터 429, `/api/chat/`는 `csrf_exempt`+Origin 검사. **위젯 API CORS**(`WidgetCorsMiddleware`, Origin 화이트리스트 기반 — 커밋 27e7efa), **Origin 화이트리스트 www/비www + http/https 4가지 변형 자동 등록**(커밋 862f716)
 - **운영**: 2000줄 날짜·넘버링 로그 로테이션(`core/logging`), `/ready`로 Gemini 키 확인, 워커 잠금 만료 복구, 위젯 버전 관리
 - **잔여 정리 대상**: `widget.js`/`webmcp-widget.js`에 레거시 `*_SYSTEM_PROMPT` 참조 코드가 일부 남아 있으나 **전송되지 않음**(동작 영향 없음). `crawl4ai`는 무거워 주석 처리, **httpx 폴백 사용 중**. M7(PostgreSQL/Celery) 미착수.
-- **커밋 상태**: GitHub 퍼블리시 완료 — `https://github.com/ilyoungkim/webmcp_auto` (origin/main, 최신 커밋 ea0abb7, 2026-08-30). 기존 템플릿 파일은 강제 푸시로 제거됨.
+- **커밋 상태**: GitHub 퍼블리시 완료 — `https://github.com/ilyoungkim/webmcp_auto` (origin/main, 최신 커밋 862f716, 2026-09-10). 기존 템플릿 파일은 강제 푸시로 제거됨.
 
 ### 0.9 다국어 사일로 + 보안 강화 (2026-08-29~30 최종)
 
@@ -911,7 +911,7 @@ Django `contrib.sessions`를 쓰므로 별도 `sessions` 테이블을 만들지 
 #### 데이터 플레인
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/chat/` | `{question, publicId, memory}` → Origin/세션 인증 → 쿼터 → 저장 Q&A 매칭(≥0.6) 또는 Gemini. 401/403/429 |
+| POST | `/api/chat/` | `{question, publicId, memory}` → Origin/세션 인증 → 쿼터 → 저장 Q&A 매칭(≥0.75) 또는 Gemini. 401/403/429 |
 | POST | `/api/chat/report/` | 위젯 '오류 신고하기' → ChatErrorReport 저장 |
 | GET | `/health/` | 프로세스 |
 | GET | `/ready/` | DB + `GEMINI_API_KEY` (503 가능) |
@@ -1017,9 +1017,9 @@ export default defineNuxtConfig({
 | 섹션 | 내용 |
 |------|------|
 | 1 | 우하단 AI 비서 소개 |
-| 2 | 권장: `/embed/<publicId>.js` 1줄 |
+| 2 | 권장: `/embed/<publicId>.js` 1줄 (워드프레스 등 보안 강한 호스팅 대응) |
 | 3 | 자체 호스팅 번들 5파일 |
-| 4 | Origin 자동 등록, www/스테이징은 콘솔에서 추가 |
+| 4 | Origin 자동 등록(www/비www + http/https 4가지 변형), 스테이징은 콘솔에서 추가 |
 | 5 | title/theme/names |
 | 6 | 403 Origin, 429 쿼터, CSP에 SaaS 호스트 허용 |
 

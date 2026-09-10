@@ -138,7 +138,9 @@ server {
         proxy_pass http://127.0.0.1:18080;
         proxy_set_header Host $host:8443;
         proxy_set_header X-Forwarded-Proto https;      # 필수
-        proxy_set_header Origin https://$host:8443;    # CSRF/Origin 정합
+        # ⚠️ proxy_set_header Origin ... 금지 — 브라우저 Origin을 덮어써 위젯 채팅/페이지답변
+        #    Origin 화이트리스트 검증이 실패한다(403 "Domain not allowed"). 실제 브라우저
+        #    Origin을 그대로 전달해야 한다.
         proxy_read_timeout 180s;                       # LLM 지연 대비
     }
 }
@@ -175,6 +177,8 @@ echo | openssl s_client -connect 127.0.0.1:8443 -servername webmcp.duckdns.org 2
 | 컨테이너 재시작 후 nginx 502 (`Host is unreachable`) | 정적 upstream의 시작 시 1회 resolve | resolver 기반 proxy_pass(적용됨) 또는 nginx restart |
 | 데이터 일부만 복원됨, 이후 PK 충돌 | 시퀀스 뒤처짐 | `setval(pg_get_serial_sequence(테이블,'id'), MAX(id))` — 테이블마다 |
 | 위젯 채팅 504 | Gemini 실시간 호출 지연 | 호스트 nginx `proxy_read_timeout 180s` 상향, 필요 시 백엔드 타임아웃 정책 조정 |
+| 고객 사이트 위젯 채팅/상태배지 404 | `webmcp.js`가 `/api/chat/` 상대경로 하드코딩 + 서버 CORS 미지원 | `config.proxyEndpoint` 절대 URL + `WidgetCorsMiddleware`(Origin 화이트리스트 기반) — 커밋 27e7efa |
+| 고객 사이트 HTTP→HTTPS 전환 시 위젯 403 반복 | Origin 화이트리스트에 http/https 한쪽만 등록 | `_register_origins()`가 www/비www + http/https 4가지 변형 자동 등록 + `backfill_origins` 관리 명령 — 커밋 862f716 |
 
 ## 7. 새 언어 사일로 추가
 
